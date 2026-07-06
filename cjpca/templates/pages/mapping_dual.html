@@ -1,0 +1,120 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Dual policy mapping — CJPCA{% endblock %}
+
+{% block content %}
+<div class="flex h-full bg-gray-50 overflow-hidden">
+
+ <div class="flex flex-col flex-1 min-w-0 overflow-hidden">
+
+ {# Top bar #}
+ <div class="bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between flex-shrink-0">
+ <div>
+ <h1 style="font-size:15px;font-weight:700;color:#002583;">Dual policy mapping</h1>
+ <p style="font-size:12px;color:#002583;margin-top:1px;">
+ Map BBK's internal policies against TWO regulations side-by-side. Useful when an obligation might apply differently across jurisdictions (e.g. Bahrain vs India).
+ </p>
+ </div>
+ <a href="{% url 'mapping' %}" style="font-size:11px;color:#002583;text-decoration:underline;">← Back to mapping</a>
+ </div>
+
+ {# Form #}
+ <form method="get" class="bg-white border-b border-gray-100 px-6 py-3 flex-shrink-0 flex items-center gap-3 flex-wrap">
+ <input name="topic" value="{{ topic }}" type="text" required minlength="3"
+ placeholder="Topic (e.g. consent, breach notification, retention)…"
+ style="flex:1;min-width:280px;padding:7px 12px;border:1px solid #E5E8EF;border-radius:8px;font-size:12px;background:#ffffff;">
+ <div style="display:flex;gap:6px;align-items:center;">
+ {% for code, label in jur_options %}
+ <label style="display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border:1px solid #E5E8EF;border-radius:8px;background:#ffffff;font-size:11px;cursor:pointer;">
+ <input type="checkbox" name="jurs" value="{{ code }}" {% if code in jurs %}checked{% endif %}>
+ {{ label }}
+ </label>
+ {% endfor %}
+ </div>
+ <button type="submit"
+ style="padding:7px 14px;border-radius:8px;background:#002583;color:#fff;font-size:12px;font-weight:500;border:none;cursor:pointer;">
+ Run dual mapping
+ </button>
+ <span style="font-size:10px;color:#002583;">Pick exactly 2 jurisdictions. Run takes ~1-2 min.</span>
+ </form>
+
+ {# Error #}
+ {% if error %}
+ <div style="margin:14px 24px 0;padding:10px 14px;border-radius:8px;background:#ffffff;color:#002583;font-size:12px;border:1px solid #E5E8EF;">
+ <strong>Error:</strong> {{ error }}
+ </div>
+ {% endif %}
+
+ {# Results — two columns #}
+ <div class="flex-1 overflow-y-auto px-6 py-5">
+ {% if not topic %}
+ <div style="max-width:520px;margin:40px auto;text-align:center;color:#002583;">
+ <p style="font-size:14px;font-weight:600;color:#002583;margin-bottom:6px;">Enter a topic and pick 2 jurisdictions to start.</p>
+ <p style="font-size:12px;">Each side runs <code style="background:#ffffff;padding:1px 4px;border-radius:3px;">map_policy_coverage()</code> against BBK's policies independently.</p>
+ </div>
+ {% elif reports %}
+
+ <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+ {% for entry in reports %}
+ {% with side=entry.side r=entry.report %}
+ <div style="background:#fff;border:1px solid #E5E8EF;border-radius:10px;overflow:hidden;">
+ <div style="padding:12px 16px;border-bottom:1px solid #E5E8EF;background:{% if side == 'A' %}#ffffff{% else %}#ffffff{% endif %};">
+ <p style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:{% if side == 'A' %}#002583{% else %}#002583{% endif %};margin:0;">
+ Side {{ side }} · {{ entry.jurisdiction }}
+ </p>
+ <p style="font-size:11px;color:#002583;margin:3px 0 0;">{{ r.items|length }} obligation{{ r.items|length|pluralize }} mapped</p>
+ </div>
+
+ {% if r.summary %}
+ <div style="padding:10px 16px;border-bottom:1px solid #E5E8EF;background:#ffffff;">
+ <p style="font-size:11px;color:#002583;line-height:1.55;margin:0;font-style:italic;">{{ r.summary|truncatechars:240 }}</p>
+ </div>
+ {% endif %}
+
+ <div style="padding:6px 16px 14px;">
+ {% for item in r.items %}
+ <div style="padding:11px 0;border-bottom:1px solid #E5E8EF;">
+ <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px;">
+ <span style="font-size:10px;font-weight:700;color:#002583;">{{ item.regulation_citation|truncatechars:60 }}</span>
+ <span style="padding:1px 7px;border-radius:4px;font-size:9px;font-weight:700;
+ {% if item.coverage_status == 'Fully Covered' or item.coverage_status == 'Covered' %}background:#ffffff;color:#002583;
+ {% elif item.coverage_status == 'Partially Covered' %}background:#ffffff;color:#002583;
+ {% elif item.coverage_status == 'Not Covered' %}background:#ffffff;color:#002583;
+ {% else %}background:#ffffff;color:#002583;{% endif %}">
+ {{ item.coverage_status }}
+ </span>
+ {% if not item.citation_verified %}
+ <span style="padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;background:#ffffff;color:#002583;">⚠ Unverified</span>
+ {% endif %}
+ {% if item.hallucination_risk and item.hallucination_risk > 0.4 %}
+ <span style="padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;{% if item.hallucination_risk > 0.7 %}background:#ffffff;color:#002583;{% else %}background:#ffffff;color:#002583;{% endif %}">
+ risk {{ item.hallucination_risk|floatformat:2 }}
+ </span>
+ {% endif %}
+ </div>
+ <p style="font-size:11px;color:#002583;line-height:1.5;margin:0 0 5px;">{{ item.regulatory_obligation|truncatechars:160 }}</p>
+ {% if item.regulation_evidence %}
+ <p style="font-size:10px;color:#002583;font-style:italic;line-height:1.5;margin:0 0 5px;border-left:2px solid #002583;padding-left:7px;">"{{ item.regulation_evidence|truncatechars:140 }}"</p>
+ {% endif %}
+ {% if item.policy_section and item.policy_section != "None identified" %}
+ <p style="font-size:10px;color:#002583;margin:0;">Policy: <span style="color:#002583;">{{ item.policy_section|truncatechars:80 }}</span></p>
+ {% endif %}
+ {% if item.gap_description %}
+ <p style="font-size:10.5px;color:#002583;margin:5px 0 0;line-height:1.45;"><strong>Gap:</strong> {{ item.gap_description|truncatechars:140 }}</p>
+ {% endif %}
+ </div>
+ {% empty %}
+ <p style="font-size:11px;color:#002583;font-style:italic;padding:14px 0;">No obligations identified for this topic.</p>
+ {% endfor %}
+ </div>
+ </div>
+ {% endwith %}
+ {% endfor %}
+ </div>
+
+ {% endif %}
+ </div>
+ </div>
+</div>
+{% endblock %}

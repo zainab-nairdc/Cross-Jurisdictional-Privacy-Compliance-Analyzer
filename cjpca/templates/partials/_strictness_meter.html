@@ -1,0 +1,111 @@
+﻿{% comment %}
+_strictness_meter.html — Visual 9: Jurisdictional Strictness Meter.
+Loaded via HTMX hx-get into each regulation panel header.
+Context: result (StrictnessResult dataclass)
+{% endcomment %}
+<div
+ x-data="{ open: false }"
+ style="padding:12px 14px;cursor:pointer;border-top:1px solid rgba(27,58,107,0.08);"
+ @click="open = true"
+ title="Strictness score: {{ result.score }} / 10 ({{ result.score_tier }}). Click for breakdown."
+>
+ {# ── Top row: name + score ── #}
+ <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;gap:8px;">
+ <span style="font-size:13px;font-weight:500;font-family:'Satoshi',system-ui,sans-serif;color:var(--text-primary,#002583);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+ {{ result.document_name }}
+ </span>
+ <span style="display:flex;align-items:baseline;gap:2px;flex-shrink:0;">
+ <span style="font-size:16px;font-weight:500;font-family:'Satoshi',sans-serif;color:var(--text-primary,#002583);">{{ result.score }}</span>
+ <span style="font-size:11px;color:var(--text-tertiary,#002583);font-family:'Satoshi',sans-serif;">/10</span>
+ </span>
+ </div>
+
+ {# ── Progress bar ── #}
+ <div
+ style="height:6px;background:var(--surface-2,#ffffff);border-radius:3px;overflow:hidden;"
+ title="Strictness score: {{ result.score }} / 10 ({{ result.score_tier }}). Click for breakdown."
+ >
+ <div style="height:100%;border-radius:3px;background:{{ result.bar_color }};width:{{ result.bar_width_pct }}%;"></div>
+ </div>
+
+ {# ── Summary line ── #}
+ <p style="font-size:11px;font-family:'Satoshi',system-ui,sans-serif;color:var(--text-tertiary,#002583);margin-top:6px;margin-bottom:0;line-height:1.4;">
+ {{ result.summary_line }}
+ </p>
+
+ {# ── Breakdown modal ── #}
+ <div
+ x-show="open"
+ x-cloak
+ @click.stop
+ style="position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.35);padding:16px;"
+ >
+ <div
+ @click.stop
+ style="background:#FFFFFF;border-radius:12px;padding:22px 24px;max-width:500px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,0.18);position:relative;"
+ >
+ {# Modal header #}
+ <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;">
+ <div>
+ <p style="font-size:13px;font-weight:700;color:#002583;margin:0 0 3px;">Strictness breakdown</p>
+ <p style="font-size:11px;color:#002583;margin:0;">{{ result.document_name }}</p>
+ </div>
+ <button
+ @click="open = false"
+ style="background:none;border:none;cursor:pointer;color:#002583;font-size:22px;line-height:1;padding:0;width:26px;height:26px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-left:12px;"
+ aria-label="Close"
+ >&times;</button>
+ </div>
+
+ {# Score badge #}
+ <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;padding:12px 14px;background:#ffffff;border-radius:8px;">
+ <span style="font-size:32px;font-weight:700;font-family:'Satoshi',sans-serif;color:{{ result.bar_color }};line-height:1;">{{ result.score }}</span>
+ <div>
+ <p style="font-size:11px;color:#002583;margin:0 0 4px;">out of 10</p>
+ <span style="font-size:10px;font-weight:700;padding:2px 9px;border-radius:20px;letter-spacing:0.04em;background:{{ result.bar_color }}22;color:{{ result.bar_color }};">
+ {{ result.score_tier|upper }}
+ </span>
+ </div>
+ </div>
+
+ {# Component breakdown table #}
+ {% if result.components %}
+ <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:16px;">
+ <thead>
+ <tr style="border-bottom:1.5px solid #E5E8EF;">
+ <th style="text-align:left;padding:4px 8px 6px;font-size:9px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:0.07em;">Component</th>
+ <th style="text-align:right;padding:4px 8px 6px;font-size:9px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:0.07em;">Raw value</th>
+ <th style="text-align:right;padding:4px 8px 6px;font-size:9px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:0.07em;">Norm.</th>
+ <th style="text-align:right;padding:4px 8px 6px;font-size:9px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:0.07em;">Weight</th>
+ <th style="text-align:right;padding:4px 8px 6px;font-size:9px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:0.07em;">Contrib.</th>
+ </tr>
+ </thead>
+ <tbody>
+ {% for key, comp in result.components.items %}
+ <tr style="border-bottom:1px solid #E5E8EF;">
+ <td style="padding:7px 8px;color:#002583;font-family:'Satoshi',system-ui,sans-serif;">{{ comp.label }}</td>
+ <td style="padding:7px 8px;text-align:right;font-family:'Satoshi',sans-serif;color:#002583;">{{ comp.value }}</td>
+ <td style="padding:7px 8px;text-align:right;font-family:'Satoshi',sans-serif;color:#002583;">{{ comp.normalized }}</td>
+ <td style="padding:7px 8px;text-align:right;font-family:'Satoshi',sans-serif;color:#002583;">{{ comp.weight }}</td>
+ <td style="padding:7px 8px;text-align:right;font-family:'Satoshi',sans-serif;color:#002583;font-weight:600;">{{ comp.contribution }}</td>
+ </tr>
+ {% endfor %}
+ </tbody>
+ </table>
+ {% endif %}
+
+ {# Formula explanation #}
+ <div style="background:#ffffff;border-radius:6px;padding:9px 12px;margin-bottom:14px;">
+ <p style="font-size:10px;color:#002583;line-height:1.65;margin:0;">
+ <strong style="color:#002583;">Formula:</strong>
+ (verb density × 0.35) + (numeric thresholds × 0.25) + (penalty severity × 0.30) + (specificity × 0.10), scaled to 0–10.
+ </p>
+ </div>
+
+ {# Disclosure #}
+ <p style="font-size:10px;color:#002583;line-height:1.6;font-style:italic;margin:0;">
+ This score is computed from objective textual signals. It is not a legal determination of regulatory strength and does not reflect enforcement practice.
+ </p>
+ </div>
+ </div>
+</div>

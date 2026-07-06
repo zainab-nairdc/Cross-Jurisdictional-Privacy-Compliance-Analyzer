@@ -1,0 +1,45 @@
+# python packages 
+
+# CJPCA Django frontend dependencies
+# Install with: pip install -r requirements.txt
+
+# ── Core ────────────────────────────────────────────────────────────────────
+Django>=5.0,<6.0
+
+# ── Django Channels (WebSocket for ingestion progress) ──────────────────────
+channels>=4.0
+daphne>=4.0                     # ASGI server that runs Channels
+# channels-redis>=4.1           # Uncomment for Redis channel layer in production
+
+# ── HTMX integration ────────────────────────────────────────────────────────
+django-htmx>=1.17               # adds request.htmx + HtmxMiddleware
+
+# ── Template utilities ───────────────────────────────────────────────────────
+django-widget-tweaks>=1.5       # adds form field attribute filters in templates
+
+# ── Static files ─────────────────────────────────────────────────────────────
+whitenoise>=6.6                 # serve static files without a CDN/nginx in dev+prod
+
+# NOTE (PoC): roles, MFA/2FA, account lockout, geo-fencing and CSP have been
+# removed for this proof-of-concept. Authentication is plain Django username/
+# password login. (Previously: django-otp, django-two-factor-auth, qrcode,
+# django-axes, django-csp.)
+
+# ── Reasoning layer (LangChain Phase 1) ──────────────────────────────────────
+# Pydantic v2 schemas + ChatOllama + OutputFixingParser(PydanticOutputParser).
+# OutputFixingParser lives in `langchain_classic` in LangChain 1.x; pulled
+# in transitively via `langchain` so an explicit pin is not required.
+langchain>=1.0                  # umbrella package (re-exports langchain-classic)
+langchain-core>=1.0             # PromptTemplate, PydanticOutputParser, BaseRetriever, Document
+langchain-ollama>=1.0           # ChatOllama for local Ollama inference
+pydantic>=2.0                   # Pydantic v2 with AliasChoices + field_validator
+
+# Phase 2 will add langchain-community (Chroma vectorstore) and
+# langchain-huggingface (embeddings); Phase 3 will add langgraph. They are
+# already installed transitively in the dev venv but should be explicitly
+# declared here at the start of each phase for fresh-checkout reproducibility.
+
+# ── Tailwind CSS ─────────────────────────────────────────────────────────────
+# Tailwind is compiled via the standalone CLI (no Python package needed):
+#   npm install -D tailwindcss
+#   npx tailwindcss -i static/css/tailwind.css -o static/css/output.css --watch

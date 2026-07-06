@@ -1,0 +1,232 @@
+{% comment %}
+Policy mapping obligation review card. Context: item (ObligationMapping).
+Renders the same evidence + AI signals the analyst workspace shows, so the
+reviewer can decide with full context.
+{% endcomment %}
+
+{% with cov=item.coverage %}
+
+<div id="rv-map-card-{{ item.pk }}"
+     style="background:#fff;border-radius:14px;border:1px solid #E5E8EF;overflow:hidden;margin-bottom:14px;
+            box-shadow:0 1px 3px rgba(27,48,104,0.06);transition:box-shadow .15s;border-left:4px solid {% if cov == 'covered' %}#1B7F3A{% elif cov == 'partial' %}#FFB800{% elif cov == 'none' %}#D93939{% else %}#002583{% endif %};">
+
+ {# ── Header: coverage + AI signals + lifecycle ── #}
+ <div style="padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0;">
+   <span style="padding:3px 10px;border-radius:5px;font-size:10px;font-weight:800;background:{% if cov == 'covered' %}#E1F4E5{% elif cov == 'partial' %}#FFF6E0{% elif cov == 'none' %}#FCE8E8{% else %}#E5E8EF{% endif %};color:{% if cov == 'covered' %}#1B7F3A{% elif cov == 'partial' %}#FFB800{% elif cov == 'none' %}#D93939{% else %}#002583{% endif %};">
+    {% if cov == 'covered' %}Covered{% elif cov == 'partial' %}Partial{% elif cov == 'none' %}Not Covered{% else %}Needs Review{% endif %}
+   </span>
+   {% if item.severity %}
+    {% with sev=item.severity %}
+    <span style="padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700;
+                background:{% if sev == 'critical' %}#FCE8E8{% elif sev == 'high' %}#FFEEDD{% elif sev == 'medium' %}#FFF6E0{% else %}#E5E8EF{% endif %};
+                color:{% if sev == 'critical' %}#D93939{% elif sev == 'high' %}#E07A1F{% elif sev == 'medium' %}#B07A00{% else %}#5A6685{% endif %};">
+     {{ sev|title }} risk
+    </span>
+    {% endwith %}
+   {% endif %}
+   <span style="padding:2px 8px;border-radius:20px;font-size:9px;font-weight:600;background:#F4F6FB;color:#6B7280;">
+    {{ item.article_ref|truncatechars:50 }}
+   </span>
+  </div>
+  <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap;">
+   {# AI confidence #}
+   <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:9px;font-weight:700;background:#fff;color:#002583;border:1px solid #E5E8EF;"
+         title="Confidence derived from citation verification × (1 − hallucination risk).">
+    Conf {{ item.confidence_display }}%
+   </span>
+   {# Citation verified #}
+   {% if item.citation_verified %}
+    <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:9px;font-weight:700;background:#E1F4E5;color:#1B7F3A;"
+          title="Regulation citation matches a real chunk in the indexed corpus.">
+     ✓ Verified
+    </span>
+   {% else %}
+    <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:9px;font-weight:700;background:#FFF6E0;color:#B07A00;"
+          title="Citation could not be matched verbatim against the indexed chunk text.">
+     ⚠ Unverified
+    </span>
+   {% endif %}
+   {# Hallucination risk only when noticeable #}
+   {% if item.hallucination_risk and item.hallucination_risk > 0.4 %}
+    <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:9px;font-weight:700;
+                 background:{% if item.hallucination_risk > 0.7 %}#FCE8E8{% else %}#FFF6E0{% endif %};
+                 color:{% if item.hallucination_risk > 0.7 %}#D93939{% else %}#B07A00{% endif %};"
+          title="NLI cross-encoder hallucination risk — how far the AI's prose drifts from the cited chunk. 0=entailed, 1=unsupported.">
+     AI risk {{ item.hallucination_risk|floatformat:2 }}
+    </span>
+   {% endif %}
+   {# Lifecycle #}
+   {% if item.lifecycle == 'approved' %}
+    <span style="padding:3px 10px;border-radius:20px;font-size:9px;font-weight:700;background:#E1F4E5;color:#1B7F3A;">Approved</span>
+   {% elif item.lifecycle == 'rejected' %}
+    <span style="padding:3px 10px;border-radius:20px;font-size:9px;font-weight:700;background:#FCE8E8;color:#D93939;">Rejected</span>
+   {% endif %}
+  </div>
+ </div>
+
+ {# ── Side-by-side: regulation obligation vs policy evidence ── #}
+ <div style="display:grid;grid-template-columns:1fr 1fr;border-top:1px solid #EEF1F6;border-bottom:1px solid #EEF1F6;">
+
+  <div style="padding:14px 16px;border-right:1px solid #EEF1F6;background:#FAFBFD;">
+   <p style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#002583;margin:0 0 6px;display:flex;align-items:center;gap:6px;">
+    <span style="width:6px;height:6px;border-radius:50%;background:#002583;"></span>Regulation obligation
+   </p>
+   <p style="font-size:10px;font-weight:700;color:#002583;margin:0 0 6px;line-height:1.4;">{{ item.article_ref }}</p>
+   <p style="font-size:11.5px;color:#1F2937;line-height:1.55;margin:0 0 8px;">
+    {{ item.obligation_text|default:item.obligation_title }}
+   </p>
+   {% if item.regulation_evidence %}
+   <details style="margin-top:6px;">
+    <summary style="font-size:9px;font-weight:700;color:#6B7280;cursor:pointer;text-transform:uppercase;letter-spacing:.05em;">Verbatim regulation quote</summary>
+    <p style="font-size:11px;color:#3A4660;line-height:1.5;margin:4px 0 0;padding:8px 10px;background:#fff;border-left:2px solid #E5E8EF;border-radius:0 5px 5px 0;font-style:italic;">
+     “{{ item.regulation_evidence|truncatechars:400 }}”
+    </p>
+   </details>
+   {% endif %}
+  </div>
+
+  <div style="padding:14px 16px;">
+   <p style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:{% if cov == 'covered' %}#1B7F3A{% elif cov == 'partial' %}#FFB800{% elif cov == 'none' %}#D93939{% else %}#002583{% endif %};margin:0 0 6px;display:flex;align-items:center;gap:6px;">
+    <span style="width:6px;height:6px;border-radius:50%;background:{% if cov == 'covered' %}#1B7F3A{% elif cov == 'partial' %}#FFB800{% elif cov == 'none' %}#D93939{% else %}#002583{% endif %};"></span>Policy evidence
+   </p>
+   {% if item.evidence_source and item.evidence_source != "None identified" %}
+    <p style="font-size:10px;font-weight:700;color:#002583;margin:0 0 6px;line-height:1.4;">{{ item.evidence_source }}</p>
+   {% endif %}
+   {% if item.evidence_text %}
+    <p style="font-size:11.5px;color:#1F2937;line-height:1.55;margin:0;">
+     “{{ item.evidence_text|truncatechars:400 }}”
+    </p>
+   {% else %}
+    <p style="font-size:11.5px;color:#9CA3AF;font-style:italic;margin:0;">No matching policy clause found for this obligation.</p>
+   {% endif %}
+  </div>
+
+ </div>
+
+ {# ── AI verdict + reviewer-editable remediation + severity ── #}
+ <div style="padding:12px 16px;background:#FAFBFD;border-bottom:1px solid #EEF1F6;display:flex;flex-direction:column;gap:12px;">
+  {% if item.rationale %}
+   <div>
+    <p style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#002583;margin:0 0 4px;">
+     {% if cov == 'covered' %}AI verdict reasoning{% else %}AI gap description{% endif %}
+    </p>
+    <p style="font-size:11.5px;color:#1F2937;line-height:1.6;margin:0;">{{ item.rationale }}</p>
+   </div>
+  {% endif %}
+
+  {% if is_reviewer or is_admin %}
+   {% if cov != 'covered' %}
+    {# Reviewer-editable severity. Saves & re-renders the picker in place. #}
+    <div>
+     <p style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#002583;margin:0 0 4px;">Severity (reviewer-editable)</p>
+     {% include 'partials/_severity_picker.html' %}
+     <p style="font-size:9.5px;color:#6B7280;margin:4px 0 0;line-height:1.4;">
+      AI default derived from coverage &times; confidence. Adjust before validation if you disagree &mdash; this drives the suggested remediation due date in the exported package.
+     </p>
+    </div>
+
+    {# Reviewer-editable remediation + explicit due date. One form saves both. #}
+    {% if item.gap_for_review %}
+     <div>
+      <p style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#002583;margin:0 0 4px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+       <span>Remediation &amp; due date (reviewer-editable)</span>
+       {% if item.gap_for_review.remediation_source == 'human_written' %}
+        <span style="font-size:9px;font-weight:700;background:#E1F4E5;color:#1B7F3A;padding:1px 7px;border-radius:20px;">Reviewer-written</span>
+       {% elif item.gap_for_review.remediation_source == 'ai_draft_edited' %}
+        <span style="font-size:9px;font-weight:700;background:#FFF6E0;color:#B07A00;padding:1px 7px;border-radius:20px;">AI + edits</span>
+       {% else %}
+        <span style="font-size:9px;font-weight:700;background:#E5E8EF;color:#6B7280;padding:1px 7px;border-radius:20px;">AI suggested</span>
+       {% endif %}
+      </p>
+      <form id="rm-form-{{ item.gap_for_review.pk }}"
+            x-data="{ saved: false }"
+            hx-post="{% url 'mapping-gap-save' item.gap_for_review.pk %}"
+            hx-swap="none"
+            @htmx:after-request="saved = true; setTimeout(() => saved = false, 1800)">
+       {% csrf_token %}
+       <textarea name="remediation_text" rows="3"
+                 placeholder="What internal procedure or control should BBK create / update to close this gap?"
+                 style="width:100%;padding:9px 11px;border:1px solid #E5E8EF;border-radius:8px;font-size:11.5px;color:#1F2937;line-height:1.55;font-family:inherit;outline:none;box-sizing:border-box;background:#fff;resize:vertical;transition:border-color .12s;"
+                 onfocus="this.style.borderColor='#002583'"
+                 onblur="this.style.borderColor='#E5E8EF';this.form.requestSubmit()">{{ item.gap_for_review.remediation_text }}</textarea>
+       <div style="margin-top:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <label style="font-size:10px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;gap:8px;">
+         Remediation due
+         <input type="date" name="due_date"
+                value="{{ item.gap_for_review.due_date|date:'Y-m-d' }}"
+                onchange="this.form.requestSubmit()"
+                style="padding:5px 9px;border:1px solid #E5E8EF;border-radius:7px;font-size:11px;color:#1F2937;font-family:inherit;outline:none;background:#fff;">
+        </label>
+        {% if item.gap_for_review.due_date %}
+         <span style="font-size:10px;font-weight:700;color:#1B7F3A;background:#E1F4E5;padding:2px 8px;border-radius:20px;">Reviewer-set: {{ item.gap_for_review.due_date|date:"d M Y" }}</span>
+        {% else %}
+         <span style="font-size:10px;color:#9CA3AF;font-style:italic;">Not set &mdash; exporter will compute from severity ({% if item.severity == 'critical' %}today+2w{% elif item.severity == 'high' %}today+1mo{% elif item.severity == 'medium' %}today+3mo{% else %}today+6mo{% endif %}).</span>
+        {% endif %}
+        <span x-show="saved" x-cloak x-transition.opacity
+              style="font-size:10px;font-weight:700;color:#1B7F3A;background:#E1F4E5;padding:2px 8px;border-radius:20px;display:inline-flex;align-items:center;gap:4px;">
+         <svg width="9" height="9" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+         Saved
+        </span>
+       </div>
+      </form>
+      <p style="font-size:9.5px;color:#6B7280;margin:6px 0 0;line-height:1.4;">
+       Edits save when you click away (text) or change the date. Both flow into the Gap Register Excel verbatim &mdash; what you set here is what the DPO gets.
+      </p>
+     </div>
+    {% endif %}
+   {% endif %}
+  {% endif %}
+ </div>
+
+ {# ── Decision row: note + actions ── #}
+ <div style="padding:12px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+  <a href="{% url 'mapping-workspace' item.analysis.pk %}"
+     style="display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:20px;background:#F4F6FB;color:#002583;font-size:10px;font-weight:700;text-decoration:none;white-space:nowrap;flex-shrink:0;">
+   <svg width="9" height="9" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/></svg>
+   Open workspace
+  </a>
+
+  <form hx-post="{% url 'mapping-obligation-transition' item.pk %}" hx-target="#rv-map-card-{{ item.pk }}" hx-swap="outerHTML"
+        style="flex:1;min-width:180px;">
+   {% csrf_token %}
+   <input type="text" name="note" value="{{ item.reviewer_notes }}"
+          placeholder="Reviewer note (optional) — your reasoning here travels back to the analyst."
+          style="width:100%;padding:7px 12px;border:1px solid #E5E8EF;border-radius:8px;font-size:11.5px;color:#1F2937;font-family:inherit;outline:none;box-sizing:border-box;background:#fff;transition:border-color .12s;"
+          onfocus="this.style.borderColor='#002583'"
+          onblur="this.style.borderColor='#E5E8EF';this.form.requestSubmit()">
+  </form>
+
+  <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+   {% if item.lifecycle == 'approved' or item.lifecycle == 'rejected' %}
+    <form hx-post="{% url 'mapping-obligation-transition' item.pk %}" hx-target="#rv-map-card-{{ item.pk }}" hx-swap="outerHTML">
+     {% csrf_token %}<input type="hidden" name="action" value="reset">
+     <button type="submit" style="padding:6px 14px;border-radius:8px;font-size:11px;font-weight:600;background:#fff;color:#6B7280;border:1px solid #E5E8EF;cursor:pointer;font-family:inherit;">
+      Undo
+     </button>
+    </form>
+   {% else %}
+    <form hx-post="{% url 'mapping-obligation-transition' item.pk %}" hx-target="#rv-map-card-{{ item.pk }}" hx-swap="outerHTML">
+     {% csrf_token %}<input type="hidden" name="action" value="rejected">
+     <button type="submit" title="Reject — sends row back to analyst with your note"
+             style="display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;font-size:11px;font-weight:700;background:#fff;color:#D93939;border:1.5px solid #FCE8E8;cursor:pointer;font-family:inherit;transition:background .12s;"
+             onmouseover="this.style.background='#FCE8E8'" onmouseout="this.style.background='#fff'">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      Reject
+     </button>
+    </form>
+    <form hx-post="{% url 'mapping-obligation-transition' item.pk %}" hx-target="#rv-map-card-{{ item.pk }}" hx-swap="outerHTML">
+     {% csrf_token %}<input type="hidden" name="action" value="approved">
+     <button type="submit" title="Approve — flows into Copilot's approved data + executive summary"
+             style="display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;font-size:11px;font-weight:700;background:#1B7F3A;color:#fff;border:none;cursor:pointer;font-family:inherit;box-shadow:0 1px 4px rgba(27,127,58,.22);transition:background .12s;"
+             onmouseover="this.style.background='#166830'" onmouseout="this.style.background='#1B7F3A'">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+      Approve
+     </button>
+    </form>
+   {% endif %}
+  </div>
+ </div>
+
+</div>
+{% endwith %}

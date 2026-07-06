@@ -1,0 +1,83 @@
+D:\Cross-Jurisdictional Privacy Compliance Analyzer\.venv\Lib\site-packages\langchain_core\_api\deprecation.py:25: UserWarning: Core Pydantic V1 functionality isn't compatible with Python 3.14 or greater.
+  from pydantic.v1.fields import FieldInfo as FieldInfoV1
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+================================================================================
+  RETRIEVAL EVALUATION (RetrieverEvaluator)
+================================================================================
+
+  loading chunks_inspect map (chunk_id -> node_id)...
+  loaded 1,280 chunk -> node mappings
+  ready: 8 ground-truth pairs
+
+  warming up retrievers...
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 9442.25it/s]
+[1mBertModel LOAD REPORT[0m from: BAAI/bge-small-en-v1.5
+Key                     | Status     |  | 
+------------------------+------------+--+-
+embeddings.position_ids | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+  [retriever] Loading embedding model: BAAI/bge-small-en-v1.5... Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 9542.54it/s]
+[1mBertModel LOAD REPORT[0m from: BAAI/bge-small-en-v1.5
+Key                     | Status     |  | 
+------------------------+------------+--+-
+embeddings.position_ids | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+done
+  [reranker] Loading bge-reranker-large... The Transformer `cache_dir` argument is deprecated. Please pass `cache_dir` via `model_kwargs`, `processor_kwargs`, and/or `config_kwargs` instead.
+Loading weights:   0%|          | 0/393 [00:00<?, ?it/s]Loading weights: 100%|██████████| 393/393 [00:00<00:00, 8558.29it/s]
+[1mXLMRobertaForSequenceClassification LOAD REPORT[0m from: BAAI/bge-reranker-large
+Key                             | Status     |  | 
+--------------------------------+------------+--+-
+roberta.embeddings.position_ids | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+done
+Loading weights:   0%|          | 0/105 [00:00<?, ?it/s]Loading weights: 100%|██████████| 105/105 [00:00<00:00, 7212.49it/s]
+[1mBertForSequenceClassification LOAD REPORT[0m from: cross-encoder/ms-marco-MiniLM-L-6-v2
+Key                          | Status     |  | 
+-----------------------------+------------+--+-
+bert.embeddings.position_ids | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+  done.
+
+================================================================================
+  running 8 queries through CUSTOM retriever...
+  custom done in 282.4s
+
+  running 8 queries through LLAMAINDEX retriever...
+  llamaindex done in 11.6s
+
+================================================================================
+  PER-QUERY DETAIL (rank = position of expected chunk in top-5; '-' = miss)
+================================================================================
+  query                                                        custom    llama
+  How long must banking companies retain KYC and transacti          -        3
+  What is the breach notification timeline to the Bahrain           -        3
+  Under what conditions can sensitive personal data be pro          -        -
+  How does a controller obtain prior authorization to tran          2        5
+  Where must Indian payment system data be stored?                  2        1
+  What does Kuwait DPPR require for data classification?            -        1
+  Can a data subject withdraw consent under Bahrain law?            5        2
+  What are BBK's internal retention periods for customer r          2        1
+
+================================================================================
+  AVERAGE METRICS (higher is better, all 0.0-1.0 range)
+================================================================================
+  metric              custom  llamaindex      winner
+  hit_rate            0.5000      0.8750       llama
+  mrr                 0.2125      0.5458       llama
+  precision           0.1000      0.1750       llama
+  recall              0.5000      0.8750       llama
+  ap                  0.2125      0.5458       llama
+  ndcg                0.2850      0.6272       llama
+
+  total latency:
+    custom     :  282.4s (35.30s per query)
+    llamaindex :   11.6s (1.45s per query)

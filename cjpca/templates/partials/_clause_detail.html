@@ -1,0 +1,251 @@
+{% comment %}
+Context: result (ComparisonResult), run (ComparisonRun)
+hx_target: set only when rendered from Review page
+{% endcomment %}
+<div style="display:flex;flex-direction:column;">
+
+ {# ── Header strip ── #}
+ <div style="padding:10px 14px 8px;border-bottom:1px solid #E5E8EF;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fff;">
+ <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;min-width:0;">
+ <span style="padding:3px 10px;border-radius:6px;font-size:10px;font-weight:700;flex-shrink:0;
+ background:{{ result.rel_bg }};color:{{ result.rel_color }};">
+ {{ result.rel_label }}
+ </span>
+ {% for pid in result.principle_ids %}
+ <span style="padding:2px 7px;border-radius:20px;font-size:8.5px;font-weight:600;background:#ffffff;color:#002583;white-space:nowrap;">{{ pid|title }}</span>
+ {% endfor %}
+ {% if not result.citation_verified %}
+ <span style="padding:2px 8px;border-radius:5px;font-size:9px;font-weight:700;background:#ffffff;color:#002583;border:1px solid #002583;flex-shrink:0;"
+ title="Citation could not be verified against retrieved chunks">
+ ⚠ Unverified
+ </span>
+ {% endif %}
+ {% comment %}
+ Hallucination risk badge — populated by reasoning.workflow_helpers
+ NLI scoring. Below 0.4 = grounded, 0.4-0.7 = caution, above 0.7 = high risk.
+ {% endcomment %}
+ {% if result.hallucination_risk and result.hallucination_risk > 0.4 %}
+ <span style="padding:2px 8px;border-radius:5px;font-size:9px;font-weight:700;flex-shrink:0;
+ {% if result.hallucination_risk > 0.7 %}background:#ffffff;color:#002583;border:1px solid #002583;
+ {% else %}background:#ffffff;color:#002583;border:1px solid #002583;{% endif %}"
+ title="NLI hallucination risk score (0=grounded, 1=unsupported). Higher means the AI's prose summary is less directly supported by the cited chunk.">
+ AI risk {{ result.hallucination_risk|floatformat:2 }}
+ </span>
+ {% endif %}
+ </div>
+ <div style="display:flex;align-items:center;gap:14px;flex-shrink:0;">
+ <div style="text-align:right;">
+ <p style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#002583;margin:0 0 2px;">Confidence</p>
+ <p style="font-size:16px;font-weight:800;color:#002583;margin:0;line-height:1;">{{ result.confidence_pct }}%</p>
+ </div>
+ <div style="text-align:right;">
+ <p style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#002583;margin:0 0 2px;">Similarity</p>
+ <p style="font-size:16px;font-weight:800;color:#002583;margin:0;line-height:1;">{{ result.similarity_pct }}%</p>
+ </div>
+ </div>
+ </div>
+
+ {# Confidence bar #}
+ <div style="height:3px;background:#ffffff;flex-shrink:0;">
+ <div style="height:100%;width:{{ result.confidence_pct }}%;background:{{ result.rel_color }};transition:width .4s;"></div>
+ </div>
+
+ {# ── Body ── #}
+ <div>
+
+ {# Reg A clause #}
+ <div style="padding:10px 14px;border-bottom:1px solid #E5E8EF;">
+ <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+ <div style="display:flex;align-items:center;gap:7px;">
+ <div style="width:8px;height:8px;border-radius:50%;background:#002583;flex-shrink:0;"></div>
+ <p style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:#002583;margin:0;">
+ {{ run.reg_a.name|default:"Reg A" }} — {{ result.citation_a }}
+ </p>
+ </div>
+ {% if run.reg_a %}
+ <button onclick="(function(){
+ var cit='{{ result.citation_a|escapejs }}';
+ var art=cit.indexOf('—')>-1?cit.split('—').pop().trim():cit;
+ var root=Alpine.$data(document.body);
+ root.docViewerDoc='{{ run.reg_a.pk }}';
+ root.docViewerArt=art;
+ root.docViewerOpen=true;
+ })()"
+ style="display:flex;align-items:center;gap:4px;padding:3px 9px;border-radius:5px;font-size:9px;font-weight:700;color:#002583;background:#ffffff;border:none;cursor:pointer;white-space:nowrap;flex-shrink:0;">
+ <svg width="9" height="9" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
+ View
+ </button>
+ {% endif %}
+ </div>
+ <div style="background:#ffffff;border-left:3px solid #002583;border-radius:0 8px 8px 0;padding:12px 14px;">
+ <p style="font-size:11px;color:#002583;line-height:1.7;margin:0;">
+ {{ result.clause_text_a|default:result.preview_a }}
+ </p>
+ {% if result.evidence_a %}
+ <div style="margin-top:10px;padding-top:10px;border-top:1px dashed #E5E8EF;">
+ <p style="font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#002583;margin:0 0 5px;">Verbatim quote (grounding evidence)</p>
+ <blockquote style="font-size:10.5px;color:#002583;line-height:1.6;margin:0;font-style:italic;border-left:2px solid #002583;padding-left:8px;">
+ "{{ result.evidence_a }}"
+ </blockquote>
+ </div>
+ {% endif %}
+ </div>
+ </div>
+
+ {# Reg B clause #}
+ <div style="padding:10px 14px;border-bottom:1px solid #E5E8EF;">
+ <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+ <div style="display:flex;align-items:center;gap:7px;">
+ <div style="width:8px;height:8px;border-radius:50%;background:#002583;flex-shrink:0;"></div>
+ <p style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:#002583;margin:0;">
+ {{ run.reg_b.name|default:"Reg B" }} — {{ result.citation_b|default:"No match" }}
+ </p>
+ </div>
+ {% if run.reg_b and result.citation_b %}
+ <button onclick="(function(){
+ var cit='{{ result.citation_b|escapejs }}';
+ var art=cit.indexOf('—')>-1?cit.split('—').pop().trim():cit;
+ var root=Alpine.$data(document.body);
+ root.docViewerDoc='{{ run.reg_b.pk }}';
+ root.docViewerArt=art;
+ root.docViewerOpen=true;
+ })()"
+ style="display:flex;align-items:center;gap:4px;padding:3px 9px;border-radius:5px;font-size:9px;font-weight:700;color:#002583;background:#ffffff;border:none;cursor:pointer;white-space:nowrap;flex-shrink:0;">
+ <svg width="9" height="9" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
+ View
+ </button>
+ {% endif %}
+ </div>
+ {% if result.is_orphan %}
+ <div style="background:#ffffff;border-left:3px solid #E5E8EF;border-radius:0 8px 8px 0;padding:12px 14px;">
+ <p style="font-size:11px;color:#002583;font-style:italic;margin:0;">No corresponding clause in {{ run.reg_b.name|default:"Reg B" }}.</p>
+ </div>
+ {% else %}
+ <div style="background:#ffffff;border-left:3px solid #002583;border-radius:0 8px 8px 0;padding:12px 14px;">
+ <p style="font-size:11px;color:#002583;line-height:1.7;margin:0;">
+ {{ result.clause_text_b|default:result.preview_b }}
+ </p>
+ {% if result.evidence_b %}
+ <div style="margin-top:10px;padding-top:10px;border-top:1px dashed #E5E8EF;">
+ <p style="font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#002583;margin:0 0 5px;">Verbatim quote (grounding evidence)</p>
+ <blockquote style="font-size:10.5px;color:#002583;line-height:1.6;margin:0;font-style:italic;border-left:2px solid #002583;padding-left:8px;">
+ "{{ result.evidence_b }}"
+ </blockquote>
+ </div>
+ {% endif %}
+ </div>
+ {% endif %}
+ </div>
+
+ {# Key difference #}
+ {% if result.key_difference %}
+ <div style="padding:8px 14px;border-bottom:1px solid #E5E8EF;background:#ffffff;">
+ <p style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:#002583;margin:0 0 7px;display:flex;align-items:center;gap:5px;">
+ <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#002583" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
+ Key Difference
+ </p>
+ <p style="font-size:11px;color:#002583;line-height:1.65;margin:0;">{{ result.key_difference }}</p>
+ </div>
+ {% endif %}
+
+ {# AI rationale #}
+ {% if result.rationale %}
+ <div style="padding:8px 14px;border-bottom:1px solid #E5E8EF;">
+ <p style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:#002583;margin:0 0 7px;">AI Rationale</p>
+ <p style="font-size:11px;color:#002583;line-height:1.7;margin:0;">{{ result.rationale }}</p>
+ </div>
+ {% endif %}
+
+ {# Audit trail #}
+ {% if result.audit_events.exists %}
+ <div style="padding:8px 14px;border-bottom:1px solid #E5E8EF;">
+ <p style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#002583;margin:0 0 8px;">Audit Trail</p>
+ <div style="display:flex;flex-direction:column;gap:6px;">
+ {% for event in result.audit_events.all|slice:":3" %}
+ <div style="display:flex;align-items:flex-start;gap:8px;">
+ <div style="width:5px;height:5px;border-radius:50%;background:#ffffff;flex-shrink:0;margin-top:5px;"></div>
+ <p style="font-size:10px;color:#002583;margin:0;line-height:1.5;">
+ <span style="font-weight:700;">{{ event.actor }}</span> {{ event.action }}
+ {% if event.from_lifecycle %}<span style="color:#002583;"> · {{ event.from_lifecycle }} → {{ event.to_lifecycle }}</span>{% endif %}
+ <span style="color:#ffffff;margin-left:4px;">{{ event.timestamp|timesince }} ago</span>
+ </p>
+ </div>
+ {% endfor %}
+ </div>
+ </div>
+ {% endif %}
+
+ </div>
+
+ {# ── Footer: status + review CTA ── #}
+ {% if not hx_target %}
+ <div style="position:sticky;bottom:0;padding:10px 14px;border-top:1px solid #E5E8EF;display:flex;align-items:center;justify-content:space-between;background:#ffffff;box-shadow:0 -2px 8px rgba(0,0,0,.06);z-index:10;">
+ <div style="display:flex;align-items:center;gap:8px;">
+ <span style="font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#002583;">Status</span>
+ <span style="padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;
+ {% if result.lifecycle == 'approved' %}background:#ffffff;color:#002583;
+ {% elif result.lifecycle == 'rejected' %}background:#ffffff;color:#002583;
+ {% elif result.lifecycle == 'reviewed' %}background:#ffffff;color:#002583;
+ {% else %}background:#ffffff;color:#002583;{% endif %}">
+ {{ result.lifecycle|title }}
+ </span>
+ </div>
+ <a href="{% url 'review' %}"
+ style="display:flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;background:#002583;color:#fff;font-size:11px;font-weight:700;text-decoration:none;">
+ Review &amp; Validate
+ <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+ </a>
+ </div>
+ {% endif %}
+
+ {# Review actions (Review page only) #}
+ {% if hx_target %}
+ <div style="padding:14px 18px;border-top:2px solid #E5E8EF;flex-shrink:0;background:#ffffff;">
+ <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+ {% if result.lifecycle != 'approved' %}
+ <form hx-post="{% url 'comparison-result-transition' result.pk %}" hx-target="{{ hx_target }}" hx-swap="innerHTML">
+ {% csrf_token %}
+ <input type="hidden" name="action" value="approved">
+ <button type="submit" style="display:flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;font-size:11px;font-weight:700;background:#002583;color:#fff;border:none;cursor:pointer;">
+ <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+ Approve
+ </button>
+ </form>
+ {% endif %}
+ {% if result.lifecycle != 'rejected' %}
+ <form hx-post="{% url 'comparison-result-transition' result.pk %}" hx-target="{{ hx_target }}" hx-swap="innerHTML">
+ {% csrf_token %}
+ <input type="hidden" name="action" value="rejected">
+ <button type="submit" style="display:flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;font-size:11px;font-weight:700;background:#002583;color:#fff;border:none;cursor:pointer;">
+ <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+ Reject
+ </button>
+ </form>
+ {% endif %}
+ {% if result.lifecycle != 'draft' %}
+ <form hx-post="{% url 'comparison-result-transition' result.pk %}" hx-target="{{ hx_target }}" hx-swap="innerHTML">
+ {% csrf_token %}
+ <input type="hidden" name="action" value="reset">
+ <button type="submit" style="padding:7px 12px;border-radius:8px;font-size:11px;font-weight:600;background:#ffffff;color:#002583;border:1px solid #E5E8EF;cursor:pointer;">Reset</button>
+ </form>
+ {% endif %}
+ <span style="margin-left:auto;padding:4px 10px;border-radius:20px;font-size:10px;font-weight:700;
+ {% if result.lifecycle == 'approved' %}background:#ffffff;color:#002583;
+ {% elif result.lifecycle == 'rejected' %}background:#ffffff;color:#002583;
+ {% elif result.lifecycle == 'reviewed' %}background:#ffffff;color:#002583;
+ {% else %}background:#ffffff;color:#002583;{% endif %}">
+ {{ result.lifecycle|title }}
+ </span>
+ </div>
+ <form hx-post="{% url 'comparison-result-note' result.pk %}" hx-swap="none">
+ {% csrf_token %}
+ <textarea name="note" rows="2" placeholder="Add a reviewer note…"
+ style="width:100%;padding:8px 10px;border:1px solid #E5E8EF;border-radius:8px;font-size:11px;color:#002583;resize:vertical;font-family:inherit;outline:none;box-sizing:border-box;">{{ result.reviewer_note }}</textarea>
+ <div style="display:flex;justify-content:flex-end;margin-top:4px;">
+ <button type="submit" style="padding:5px 14px;border-radius:6px;font-size:10px;font-weight:700;background:#002583;color:#fff;border:none;cursor:pointer;">Save note</button>
+ </div>
+ </form>
+ </div>
+ {% endif %}
+
+</div>

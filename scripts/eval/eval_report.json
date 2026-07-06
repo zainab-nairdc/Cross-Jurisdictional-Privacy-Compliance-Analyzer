@@ -1,0 +1,373 @@
+{
+  "summary": {
+    "hit_rate": 0.8571,
+    "mrr": 0.8571,
+    "context_relevance": 0.7837,
+    "faithfulness": 0.6574,
+    "citation_accuracy": 0.8857
+  },
+  "queries": [
+    {
+      "query": "definition of personal data and sensitive personal data",
+      "description": "Bahrain \u2014 Definitions",
+      "expected_articles": [
+        "Article (1)"
+      ],
+      "expected_jurisdiction": "Bahrain",
+      "retrieved_articles": [
+        "Article (1)",
+        "Article (1)",
+        "Article (1)",
+        "Article (1)",
+        "Article (5)"
+      ],
+      "retrieved_jurisdictions": [
+        "Bahrain",
+        "Bahrain",
+        "Bahrain",
+        "Bahrain",
+        "Bahrain"
+      ],
+      "hit": true,
+      "reciprocal_rank": 1.0,
+      "context_relevance": 0.8284,
+      "faithfulness": 0.0,
+      "citation_accuracy": 1.0
+    },
+    {
+      "query": "data breach notification obligations Bahrain",
+      "description": "Bahrain \u2014 Data breach notification",
+      "expected_articles": [
+        "Article (14)"
+      ],
+      "expected_jurisdiction": "Bahrain",
+      "retrieved_articles": [
+        "Article (4)",
+        "Article (4)",
+        "Article (4)",
+        "Article (4)",
+        "Article (4)"
+      ],
+      "retrieved_jurisdictions": [
+        "Bahrain",
+        "Bahrain",
+        "Bahrain",
+        "Bahrain",
+        "Bahrain"
+      ],
+      "hit": false,
+      "reciprocal_rank": 0.0,
+      "context_relevance": 0.7377,
+      "faithfulness": 0.0,
+      "citation_accuracy": 1.0
+    },
+    {
+      "query": "consent conditions for processing personal data Bahrain",
+      "description": "Bahrain \u2014 Consent for processing",
+      "expected_articles": [
+        "Article (5)",
+        "Article (24)"
+      ],
+      "expected_jurisdiction": "Bahrain",
+      "retrieved_articles": [
+        "Article (5)",
+        "Article (5)",
+        "Article (4)",
+        "Article (5)",
+        "Article (5)"
+      ],
+      "retrieved_jurisdictions": [
+        "Bahrain",
+        "Bahrain",
+        "Bahrain",
+        "Bahrain",
+        "Bahrain"
+      ],
+      "hit": true,
+      "reciprocal_rank": 1.0,
+      "context_relevance": 0.7783,
+      "faithfulness": 0.875,
+      "citation_accuracy": 1.0
+    },
+    {
+      "query": "transfer of personal data outside Bahrain",
+      "description": "Bahrain \u2014 Cross-border transfer",
+      "expected_articles": [
+        "Article (12)",
+        "Article (13)"
+      ],
+      "expected_jurisdiction": "Bahrain",
+      "retrieved_articles": [
+        "Section Three",
+        "Section Three",
+        "Article (4)",
+        "Article (4)",
+        "Article (3)"
+      ],
+      "retrieved_jurisdictions": [
+        "Bahrain",
+        "Bahrain",
+        "Bahrain",
+        "Bahrain",
+        "Bahrain"
+      ],
+      "hit": false,
+      "reciprocal_rank": 0.0,
+      "context_relevance": 0.8452,
+      "faithfulness": 0.0,
+      "citation_accuracy": 1.0
+    },
+    {
+      "query": "data protection guardian appointment duties Bahrain",
+      "description": "Bahrain \u2014 DPO equivalent",
+      "expected_articles": [
+        "Article (10)"
+      ],
+      "expected_jurisdiction": "Bahrain",
+      "retrieved_articles": [
+        "Article (10)",
+        "Article (10)",
+        "Article (10)",
+        "Article (10)",
+        "Article (9)"
+      ],
+      "retrieved_jurisdictions": [
+        "Bahrain",
+        "Bahrain",
+        "Bahrain",
+        "Bahrain",
+        "Bahrain"
+      ],
+      "hit": true,
+      "reciprocal_rank": 1.0,
+      "context_relevance": 0.7762,
+      "faithfulness": 0.0,
+      "citation_accuracy": 1.0
+    },
+    {
+      "query": "data fiduciary obligations India digital personal data",
+      "description": "India \u2014 Data fiduciary obligations",
+      "expected_articles": null,
+      "expected_jurisdiction": "India",
+      "retrieved_articles": [
+        "CHAPTER II",
+        "CHAPTER II",
+        "CHAPTER II",
+        "",
+        ""
+      ],
+      "retrieved_jurisdictions": [
+        "India",
+        "India",
+        "India",
+        "India",
+        "India"
+      ],
+      "hit": true,
+      "reciprocal_rank": 1.0,
+      "context_relevance": 0.8316,
+      "faithfulness": 1.0,
+      "citation_accuracy": 0.6
+    },
+    {
+      "query": "consent manager India data principal rights",
+      "description": "India \u2014 Consent and data principal rights",
+      "expected_articles": null,
+      "expected_jurisdiction": "India",
+      "retrieved_articles": [
+        "Rule 1",
+        "Rule 1",
+        "CHAPTER III",
+        "CHAPTER III",
+        "CHAPTER III"
+      ],
+      "retrieved_jurisdictions": [
+        "India",
+        "India",
+        "India",
+        "India",
+        "India"
+      ],
+      "hit": true,
+      "reciprocal_rank": 1.0,
+      "context_relevance": 0.773,
+      "faithfulness": 1.0,
+      "citation_accuracy": 1.0
+    },
+    {
+      "query": "IT outsourcing third party RBI directions",
+      "description": "India \u2014 RBI IT outsourcing",
+      "expected_articles": null,
+      "expected_jurisdiction": "India",
+      "retrieved_articles": [
+        "Chapter III - IT Infrastructure & Services Management",
+        "",
+        "",
+        "Section 35A",
+        ""
+      ],
+      "retrieved_jurisdictions": [
+        "India",
+        "India",
+        "India",
+        "India",
+        "India"
+      ],
+      "hit": true,
+      "reciprocal_rank": 1.0,
+      "context_relevance": 0.7559,
+      "faithfulness": 1.0,
+      "citation_accuracy": 0.4
+    },
+    {
+      "query": "data privacy protection regulation Kuwait",
+      "description": "Kuwait \u2014 Data privacy regulation",
+      "expected_articles": null,
+      "expected_jurisdiction": "Kuwait",
+      "retrieved_articles": [
+        "",
+        "",
+        "Article (11)",
+        "",
+        "Article (2)"
+      ],
+      "retrieved_jurisdictions": [
+        "Kuwait",
+        "Kuwait",
+        "Kuwait",
+        "Kuwait",
+        "Kuwait"
+      ],
+      "hit": true,
+      "reciprocal_rank": 1.0,
+      "context_relevance": 0.7648,
+      "faithfulness": 0.75,
+      "citation_accuracy": 0.4
+    },
+    {
+      "query": "cyber operational resilience framework Kuwait",
+      "description": "Kuwait \u2014 Cyber resilience",
+      "expected_articles": null,
+      "expected_jurisdiction": "Kuwait",
+      "retrieved_articles": [
+        "Chapter 4 \u2013 Cyber Resilience Baselines",
+        "Chapter 3 \u2013 Cyber and Operational Resilience Framework",
+        "Chapter 4 \u2013 Cyber Resilience Baselines",
+        "Chapter 1 \u2013 Cyber and Operational Resilience Framework",
+        "Chapter 1 \u2013 Cyber and Operational Resilience Framework"
+      ],
+      "retrieved_jurisdictions": [
+        "Kuwait",
+        "Kuwait",
+        "Kuwait",
+        "Kuwait",
+        "Kuwait"
+      ],
+      "hit": true,
+      "reciprocal_rank": 1.0,
+      "context_relevance": 0.8427,
+      "faithfulness": 1.0,
+      "citation_accuracy": 1.0
+    },
+    {
+      "query": "data subject rights BBK policy procedure",
+      "description": "BBK \u2014 Data subject rights policy",
+      "expected_articles": null,
+      "expected_jurisdiction": "BBK",
+      "retrieved_articles": [
+        "5. Data Subject Rights",
+        "5. Data Subject Rights",
+        "6. Data Subject Rights \u2014 Local Handling Procedure",
+        "1. Purpose and Scope",
+        "6. Data Subject Rights \u2014 Kuwait Local Procedure"
+      ],
+      "retrieved_jurisdictions": [
+        "BBK",
+        "BBK",
+        "BBK",
+        "BBK",
+        "BBK"
+      ],
+      "hit": true,
+      "reciprocal_rank": 1.0,
+      "context_relevance": 0.7667,
+      "faithfulness": 1.0,
+      "citation_accuracy": 1.0
+    },
+    {
+      "query": "third party vendor data processing BBK",
+      "description": "BBK \u2014 Third party data processing policy",
+      "expected_articles": null,
+      "expected_jurisdiction": "BBK",
+      "retrieved_articles": [
+        "9. Third-Party and Vendor Incident Obligations",
+        "9. Third-Party and Vendor Incident Obligations",
+        "1. Purpose and Scope",
+        "1. When Does This Apply?",
+        "4 \nHow does BBK collect my Personal Data?"
+      ],
+      "retrieved_jurisdictions": [
+        "BBK",
+        "BBK",
+        "BBK",
+        "BBK",
+        "BBK"
+      ],
+      "hit": true,
+      "reciprocal_rank": 1.0,
+      "context_relevance": 0.7942,
+      "faithfulness": 1.0,
+      "citation_accuracy": 1.0
+    },
+    {
+      "query": "data retention period storage limitation",
+      "description": "Cross \u2014 Data retention across jurisdictions",
+      "expected_articles": null,
+      "expected_jurisdiction": null,
+      "retrieved_articles": [
+        "5. Data Retention \u2014 India Regulatory Schedule",
+        "5. Data Retention \u2014 India Regulatory Schedule",
+        "Chapter 6 \u2013 Third-Party Risk Management Baselines",
+        "Chapter 6 \u2013 Third-Party Risk Management Baselines",
+        "Chapter 6 \u2013 Third-Party Risk Management Baselines"
+      ],
+      "retrieved_jurisdictions": [
+        "BBK",
+        "BBK",
+        "Kuwait",
+        "Kuwait",
+        "Kuwait"
+      ],
+      "hit": true,
+      "reciprocal_rank": 1.0,
+      "context_relevance": 0.7242,
+      "faithfulness": 0.5789,
+      "citation_accuracy": 1.0
+    },
+    {
+      "query": "penalties fines violation data protection law",
+      "description": "Cross \u2014 Penalties for non-compliance",
+      "expected_articles": null,
+      "expected_jurisdiction": null,
+      "retrieved_articles": [
+        "Article (55)",
+        "Article (55)",
+        "Article (58)",
+        "Article (58)",
+        "CHAPTER IX"
+      ],
+      "retrieved_jurisdictions": [
+        "Bahrain",
+        "Bahrain",
+        "Bahrain",
+        "Bahrain",
+        "India"
+      ],
+      "hit": true,
+      "reciprocal_rank": 1.0,
+      "context_relevance": 0.7531,
+      "faithfulness": 1.0,
+      "citation_accuracy": 1.0
+    }
+  ]
+}

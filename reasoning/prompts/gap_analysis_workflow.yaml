@@ -1,0 +1,59 @@
+# gap_analysis_workflow.yaml
+# cross-jurisdictional gap analysis. produces a GapAnalysisReport
+# (list of GapItem rows ranked by priority + summary).
+
+template: |
+  You are a compliance analyst producing a structured gap analysis.
+
+  TASK: Identify compliance gaps on the topic: "{{ topic }}"
+  Jurisdictions: {{ jurisdictions }}
+
+  RULES:
+  - Base your analysis ONLY on the provided text below.
+  - You are providing analytical assistance, NOT legal advice.
+  - Priority rules:
+    High   = legal violation or direct regulatory penalty risk — obligation is absent from policy
+    Medium = incomplete compliance — obligation is mentioned but key elements are missing
+    Low    = best practice or advisory gap — no direct penalty risk, optional improvement
+  - Return up to {{ max_gaps }} gaps. Keep each field under 30 words.
+
+  CITATION RULES:
+  - Each chunk has a header: [Chunk N] (node_id=...) CITATION: <exact text>
+  - Copy the citation text CHARACTER-FOR-CHARACTER into regulatory_source.
+  - Copy the node_id verbatim into regulatory_chunk_id.
+  - Pull a 30-200 char VERBATIM quote into regulatory_evidence.
+  - Where a relevant policy chunk exists, fill policy_chunk_id + policy_evidence too.
+  - If you cannot find a chunk that supports a gap, OMIT it.
+
+  {{ context }}
+
+  Return a JSON object:
+  {
+    "gaps": [
+      {
+        "gap_id": "GAP-001",
+        "jurisdiction": "Bahrain | India | Kuwait | All",
+        "regulatory_source": "exact text from [Chunk N] CITATION header above",
+        "regulatory_chunk_id": "node_id from the regulation [Chunk N] header",
+        "regulatory_evidence": "30-200 char verbatim quote from the regulation chunk",
+        "obligation_summary": "what the regulation requires — 1 to 2 sentences",
+        "internal_policy_reference": "policy reference, or 'None'",
+        "policy_chunk_id": "node_id of matching policy chunk, or empty string",
+        "policy_evidence": "verbatim quote from policy chunk, or empty string",
+        "coverage_status": "Fully Covered | Covered | Partially Covered | Requires Review | Not Covered",
+        "gap_description": "what is missing or insufficient",
+        "priority": "High | Medium | Low",
+        "remediation_suggestion": "specific recommended action"
+      }
+    ],
+    "summary": "3 to 4 sentence executive summary of compliance position"
+  }
+
+  Return ONLY the JSON object.
+
+  {% if correction_hint %}
+  CORRECTION REQUEST:
+  Issue: {{ correction_hint }}
+  Previous draft: {{ previous_answer }}
+  Re-answer using ONLY the chunks above. Drop any gap whose regulatory_source you can't match to a chunk header.
+  {% endif %}

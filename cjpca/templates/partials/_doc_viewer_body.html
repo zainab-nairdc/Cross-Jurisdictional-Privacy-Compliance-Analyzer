@@ -1,0 +1,115 @@
+{% comment %}
+_doc_viewer_body.html — HTMX fragment loaded into the viewer modal body.
+Context: doc, chunks (list[str]), sections (list[{index, heading}])
+{% endcomment %}
+
+{# ── Document header strip ── #}
+<div style="padding:14px 20px;border-bottom:1px solid #E5E8EF;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0;background:#ffffff;">
+ <div style="min-width:0;">
+ <p style="font-size:13px;font-weight:700;color:#002583;margin:0 0 3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ doc.name }}</p>
+ <div style="display:flex;align-items:center;gap:8px;">
+ <span style="font-size:10px;color:#002583;">{{ chunks|length }} sections</span>
+ <span style="font-size:10px;color:#ffffff;">·</span>
+ <span style="padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700;background:#ffffff;color:#002583;">{{ doc.get_jurisdiction_display }}</span>
+ {% if doc.status == 'processing' %}
+ <span style="padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700;background:#ffffff;color:#002583;">Processing</span>
+ {% elif doc.status == 'failed' %}
+ <span style="padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700;background:#ffffff;color:#002583;">Failed</span>
+ {% endif %}
+ </div>
+ </div>
+ <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+ {% if doc.source_url %}
+ <a href="{{ doc.source_url }}" target="_blank" rel="noopener"
+ style="display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:600;color:#002583;text-decoration:none;padding:5px 10px;border-radius:7px;border:1.5px solid #E5E8EF;background:#ffffff;transition:background .12s;"
+ onmouseover="this.style.background='#ffffff'" onmouseout="this.style.background='#ffffff'">
+ <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/>
+ </svg>
+ Official source
+ </a>
+ {% endif %}
+ <span style="font-size:9px;color:#ffffff;font-weight:500;">System view — as ingested</span>
+ </div>
+</div>
+
+{% comment %}Body: nav sidebar + text area. The highlighted chunk uses an amber/yellow tint so it's visually distinct.{% endcomment %}
+
+{% comment %}
+No-op when the highlight couldn't be matched — silent fallback. The user
+just gets the doc opened at the top with the section nav available. Loud
+warnings here were more annoying than helpful since the matcher already
+runs 4 fallback passes (chunk_id, normalised quote, no-whitespace, alpha-only).
+{% endcomment %}
+
+<div style="flex:1;min-height:0;display:flex;overflow:hidden;" data-highlight-idx="{% if highlight_idx is not None %}{{ highlight_idx }}{% endif %}">
+
+ {# Article nav sidebar #}
+ {% if sections %}
+ <div style="width:170px;flex-shrink:0;border-right:1px solid #E5E8EF;overflow-y:auto;background:#F4F6FB;padding:12px 0;">
+ <p style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:#5A6685;padding:0 14px 8px;">Contents</p>
+ {% for section in sections %}
+ <button
+ onclick="document.getElementById('chunk-{{ section.index }}').scrollIntoView({behavior:'smooth',block:'start'})"
+ style="display:block;width:100%;text-align:left;padding:6px 14px;background:none;border:none;border-left:2px solid transparent;cursor:pointer;font-size:10px;color:#1A2440;line-height:1.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:inherit;transition:background .1s,color .1s,border-color .1s;"
+ onmouseover="this.style.background='#fff';this.style.color='#002583';this.style.borderLeftColor='#002583';"
+ onmouseout="this.style.background='';this.style.color='#1A2440';this.style.borderLeftColor='transparent';"
+ >{{ section.heading|truncatechars:28 }}</button>
+ {% endfor %}
+ </div>
+ {% endif %}
+
+ {# Main text area #}
+ <div id="doc-viewer-scroll" style="flex:1;overflow-y:auto;padding:20px 28px;background:#fff;">
+ {% if chunks %}
+ {% for chunk in chunks %}
+ {% with idx=forloop.counter0 %}
+ {% if highlight_idx is not None and idx == highlight_idx %}
+ {# Cited paragraph — amber/yellow highlight so it actually stands out. #}
+ <div id="chunk-{{ idx }}"
+      style="padding:16px 18px;border-radius:10px;margin-bottom:10px;background:#FFF6DD;border:1.5px solid #FFB800;border-left:4px solid #FFB800;box-shadow:0 0 0 4px rgba(255,184,0,0.08);transition:background .3s;animation:highlight-flash 1.2s ease-out;">
+   <div style="display:inline-flex;align-items:center;gap:6px;margin-bottom:10px;padding:3px 10px;border-radius:5px;background:#FFB800;color:#1A2440;">
+     <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.8"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/></svg>
+     <span style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;">Cited paragraph</span>
+   </div>
+   <p style="font-size:12.5px;font-family:'Satoshi',system-ui,sans-serif;line-height:1.85;color:#1A2440;margin:0;white-space:pre-wrap;font-weight:500;">{{ chunk }}</p>
+ </div>
+ {% else %}
+ <div id="chunk-{{ idx }}"
+      style="padding:14px 16px;border-radius:10px;margin-bottom:10px;border:1px solid transparent;transition:background .15s, border-color .15s;"
+      onmouseover="this.style.background='#F4F6FB';"
+      onmouseout="this.style.background='';">
+   <p style="font-size:12px;font-family:'Satoshi',system-ui,sans-serif;line-height:1.85;color:#1A2440;margin:0;white-space:pre-wrap;">{{ chunk }}</p>
+ </div>
+ {% endif %}
+ {% if not forloop.last %}
+ <div style="height:1px;background:#E5E8EF;margin:4px 16px 14px;border-radius:1px;"></div>
+ {% endif %}
+ {% endwith %}
+ {% endfor %}
+ <style>
+   @keyframes highlight-flash {
+     0%   { background: #FFE8A0; box-shadow: 0 0 0 8px rgba(255,184,0,0.18); }
+     100% { background: #FFF6DD; box-shadow: 0 0 0 4px rgba(255,184,0,0.08); }
+   }
+ </style>
+ {% else %}
+ <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:14px;padding:48px 24px;text-align:center;">
+ <div style="width:52px;height:52px;border-radius:14px;background:#ffffff;display:flex;align-items:center;justify-content:center;">
+ <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="1.5">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
+ </svg>
+ </div>
+ <div>
+ <p style="font-size:13px;font-weight:700;color:#002583;margin:0 0 5px;">No text available</p>
+ <p style="font-size:11px;color:#002583;margin:0;line-height:1.6;max-width:260px;">
+ {% if doc.status == 'processing' %}Document is still being ingested — check back shortly.
+ {% elif doc.status == 'failed' %}Ingestion failed — this document could not be parsed.
+ {% else %}Text index not found. Re-ingest this document to restore.{% endif %}
+ </p>
+ </div>
+ </div>
+ {% endif %}
+ </div>
+
+</div>

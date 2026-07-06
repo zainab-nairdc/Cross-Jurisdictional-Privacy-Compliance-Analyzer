@@ -1,0 +1,121 @@
+{% comment %}
+Context: results (ComparisonResult queryset), run, counts dict
+{% endcomment %}
+
+{% if not results %}
+<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:64px 24px;gap:12px;">
+ <div style="width:48px;height:48px;border-radius:50%;background:#ffffff;display:flex;align-items:center;justify-content:center;">
+ <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#ffffff" stroke-width="1.5">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/>
+ </svg>
+ </div>
+ <p style="font-size:12px;color:#002583;font-weight:500;margin:0;">No clauses match the current filter</p>
+</div>
+
+{% else %}
+<div style="display:flex;flex-direction:column;gap:5px;padding:2px 1px;">
+ {% for result in results %}
+
+ <div class="clause-card"
+ data-result-pk="{{ result.pk }}"
+ data-rel-color="{{ result.rel_color }}"
+ style="border:1px solid #E5E8EF;border-left:3px solid {{ result.rel_color }};border-radius:10px;overflow:hidden;cursor:pointer;background:#fff;transition:box-shadow .12s,border-color .12s;"
+ onmouseover="this.style.borderColor='{{ result.rel_color }}';this.style.borderLeftColor='{{ result.rel_color }}';this.style.boxShadow='0 2px 8px rgba(0,0,0,.07)'"
+ onmouseout="this.style.borderColor='#ffffff';this.style.borderLeftColor='{{ result.rel_color }}';this.style.boxShadow='none'"
+ hx-get="{% url 'comparison-result-detail' result.pk %}"
+ hx-target="#clause-detail-pane"
+ hx-swap="innerHTML"
+ onclick="(function(el){
+ const pk = +el.dataset.resultPk;
+ document.querySelectorAll('[data-result-pk]').forEach(c => {
+ c.style.borderColor = '#ffffff';
+ c.style.borderLeftColor = c.dataset.relColor || '#002583';
+ c.style.background = '#fff';
+ c.style.boxShadow = 'none';
+ });
+ el.style.borderColor = el.dataset.relColor;
+ el.style.background = '#ffffff';
+ el.style.boxShadow = '0 0 0 3px ' + el.dataset.relColor + '22';
+ try {
+ const comp = document.querySelector('[x-data]').__x;
+ if (comp) {
+ comp.$data.selectedCardPk = pk;
+ comp.$data.cardPks = [...document.querySelectorAll('[data-result-pk]')].map(e => +e.dataset.resultPk);
+ }
+ } catch(e) {}
+ })(this)">
+
+ <div style="padding:10px 12px 10px 14px;">
+
+ {# Row 1: relationship pill + lifecycle status #}
+ <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;">
+ <span style="padding:2px 8px;border-radius:5px;font-size:9.5px;font-weight:700;white-space:nowrap;
+ background:{{ result.rel_bg }};color:{{ result.rel_color }};">
+ {{ result.rel_label }}
+ </span>
+ <span style="font-size:9px;font-weight:600;white-space:nowrap;
+ {% if result.lifecycle == 'approved' %}color:#002583;
+ {% elif result.lifecycle == 'rejected' %}color:#002583;
+ {% elif result.lifecycle == 'reviewed' %}color:#002583;
+ {% else %}color:#ffffff;{% endif %}">
+ {% if result.lifecycle == 'approved' %}✓ Approved
+ {% elif result.lifecycle == 'rejected' %}✗ Rejected
+ {% elif result.lifecycle == 'reviewed' %}Reviewed
+ {% else %}Draft{% endif %}
+ </span>
+ </div>
+
+ {# Row 2: citations #}
+ <div style="display:flex;align-items:center;gap:5px;margin-bottom:6px;min-width:0;">
+ <span style="font-size:10.5px;font-weight:700;color:#002583;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:44%;">
+ {% if result.citation_a %}{{ result.citation_a }}{% else %}—{% endif %}
+ </span>
+ <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" style="flex-shrink:0;">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/>
+ </svg>
+ <span style="font-size:10.5px;font-weight:700;color:#002583;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:44%;">
+ {% if result.citation_b %}{{ result.citation_b }}{% else %}<span style="font-weight:400;color:#ffffff;font-style:italic;">no match</span>{% endif %}
+ </span>
+ </div>
+
+ {# Row 3: preview text #}
+ <p style="font-size:10.5px;color:#002583;line-height:1.55;margin:0 0 8px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">
+ {% if result.preview_a %}{{ result.preview_a }}{% elif result.preview_b %}{{ result.preview_b }}{% endif %}
+ </p>
+
+ {# Row 4: confidence bar + score + principle tag #}
+ <div style="display:flex;align-items:center;gap:7px;">
+ <div style="flex:1;height:3px;background:#ffffff;border-radius:2px;overflow:hidden;">
+ <div style="height:100%;width:{{ result.confidence_pct }}%;background:{{ result.rel_color }};border-radius:2px;"></div>
+ </div>
+ <span style="font-size:9px;font-weight:700;color:#002583;white-space:nowrap;flex-shrink:0;">{{ result.confidence_pct }}%</span>
+ {% if result.principle_ids %}
+ {% for pid in result.principle_ids|slice:":1" %}
+ <span style="padding:1px 5px;border-radius:4px;font-size:8.5px;font-weight:600;background:#ffffff;color:#002583;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:56px;flex-shrink:0;">{{ pid }}</span>
+ {% endfor %}
+ {% endif %}
+ </div>
+
+ </div>
+ </div>
+
+ {% endfor %}
+</div>
+
+{# Pagination #}
+{% if is_paginated %}
+<div style="display:flex;justify-content:center;align-items:center;gap:6px;padding:14px 0 4px;">
+ {% if page_obj.has_previous %}
+ <button hx-get="{% url 'comparison-run-clauses' run.pk %}?page={{ page_obj.previous_page_number }}"
+ hx-target="#clause-list-container" hx-swap="innerHTML"
+ style="padding:4px 12px;border-radius:6px;font-size:10px;font-weight:600;background:#ffffff;border:1px solid #E5E8EF;color:#002583;cursor:pointer;">← Prev</button>
+ {% endif %}
+ <span style="font-size:10px;color:#002583;padding:4px 8px;">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+ {% if page_obj.has_next %}
+ <button hx-get="{% url 'comparison-run-clauses' run.pk %}?page={{ page_obj.next_page_number }}"
+ hx-target="#clause-list-container" hx-swap="innerHTML"
+ style="padding:4px 12px;border-radius:6px;font-size:10px;font-weight:600;background:#ffffff;border:1px solid #E5E8EF;color:#002583;cursor:pointer;">Next →</button>
+ {% endif %}
+</div>
+{% endif %}
+{% endif %}

@@ -1,0 +1,114 @@
+﻿{% comment %}
+Context: run, top3, histogram, summary, bbk_impl, total, high_conf
+{% endcomment %}
+<div style="max-width:900px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+
+ {# ── AI Summary ── #}
+ <div style="background:#fff;border:1px solid #E5E8EF;border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:12px;">
+ <div style="display:flex;align-items:center;gap:8px;">
+ <div style="width:32px;height:32px;border-radius:50%;background:#002583;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+ <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.847a4.5 4.5 0 003.09 3.09L15.75 12l-2.847.813a4.5 4.5 0 00-3.09 3.09z"/></svg>
+ </div>
+ <div>
+ <p style="font-size:12px;font-weight:700;color:#002583;margin:0;">AI Summary</p>
+ <p style="font-size:10px;color:#002583;margin:0;">Overall alignment assessment</p>
+ </div>
+ </div>
+ {% if summary %}
+ <p style="font-size:11px;color:#002583;line-height:1.75;margin:0;">{{ summary }}</p>
+ {% else %}
+ <p style="font-size:11px;color:#002583;font-style:italic;">Summary not available for this run.</p>
+ {% endif %}
+ <div style="border-top:1px solid #E5E8EF;padding-top:10px;display:flex;gap:12px;">
+ <div style="text-align:center;">
+ <p style="font-size:16px;font-weight:800;color:#002583;margin:0;">{{ total }}</p>
+ <p style="font-size:9px;color:#002583;margin:0;">Total pairs</p>
+ </div>
+ <div style="text-align:center;">
+ <p style="font-size:16px;font-weight:800;color:#002583;margin:0;">{{ high_conf }}</p>
+ <p style="font-size:9px;color:#002583;margin:0;">High confidence</p>
+ </div>
+ </div>
+ </div>
+
+ {# ── BBK Implications ── #}
+ <div style="background:#fff;border:1px solid #E5E8EF;border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:12px;">
+ <div style="display:flex;align-items:center;gap:8px;">
+ <div style="width:32px;height:32px;border-radius:50%;background:#002583;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+ <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+ </div>
+ <div>
+ <p style="font-size:12px;font-weight:700;color:#002583;margin:0;">BBK Implications</p>
+ <p style="font-size:10px;color:#002583;margin:0;">Compliance impact for clients</p>
+ </div>
+ </div>
+ {% if bbk_impl %}
+ <p style="font-size:11px;color:#002583;line-height:1.75;margin:0;">{{ bbk_impl }}</p>
+ {% else %}
+ <p style="font-size:11px;color:#002583;font-style:italic;">No implications generated.</p>
+ {% endif %}
+ </div>
+
+ {# ── Top 3 Divergences ── #}
+ <div style="background:#fff;border:1px solid #E5E8EF;border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:12px;">
+ <div>
+ <p style="font-size:12px;font-weight:700;color:#002583;margin:0 0 2px;">Top Divergences</p>
+ <p style="font-size:10px;color:#002583;margin:0;">Highest-importance clause pairs requiring attention</p>
+ </div>
+ {% if top3 %}
+ <div style="display:flex;flex-direction:column;gap:10px;">
+ {% for item in top3 %}
+ <div style="padding:10px 12px;background:#ffffff;border:1px solid #002583;border-radius:9px;border-left:3px solid #002583;">
+ <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:4px;">
+ <div style="display:flex;align-items:center;gap:5px;">
+ <span style="font-size:10px;font-weight:700;color:#002583;">{{ item.citation_a }}</span>
+ <span style="font-size:9px;color:#ffffff;">↔</span>
+ <span style="font-size:10px;font-weight:700;color:#002583;">{{ item.citation_b|default:"—" }}</span>
+ </div>
+ <span style="padding:1px 7px;border-radius:4px;font-size:9px;font-weight:700;background:{{ item.rel_bg }};color:{{ item.rel_color }};white-space:nowrap;flex-shrink:0;">{{ item.rel_label }}</span>
+ </div>
+ {% if item.key_difference %}
+ <p style="font-size:10px;color:#002583;line-height:1.6;margin:0 0 4px;">{{ item.key_difference }}</p>
+ {% endif %}
+ <span style="font-size:9px;color:#002583;">{{ item.confidence_pct }}% confidence</span>
+ </div>
+ {% endfor %}
+ </div>
+ {% else %}
+ <p style="font-size:11px;color:#002583;">No divergences found.</p>
+ {% endif %}
+ </div>
+
+ {# ── Confidence Histogram ── #}
+ <div style="background:#fff;border:1px solid #E5E8EF;border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:12px;">
+ <div>
+ <p style="font-size:12px;font-weight:700;color:#002583;margin:0 0 2px;">Confidence Distribution</p>
+ <p style="font-size:10px;color:#002583;margin:0;">AI confidence across all clause pairs</p>
+ </div>
+ {% if histogram %}
+ <div style="display:flex;flex-direction:column;gap:7px;">
+ {% for bin in histogram %}
+ <div style="display:flex;align-items:center;gap:8px;">
+ <span style="font-size:9px;color:#002583;width:52px;text-align:right;flex-shrink:0;">{{ bin.label }}</span>
+ <div style="flex:1;height:16px;background:#ffffff;border-radius:4px;overflow:hidden;">
+ <div style="height:100%;width:{{ bin.height_pct }}%;background:{{ bin.color }};border-radius:4px;display:flex;align-items:center;justify-content:flex-end;padding-right:4px;">
+ {% if bin.count %}
+ <span style="font-size:8px;font-weight:700;color:#fff;white-space:nowrap;">{{ bin.count }}</span>
+ {% endif %}
+ </div>
+ </div>
+ <span style="font-size:9px;color:#002583;width:24px;flex-shrink:0;">{{ bin.height_pct }}%</span>
+ </div>
+ {% endfor %}
+ </div>
+ <div style="display:flex;gap:10px;flex-wrap:wrap;">
+ <div style="display:flex;align-items:center;gap:4px;"><div style="width:8px;height:8px;border-radius:2px;background:#002583;"></div><span style="font-size:9px;color:#002583;">Low (&lt;57%)</span></div>
+ <div style="display:flex;align-items:center;gap:4px;"><div style="width:8px;height:8px;border-radius:2px;background:#002583;"></div><span style="font-size:9px;color:#002583;">Medium (57–70%)</span></div>
+ <div style="display:flex;align-items:center;gap:4px;"><div style="width:8px;height:8px;border-radius:2px;background:#002583;"></div><span style="font-size:9px;color:#002583;">High (&gt;70%)</span></div>
+ </div>
+ {% else %}
+ <p style="font-size:11px;color:#002583;">No histogram data available.</p>
+ {% endif %}
+ </div>
+
+</div>

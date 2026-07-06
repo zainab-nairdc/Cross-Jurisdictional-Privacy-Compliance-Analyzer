@@ -1,0 +1,425 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Home — CJPCA{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+ /* ── Card base ───────────────────────────────────────────────────── */
+ .an-card {
+ background: #fff;
+ border: 1px solid #E5E8EF;
+ border-radius: 14px;
+ overflow: hidden;
+ box-shadow: 0 1px 3px rgba(27,48,104,0.06), 0 1px 2px rgba(0,0,0,0.03);
+ }
+ .an-label {
+ font-size: 10px; font-weight: 700; text-transform: uppercase;
+ letter-spacing: .09em; color: #002583; display: block;
+ }
+ .an-track { height: 4px; border-radius: 2px; background: #ffffff; overflow: hidden; margin-top: 10px; }
+ .an-fill { height: 100%; border-radius: 2px; transition: width .6s cubic-bezier(.4,0,.2,1); }
+
+ @keyframes kpi-in { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+ .kpi-card { animation: kpi-in .35s ease both; }
+ .kpi-card:nth-child(2) { animation-delay: .07s; }
+ .kpi-card:nth-child(3) { animation-delay: .14s; }
+ .kpi-card:nth-child(4) { animation-delay: .21s; }
+
+ .hrow-link {
+ text-decoration: none; color: inherit; display: flex; align-items: center; gap: 12px;
+ flex: 1; padding: 8px 14px; border-bottom: 1px solid #E5E8EF;
+ transition: background .1s; min-height: 0;
+ }
+ .hrow-link:last-child { border-bottom: none; }
+ .hrow-link:hover { background: #ffffff; }
+
+ .qa-row {
+ display: flex; align-items: center; gap: 10px; padding: 8px 14px;
+ border-bottom: 1px solid #E5E8EF; text-decoration: none; color: inherit;
+ transition: background .12s; flex-shrink: 0;
+ }
+ .qa-row:last-child { border-bottom: none; }
+ .qa-row:hover { background: #ffffff; }
+
+ .action-row {
+ display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+ border-left: 3px solid; border-radius: 8px; background: #ffffff;
+ border-top: 1px solid #E5E8EF; border-right: 1px solid #E5E8EF;
+ border-bottom: 1px solid #E5E8EF;
+ }
+
+ .rpill { padding: 2px 8px; border-radius: 20px; font-size: 9px; font-weight: 700; white-space: nowrap; }
+ .pill { padding: 2px 8px; border-radius: 5px; font-size: 9px; font-weight: 700; white-space: nowrap; }
+
+ @keyframes pulsedot { 0%,100%{opacity:1} 50%{opacity:.35} }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="flex flex-col h-full overflow-hidden" style="background:#ffffff;">
+
+ {# ── Top bar ── #}
+ <div style="background:#fff;border-bottom:1px solid #E5E8EF;padding:14px 60px 14px 24px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;box-shadow:0 1px 0 rgba(27,48,104,0.04);">
+ <div>
+ <h1 style="font-size:16px;font-weight:800;color:#002583;margin:0;letter-spacing:-.025em;">
+ {{ greeting }}{% if request.user.is_authenticated %}, {{ request.user.first_name|default:request.user.username }}{% endif %}
+ </h1>
+ <p style="font-size:11px;color:#002583;margin:2px 0 0;">Here's your privacy compliance overview</p>
+ </div>
+ <div style="display:flex;align-items:center;gap:8px;">
+ {% if is_admin %}
+ <a href="{% url 'library-regulations' %}"
+ style="display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;background:#ffffff;color:#002583;font-size:11px;font-weight:600;text-decoration:none;border:1px solid #E5E8EF;transition:background .12s;"
+ onmouseover="this.style.background='#ffffff'" onmouseout="this.style.background='#ffffff'">
+ <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
+ Upload
+ </a>
+ {% endif %}
+ {% if is_analyst %}
+ <a href="{% url 'comparison' %}"
+ style="display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;background:#002583;color:#fff;font-size:11px;font-weight:700;text-decoration:none;box-shadow:0 2px 6px rgba(27,48,104,0.28);transition:background .12s;"
+ onmouseover="this.style.background='#002583'" onmouseout="this.style.background='#002583'">
+ <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+ New analysis
+ </a>
+ {% endif %}
+ </div>
+ </div>
+
+ {# ── Body ── #}
+ <div style="flex:1;overflow:hidden;padding:14px 20px 10px;display:flex;flex-direction:column;gap:10px;min-height:0;">
+
+ {# ══ ROW 1: 4 KPI cards ══ #}
+ <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;flex-shrink:0;">
+
+ {# Pending Review #}
+ <a href="{% url 'review' %}" class="an-card kpi-card" style="text-decoration:none;padding:14px 16px;border-left:4px solid #002583;display:block;">
+ <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+ <span class="an-label">Pending review</span>
+ <div style="width:30px;height:30px;border-radius:8px;background:#ffffff;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+ <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+ </div>
+ </div>
+ <div style="display:flex;align-items:baseline;gap:5px;margin-top:6px;">
+ <span data-countup="{{ pending_review_count }}" style="font-size:28px;font-weight:800;font-family:'Satoshi',sans-serif;line-height:1;color:#002583;letter-spacing:-.03em;">{{ pending_review_count }}</span>
+ <span style="font-size:11px;color:#002583;font-weight:500;">items</span>
+ </div>
+ <div class="an-track"><div class="an-fill" style="width:{% if pending_review_count %}60{% else %}0{% endif %}%;background:#002583;"></div></div>
+ <p style="font-size:10px;color:#002583;margin-top:6px;margin-bottom:0;">awaiting your review</p>
+ </a>
+
+ {# Open Gaps #}
+ <a href="{% url 'mapping' %}" class="an-card kpi-card" style="text-decoration:none;padding:14px 16px;border-left:4px solid #002583;display:block;">
+ <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+ <span class="an-label">Open gaps</span>
+ <div style="width:30px;height:30px;border-radius:8px;background:#ffffff;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+ <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+ </div>
+ </div>
+ <div style="display:flex;align-items:baseline;gap:5px;margin-top:6px;">
+ <span data-countup="{{ open_gaps_count }}" style="font-size:28px;font-weight:800;font-family:'Satoshi',sans-serif;line-height:1;color:#002583;letter-spacing:-.03em;">{{ open_gaps_count }}</span>
+ <span style="font-size:11px;color:#002583;font-weight:500;">gaps</span>
+ </div>
+ <div class="an-track"><div class="an-fill" style="width:{% if open_gaps_count %}55{% else %}0{% endif %}%;background:#002583;"></div></div>
+ <p style="font-size:10px;color:#002583;margin-top:6px;margin-bottom:0;">compliance gaps to fill</p>
+ </a>
+
+ {# Being Prepared #}
+ <a href="{% url 'system-monitoring' %}" class="an-card kpi-card" style="text-decoration:none;padding:14px 16px;border-left:4px solid #002583;display:block;">
+ <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+ <span class="an-label" style="display:flex;align-items:center;gap:5px;">
+ Being prepared
+ {% if ingesting_count %}<span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:#002583;animation:pulsedot 1.4s ease-in-out infinite;flex-shrink:0;"></span>{% endif %}
+ </span>
+ <div style="width:30px;height:30px;border-radius:8px;background:#ffffff;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+ <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
+ </div>
+ </div>
+ <div style="display:flex;align-items:baseline;gap:5px;margin-top:6px;">
+ <span data-countup="{{ ingesting_count }}" style="font-size:28px;font-weight:800;font-family:'Satoshi',sans-serif;line-height:1;color:#002583;letter-spacing:-.03em;">{{ ingesting_count }}</span>
+ <span style="font-size:11px;color:#002583;font-weight:500;">doc{{ ingesting_count|pluralize }}</span>
+ </div>
+ <div class="an-track"><div class="an-fill" style="width:{% if ingesting_count %}40{% else %}0{% endif %}%;background:#002583;"></div></div>
+ <p style="font-size:10px;color:#002583;margin-top:6px;margin-bottom:0;">indexing in progress</p>
+ </a>
+
+ {# Overall Coverage #}
+ <div class="an-card kpi-card" style="padding:14px 16px;border-left:4px solid #002583;">
+ <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+ <span class="an-label">Overall coverage</span>
+ <div style="width:30px;height:30px;border-radius:8px;background:#ffffff;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+ <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"/></svg>
+ </div>
+ </div>
+ <div style="display:flex;align-items:baseline;gap:2px;margin-top:6px;">
+ <span data-countup="{{ coverage_pct }}" data-suffix="%" style="font-size:28px;font-weight:800;font-family:'Satoshi',sans-serif;line-height:1;color:#002583;letter-spacing:-.03em;">{{ coverage_pct }}%</span>
+ </div>
+ <div class="an-track"><div class="an-fill" style="width:{{ coverage_pct }}%;background:#002583;"></div></div>
+ <p style="font-size:10px;color:#002583;margin-top:6px;margin-bottom:0;">obligations covered</p>
+ </div>
+
+ </div>
+
+ {# ══ ROWS 2+3: grid ══ #}
+ <div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:auto 1fr;gap:10px;">
+
+ {# Quick Actions #}
+ <div class="an-card" style="display:flex;flex-direction:column;overflow:hidden;align-self:start;">
+ <div style="padding:10px 14px 8px;border-bottom:1px solid #E5E8EF;flex-shrink:0;">
+ <span class="an-label">Quick Actions</span>
+ </div>
+ <div style="display:flex;flex-direction:column;">
+ {% comment %}
+ Quick Action tiles are role-gated: each tile only shows if the
+ current user can actually perform that action. Avoids the
+ "click → 403" UX dead-end.
+ {% endcomment %}
+
+ {% if user_role == 'analyst' %}
+ <a href="{% url 'comparison-analyst' %}" class="qa-row">
+ <div style="width:26px;height:26px;border-radius:7px;background:#002583;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+ <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/></svg>
+ </div>
+ <div style="flex:1;min-width:0;">
+ <p style="font-size:12px;font-weight:600;color:#002583;margin:0;line-height:1.3;">Start comparison</p>
+ <p style="font-size:10px;color:#002583;margin:0;">Compare two regulations on a topic</p>
+ </div>
+ <svg width="8" height="8" fill="none" viewBox="0 0 24 24" stroke="#ffffff" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+ </a>
+ <a href="{% url 'mapping' %}" class="qa-row">
+ <div style="width:26px;height:26px;border-radius:7px;background:#002583;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+ <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0z"/></svg>
+ </div>
+ <div style="flex:1;min-width:0;">
+ <p style="font-size:12px;font-weight:600;color:#002583;margin:0;line-height:1.3;">Run policy mapping</p>
+ <p style="font-size:10px;color:#002583;margin:0;">Map policy to regulations</p>
+ </div>
+ <svg width="8" height="8" fill="none" viewBox="0 0 24 24" stroke="#ffffff" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+ </a>
+ {% endif %}
+
+ {% if is_reviewer or is_admin %}
+ {# Reviewer + admin: approving/rejecting AI output #}
+ <a href="{% url 'review' %}" class="qa-row">
+ <div style="width:26px;height:26px;border-radius:7px;background:#002583;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+ <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+ </div>
+ <div style="flex:1;min-width:0;">
+ <p style="font-size:12px;font-weight:600;color:#002583;margin:0;line-height:1.3;">Review findings</p>
+ <p style="font-size:10px;color:#002583;margin:0;">Approve or reject AI results</p>
+ </div>
+ {% if pending_review_count %}<span style="font-size:9px;font-weight:700;background:#ffffff;color:#002583;padding:2px 7px;border-radius:20px;flex-shrink:0;">{{ pending_review_count }}</span>{% endif %}
+ <svg width="8" height="8" fill="none" viewBox="0 0 24 24" stroke="#ffffff" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+ </a>
+ {% endif %}
+
+ {# All roles: read-only views #}
+ <a href="{% url 'analytics' %}" class="qa-row">
+ <div style="width:26px;height:26px;border-radius:7px;background:#002583;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+ <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zm9.75-9.75c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v16.5c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V3.375zm-5.625 6c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v10.5c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V9.375z"/></svg>
+ </div>
+ <div style="flex:1;min-width:0;">
+ <p style="font-size:12px;font-weight:600;color:#002583;margin:0;line-height:1.3;">View analytics</p>
+ <p style="font-size:10px;color:#002583;margin:0;">Charts &amp; trends</p>
+ </div>
+ <svg width="8" height="8" fill="none" viewBox="0 0 24 24" stroke="#ffffff" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+ </a>
+
+ {% if is_admin %}
+ {# Admin-only: document/library administration #}
+ <a href="{% url 'library-regulations' %}" class="qa-row">
+ <div style="width:26px;height:26px;border-radius:7px;background:#002583;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+ <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
+ </div>
+ <div style="flex:1;min-width:0;">
+ <p style="font-size:12px;font-weight:600;color:#002583;margin:0;line-height:1.3;">Upload document</p>
+ <p style="font-size:10px;color:#002583;margin:0;">Add regulations or policies</p>
+ </div>
+ <svg width="8" height="8" fill="none" viewBox="0 0 24 24" stroke="#ffffff" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+ </a>
+ <a href="{% url 'user-management' %}" class="qa-row">
+ <div style="width:26px;height:26px;border-radius:7px;background:#002583;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+ <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"/></svg>
+ </div>
+ <div style="flex:1;min-width:0;">
+ <p style="font-size:12px;font-weight:600;color:#002583;margin:0;line-height:1.3;">Manage users</p>
+ <p style="font-size:10px;color:#002583;margin:0;">Invite, reset, disable accounts</p>
+ </div>
+ <svg width="8" height="8" fill="none" viewBox="0 0 24 24" stroke="#ffffff" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+ </a>
+ {% endif %}
+ </div>
+ </div>
+
+ {# Requires Attention #}
+ <div class="an-card" style="display:flex;flex-direction:column;overflow:hidden;">
+ <div style="padding:10px 14px 8px;border-bottom:1px solid #E5E8EF;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;">
+ <span class="an-label">Requires Attention</span>
+ {% if pending_actions %}<span style="font-size:9px;font-weight:700;background:#ffffff;color:#002583;padding:2px 8px;border-radius:20px;">{{ pending_actions|length }}</span>{% endif %}
+ </div>
+ {% if pending_actions %}
+ <div style="flex:1;display:flex;flex-direction:column;gap:6px;padding:10px 12px;overflow-y:auto;">
+ {% for action in pending_actions %}
+ <div class="action-row" style="border-left-color:{{ action.color }};">
+ <div style="width:6px;height:6px;border-radius:50%;background:{{ action.color }};flex-shrink:0;"></div>
+ <p style="flex:1;font-size:12px;color:#002583;min-width:0;line-height:1.4;margin:0;">{{ action.title }}</p>
+ <a href="{{ action.url }}" style="flex-shrink:0;padding:5px 12px;border-radius:6px;font-size:11px;font-weight:700;color:#fff;text-decoration:none;white-space:nowrap;background:{{ action.color }};">{{ action.button }}</a>
+ </div>
+ {% endfor %}
+ </div>
+ {% else %}
+ <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:20px;">
+ <div style="width:40px;height:40px;border-radius:50%;background:#ffffff;display:flex;align-items:center;justify-content:center;">
+ <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+ </div>
+ <p style="font-size:12px;font-weight:600;color:#002583;margin:0;">All clear</p>
+ <p style="font-size:10px;color:#002583;margin:0;text-align:center;">No items need attention.</p>
+ </div>
+ {% endif %}
+ </div>
+
+ {# Recent Analyses — spans rows 2+3 #}
+ <div class="an-card" style="display:flex;flex-direction:column;min-height:0;overflow:hidden;grid-row:span 2;">
+ <div style="padding:10px 14px 8px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #E5E8EF;flex-shrink:0;">
+ <span class="an-label">Recent Analyses</span>
+ <div style="display:flex;gap:10px;">
+ <a href="{% url 'comparison' %}" style="font-size:10px;color:#002583;text-decoration:none;font-weight:700;">+ Comparison</a>
+ <a href="{% url 'mapping' %}" style="font-size:10px;color:#002583;text-decoration:none;font-weight:700;">+ Mapping</a>
+ </div>
+ </div>
+ {% if recent_analyses %}
+ <div style="flex:1;display:flex;flex-direction:column;min-height:0;overflow-y:auto;">
+ {% for item in recent_analyses %}
+ <a href="{{ item.url }}" class="hrow-link">
+ {% if item.type == 'Comparison' %}
+ <span class="pill" style="background:#ffffff;color:#002583;flex-shrink:0;">Comp</span>
+ {% else %}
+ <span class="pill" style="background:#ffffff;color:#002583;flex-shrink:0;">Map</span>
+ {% endif %}
+ <span style="font-size:11px;color:#002583;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;">{{ item.description }}</span>
+ {% if item.status == 'complete' or item.status == 'approved' %}
+ <span class="rpill" style="background:#ffffff;color:#002583;">Done</span>
+ {% elif item.status == 'running' %}
+ <span class="rpill" style="background:#ffffff;color:#002583;">Running</span>
+ {% elif item.status == 'failed' %}
+ <span class="rpill" style="background:#ffffff;color:#002583;">Failed</span>
+ {% else %}
+ <span class="rpill" style="background:#ffffff;color:#002583;">{{ item.status|title }}</span>
+ {% endif %}
+ <span style="font-size:9px;color:#ffffff;flex-shrink:0;">{{ item.date|date:"d M" }}</span>
+ </a>
+ {% endfor %}
+ </div>
+ {% else %}
+ <div style="flex:1;display:flex;align-items:center;justify-content:center;">
+ <p style="font-size:11px;color:#002583;">No analyses yet.</p>
+ </div>
+ {% endif %}
+ </div>
+
+ {# Coverage by Jurisdiction — spans cols 1+2, row 3 #}
+ <div class="an-card" style="padding:12px 14px;display:flex;flex-direction:column;grid-column:span 2;">
+ <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px;flex-shrink:0;">
+ <span class="an-label">Coverage by Jurisdiction</span>
+ <span style="font-size:10px;color:#002583;">obligation coverage %</span>
+ </div>
+ <div style="height:110px;position:relative;">
+ <canvas id="chart-coverage-jurisdiction"></canvas>
+ </div>
+ </div>
+
+ </div>
+
+ {# ── Ingestion widget (admin-only — non-admins would get 403 every poll) ── #}
+ {% if is_admin %}
+ <div id="ingestion-widget" hx-get="{% url 'ingestion-widget' %}" hx-trigger="every 5s" hx-swap="innerHTML" style="flex-shrink:0;">
+ {% include 'partials/_ingestion_widget.html' %}
+ </div>
+ {% endif %}
+
+ </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+ document.querySelectorAll('[data-countup]').forEach(function(el) {
+ var target = parseFloat(el.dataset.countup);
+ var suffix = el.dataset.suffix || '';
+ if (isNaN(target)) return;
+ var start = performance.now();
+ var duration = 900;
+ (function update(now) {
+ var t = Math.min((now - start) / duration, 1);
+ var ease = 1 - Math.pow(1 - t, 3);
+ el.textContent = Math.round(target * ease) + suffix;
+ if (t < 1) requestAnimationFrame(update);
+ })(performance.now());
+ });
+
+ (function () {
+ const data = {{ chart_data_json|safe }};
+ function tryInit() {
+ if (typeof Chart === 'undefined') { setTimeout(tryInit, 50); return; }
+ const ctx = document.getElementById('chart-coverage-jurisdiction');
+ if (!ctx) return;
+ Chart.defaults.font.family = "'Satoshi', sans-serif";
+ new Chart(ctx, {
+ type: 'bar',
+ data: {
+ labels: data.coverageByJurisdiction.labels,
+ datasets: [{
+ data: data.coverageByJurisdiction.values,
+ backgroundColor: data.coverageByJurisdiction.labels.map((lbl, i) => {
+ if (lbl === 'Bahrain') return '#002583';
+ var v = data.coverageByJurisdiction.values[i];
+ return v >= 70 ? '#002583' : v >= 40 ? '#002583' : '#002583';
+ }),
+ borderColor: 'transparent',
+ borderWidth: 0,
+ borderRadius: 5,
+ barThickness: 16,
+ maxBarThickness: 18,
+ }],
+ },
+ options: {
+ indexAxis: 'y',
+ responsive: true,
+ maintainAspectRatio: false,
+ layout: { padding: { top: 0, bottom: 0 } },
+ plugins: {
+ legend: { display: false },
+ tooltip: {
+ backgroundColor: '#fff',
+ borderColor: '#E5E8EF',
+ borderWidth: 1,
+ titleColor: '#002583',
+ bodyColor: '#002583',
+ padding: 10,
+ cornerRadius: 8,
+ callbacks: { label: (c) => ` ${c.raw}% covered` },
+ },
+ },
+ scales: {
+ x: {
+ max: 100,
+ ticks: { callback: v => `${v}%`, font: { size: 9 }, color: '#002583' },
+ grid: { color: '#ffffff' },
+ border: { display: false },
+ },
+ y: {
+ ticks: { font: { size: 11 }, color: '#002583' },
+ grid: { display: false },
+ border: { display: false },
+ afterFit(scale) { scale.paddingTop = 8; scale.paddingBottom = 8; },
+ },
+ },
+ },
+ });
+ }
+ tryInit();
+ })();
+</script>
+{% endblock %}

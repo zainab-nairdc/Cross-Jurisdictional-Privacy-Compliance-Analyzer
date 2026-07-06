@@ -1,0 +1,343 @@
+﻿<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <title>Create account — CJPCA</title>
+ <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap" rel="stylesheet">
+ <style>
+ *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+ html, body { height: 100%; font-family: 'Satoshi', sans-serif; }
+
+ .page {
+ display: flex;
+ height: 100vh;
+ overflow: hidden;
+ }
+
+ /* ── Left panel ── */
+ .left {
+ width: 420px;
+ flex-shrink: 0;
+ background: #fff;
+ display: flex;
+ flex-direction: column;
+ justify-content: center;
+ padding: 56px 52px;
+ position: relative;
+ z-index: 2;
+ box-shadow: 4px 0 40px rgba(0,0,0,0.08);
+ overflow-y: auto;
+ }
+
+ .logo {
+ display: flex;
+ align-items: center;
+ gap: 10px;
+ margin-bottom: 40px;
+ }
+ .logo-mark {
+ width: 36px;
+ height: 36px;
+ background: #002583;
+ border-radius: 9px;
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ }
+ .logo-mark svg { color: #fff; }
+ .logo-text { font-size: 15px; font-weight: 700; color: #002583; letter-spacing: -0.02em; }
+ .logo-sub { font-size: 10px; color: #002583; font-weight: 500; margin-top: 1px; }
+
+ .form-heading { font-size: 26px; font-weight: 700; color: #002583; letter-spacing: -0.03em; margin-bottom: 6px; }
+ .form-sub { font-size: 13px; color: #002583; margin-bottom: 32px; }
+
+ .field { margin-bottom: 14px; }
+ .field label { display: block; font-size: 11px; font-weight: 600; color: #002583; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+ .field-wrap { position: relative; }
+ .field-wrap svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #002583; pointer-events: none; }
+ .field input {
+ width: 100%;
+ padding: 11px 14px 11px 40px;
+ border: 1.5px solid #E5E8EF;
+ border-radius: 10px;
+ font-size: 13px;
+ font-family: inherit;
+ color: #002583;
+ background: #ffffff;
+ outline: none;
+ transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+ }
+ .field input:focus {
+ border-color: #002583;
+ background: #fff;
+ box-shadow: 0 0 0 3px rgba(27,48,104,0.08);
+ }
+ .field input.error {
+ border-color: #002583;
+ background: #ffffff;
+ }
+
+ .btn-primary {
+ width: 100%;
+ padding: 13px;
+ border-radius: 10px;
+ border: none;
+ background: #002583;
+ color: #fff;
+ font-size: 14px;
+ font-weight: 600;
+ font-family: inherit;
+ cursor: pointer;
+ transition: background 0.15s, box-shadow 0.15s;
+ letter-spacing: -0.01em;
+ margin-top: 8px;
+ }
+ .btn-primary:hover { background: #002583; box-shadow: 0 4px 16px rgba(27,48,104,0.28); }
+
+ .divider { display: flex; align-items: center; gap: 12px; margin: 20px 0; }
+ .divider span { font-size: 11px; color: #ffffff; white-space: nowrap; }
+ .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: #E5E8EF; }
+
+ .switch { text-align: center; font-size: 12px; color: #002583; margin-top: 4px; }
+ .switch a { color: #002583; font-weight: 600; text-decoration: none; }
+ .switch a:hover { text-decoration: underline; }
+
+ .error-box {
+ background: #ffffff;
+ border: 1px solid #E5E8EF;
+ border-radius: 8px;
+ padding: 10px 14px;
+ margin-bottom: 16px;
+ font-size: 12px;
+ color: #002583;
+ }
+ .error-box ul { padding-left: 16px; margin: 0; }
+ .error-box li { margin-top: 2px; }
+
+ .field-error {
+ font-size: 11px;
+ color: #002583;
+ margin-top: 5px;
+ }
+
+ .terms {
+ font-size: 11px;
+ color: #002583;
+ text-align: center;
+ margin-top: 16px;
+ line-height: 1.6;
+ }
+ .terms a { color: #002583; text-decoration: none; }
+ .terms a:hover { text-decoration: underline; }
+
+ /* ── Right panel ── */
+ .right {
+ flex: 1;
+ position: relative;
+ background: #002583;
+ display: flex;
+ align-items: flex-end;
+ padding: 64px;
+ overflow: hidden;
+ }
+
+ /* Gradient orbs */
+ .orb {
+ position: absolute;
+ border-radius: 50%;
+ filter: blur(80px);
+ opacity: 0.35;
+ pointer-events: none;
+ }
+ .orb-1 { width: 500px; height: 500px; background: #002583; top: -100px; right: -80px; }
+ .orb-2 { width: 400px; height: 400px; background: #002583; bottom: 80px; left: 60px; opacity: 0.2; }
+ .orb-3 { width: 300px; height: 300px; background: #002583; top: 40%; right: 20%; opacity: 0.25; }
+
+ .right-content { position: relative; z-index: 1; }
+ .right-eyebrow {
+ font-size: 11px;
+ font-weight: 700;
+ color: rgba(255,255,255,0.45);
+ text-transform: uppercase;
+ letter-spacing: 0.12em;
+ margin-bottom: 16px;
+ }
+ .right-heading {
+ font-size: 52px;
+ font-weight: 700;
+ color: #fff;
+ letter-spacing: -0.04em;
+ line-height: 1.05;
+ margin-bottom: 20px;
+ }
+ .right-heading span { color: rgba(255,255,255,0.35); }
+ .right-desc {
+ font-size: 14px;
+ color: rgba(255,255,255,0.55);
+ max-width: 380px;
+ line-height: 1.7;
+ margin-bottom: 36px;
+ }
+
+ .feature-list { display: flex; flex-direction: column; gap: 12px; }
+ .feature-item {
+ display: flex;
+ align-items: flex-start;
+ gap: 12px;
+ }
+ .feature-icon {
+ width: 32px;
+ height: 32px;
+ border-radius: 8px;
+ background: rgba(255,255,255,0.1);
+ border: 1px solid rgba(255,255,255,0.12);
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ flex-shrink: 0;
+ font-size: 14px;
+ }
+ .feature-text { font-size: 13px; color: rgba(255,255,255,0.6); line-height: 1.5; padding-top: 6px; }
+ .feature-text strong { color: rgba(255,255,255,0.9); font-weight: 600; }
+ </style>
+</head>
+<body>
+<div class="page">
+
+ {# ── Left: form panel ── #}
+ <div class="left">
+
+ <div class="logo">
+ <div>
+ <div class="logo-text">CJPCA</div>
+ <div class="logo-sub">Compliance Analyzer</div>
+ </div>
+ </div>
+
+ <p class="form-heading">Create account.</p>
+ <p class="form-sub">Get started with your free workspace</p>
+
+ {% if form.non_field_errors %}
+ <div class="error-box">
+ <ul>
+ {% for error in form.non_field_errors %}
+ <li>{{ error }}</li>
+ {% endfor %}
+ </ul>
+ </div>
+ {% endif %}
+
+ {% comment %}
+ self-signup is currently disabled — the 'register' URL is commented out
+ in apps/core/urls.py. POST to '.' so this template is at least parseable
+ if anyone re-enables the route later.
+ {% endcomment %}
+ <form method="post" action=".">
+ {% csrf_token %}
+
+ <div class="field">
+ <label>Username</label>
+ <div class="field-wrap">
+ <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/>
+ </svg>
+ <input type="text" name="username" value="{{ form.username.value|default:'' }}"
+ placeholder="Choose a username" autofocus autocomplete="username"
+ class="{% if form.username.errors %}error{% endif %}">
+ </div>
+ {% if form.username.errors %}
+ <p class="field-error">{{ form.username.errors|join:", " }}</p>
+ {% endif %}
+ </div>
+
+ <div class="field">
+ <label>Email address</label>
+ <div class="field-wrap">
+ <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"/>
+ </svg>
+ <input type="email" name="email" value="{{ form.email.value|default:'' }}"
+ placeholder="your@email.com" autocomplete="email"
+ class="{% if form.email.errors %}error{% endif %}">
+ </div>
+ {% if form.email.errors %}
+ <p class="field-error">{{ form.email.errors|join:", " }}</p>
+ {% endif %}
+ </div>
+
+ <div class="field">
+ <label>Password</label>
+ <div class="field-wrap">
+ <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"/>
+ </svg>
+ <input type="password" name="password1" placeholder="Create a password" autocomplete="new-password"
+ class="{% if form.password1.errors %}error{% endif %}">
+ </div>
+ {% if form.password1.errors %}
+ <p class="field-error">{{ form.password1.errors|join:", " }}</p>
+ {% endif %}
+ </div>
+
+ <div class="field">
+ <label>Confirm password</label>
+ <div class="field-wrap">
+ <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"/>
+ </svg>
+ <input type="password" name="password2" placeholder="Repeat your password" autocomplete="new-password"
+ class="{% if form.password2.errors %}error{% endif %}">
+ </div>
+ {% if form.password2.errors %}
+ <p class="field-error">{{ form.password2.errors|join:", " }}</p>
+ {% endif %}
+ </div>
+
+ <button type="submit" class="btn-primary">Create account</button>
+ </form>
+
+ <div class="divider"><span>or</span></div>
+
+ <p class="switch">Already have an account? <a href="{% url 'login' %}">Sign in</a></p>
+
+ <p class="terms">
+ By creating an account you agree to our<br>
+ <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>
+ </p>
+
+ </div>
+
+ {# ── Right: hero panel ── #}
+ <div class="right">
+ <div class="orb orb-1"></div>
+ <div class="orb orb-2"></div>
+ <div class="orb orb-3"></div>
+
+ <div class="right-content">
+ <p class="right-eyebrow">Cross-Jurisdictional Platform</p>
+ <h1 class="right-heading">Join us<span>.</span></h1>
+ <p class="right-desc">
+ Start analyzing privacy compliance across jurisdictions in minutes.
+ Powered by AI, built for compliance teams.
+ </p>
+ <div class="feature-list">
+ <div class="feature-item">
+ <div class="feature-icon">🗺️</div>
+ <div class="feature-text"><strong>Multi-jurisdiction mapping</strong> — Bahrain, India, Kuwait</div>
+ </div>
+ <div class="feature-item">
+ <div class="feature-icon">🔍</div>
+ <div class="feature-text"><strong>Gap analysis</strong> — Identify compliance gaps automatically</div>
+ </div>
+ <div class="feature-item">
+ <div class="feature-icon">📋</div>
+ <div class="feature-text"><strong>Remediation plans</strong> — Actionable steps to close gaps fast</div>
+ </div>
+ </div>
+ </div>
+ </div>
+
+</div>
+</body>
+</html>

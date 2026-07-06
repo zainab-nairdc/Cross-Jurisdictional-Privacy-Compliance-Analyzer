@@ -1,0 +1,100 @@
+{% comment %}
+Left-panel queue for the reg-vs-reg review split-pane. Each row is HTMX-
+clickable to load the detail card on the right, plus carries a separate
+"Open workspace" pill so the reviewer can jump straight to the full
+workspace if they need broader context. Click events on the pill are
+stopped from propagating so they don't also trigger the row's detail load.
+{% endcomment %}
+
+{% if items %}
+ {% for result in items %}
+ <div class="rv-row"
+      style="border-left-color:{{ result.rv_rel_color|default:result.rel_color }};"
+      hx-get="{% url 'comparison-result-detail' result.pk %}?review=1"
+      hx-target="#rv-detail"
+      hx-swap="innerHTML"
+      onclick="document.querySelectorAll('.rv-row').forEach(r=>r.classList.remove('active'));this.classList.add('active')">
+
+  <div style="flex:1;min-width:0;">
+
+   {# Top row: relationship + lifecycle status #}
+   <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:5px;">
+    <span style="padding:2px 8px;border-radius:5px;font-size:9px;font-weight:800;background:{{ result.rv_rel_bg|default:result.rel_bg }};color:{{ result.rv_rel_color|default:result.rel_color }};">
+     {{ result.rel_label }}
+    </span>
+    {% if result.lifecycle == 'approved' %}
+     <span style="padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700;background:#E1F4E5;color:#1B7F3A;">Approved</span>
+    {% elif result.lifecycle == 'rejected' %}
+     <span style="padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700;background:#FCE8E8;color:#D93939;">Rejected</span>
+    {% elif result.lifecycle == 'reviewed' %}
+     <span style="padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700;background:#E5E8EF;color:#002583;">Reviewed</span>
+    {% else %}
+     <span style="padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700;background:#FFF6E0;color:#B07A00;">Pending</span>
+    {% endif %}
+   </div>
+
+   {# Citations #}
+   <p style="font-size:11px;font-weight:700;color:#1F2937;margin:0 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+    {{ result.citation_a|truncatechars:46 }}
+   </p>
+   {% if result.citation_b %}
+    <p style="font-size:10px;color:#6B7280;margin:0 0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+     <span style="color:#002583;font-weight:700;">↔</span> {{ result.citation_b|truncatechars:42 }}
+    </p>
+   {% else %}
+    <p style="font-size:10px;color:#9CA3AF;margin:0 0 8px;font-style:italic;">No corresponding clause</p>
+   {% endif %}
+
+   {# Footer: confidence + pair + Open workspace pill #}
+   <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;">
+    <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">
+     <div style="width:32px;height:4px;border-radius:2px;background:#EEF1F6;overflow:hidden;">
+      <div style="height:100%;width:{{ result.confidence_pct }}%;background:{% if result.confidence_pct >= 75 %}#1B7F3A{% elif result.confidence_pct >= 50 %}#FFB800{% else %}#D93939{% endif %};"></div>
+     </div>
+     <span style="font-size:9px;font-weight:700;color:#002583;">{{ result.confidence_pct }}%</span>
+    </div>
+    {% if result.run %}
+    <a href="{% url 'comparison-workspace' result.run.pk %}"
+       onclick="event.stopPropagation()"
+       title="{{ result.run.pair_label }}"
+       style="display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;color:#002583;text-decoration:none;padding:3px 9px;border-radius:20px;background:#E5E8EF;white-space:nowrap;flex-shrink:0;transition:background .12s;"
+       onmouseover="this.style.background='#D9DEE9'" onmouseout="this.style.background='#E5E8EF'">
+     <svg width="8" height="8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/></svg>
+     Open workspace
+    </a>
+    {% endif %}
+   </div>
+
+  </div>
+
+  {# Arrow indicator — opens the detail panel #}
+  <div style="display:flex;align-items:center;padding-left:8px;flex-shrink:0;color:#9CA3AF;">
+   <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
+   </svg>
+  </div>
+
+ </div>
+ {% endfor %}
+
+{% else %}
+ <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 20px;text-align:center;">
+  <div style="width:44px;height:44px;border-radius:12px;background:#E5E8EF;display:flex;align-items:center;justify-content:center;margin-bottom:12px;">
+   <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="1.5">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+   </svg>
+  </div>
+  <p style="font-size:12px;font-weight:700;color:#002583;margin:0 0 4px;">
+   {% if lifecycle_filter %}No {{ lifecycle_filter }} items{% else %}Queue is empty{% endif %}
+  </p>
+  <p style="font-size:11px;color:#6B7280;line-height:1.6;margin:0;">
+   {% if lifecycle_filter %}Switch to "All" to see all findings.
+   {% else %}Run a comparison first — results appear here.{% endif %}
+  </p>
+  {% if not lifecycle_filter %}
+   <a href="{% url 'comparison' %}" style="margin-top:14px;display:inline-flex;align-items:center;gap:5px;padding:8px 16px;border-radius:8px;background:#002583;color:#fff;font-size:11px;font-weight:700;text-decoration:none;">
+    Go to Comparisons
+   </a>
+  {% endif %}
+ </div>
+{% endif %}

@@ -1,0 +1,43 @@
+{% comment %}
+Top-right profile widget. Fixed position so it floats above any page's
+content. Clicking the avatar opens a dropdown with the full name, role,
+email, a "View profile" link, and a Sign out button.
+{% endcomment %}
+{% if user.is_authenticated %}
+<div x-data="{ open: false }"
+ x-show="!copilotOpen"
+ style="position:fixed;top:14px;right:14px;z-index:60;">
+
+ <button type="button"
+ @click="open = !open"
+ @click.outside="open = false"
+ title="{{ user.get_full_name|default:user.username }} — click for menu"
+ style="width:34px;height:34px;border-radius:50%;background:#ffffff;color:#002583;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;border:1px solid #E5E8EF;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.08);padding:0;">
+ {{ user.first_name|first|upper }}{{ user.last_name|first|upper|default:"" }}{% if not user.first_name and not user.last_name %}{{ user.username|first|upper }}{% endif %}
+ </button>
+
+ {# Dropdown #}
+ <div x-show="open" x-cloak x-transition.opacity
+ style="position:absolute;top:calc(100% + 6px);right:0;width:240px;background:#fff;border:1px solid #E5E8EF;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.08);overflow:hidden;">
+
+ {# Identity block #}
+ <div style="padding:12px 14px;border-bottom:1px solid #E5E8EF;">
+ <p style="font-size:12px;font-weight:700;color:#002583;line-height:1.3;margin:0;">{{ user.get_full_name|default:user.username }}</p>
+ <p style="font-size:10px;color:#002583;line-height:1.4;margin-top:2px;word-break:break-all;">{{ user.email|default:"—" }}</p>
+ </div>
+
+ {# Sign out — POST form (Django 5+ disallows GET logout) #}
+ <form method="post" action="{% url 'logout' %}" class="m-0 p-0" style="border-top:1px solid #E5E8EF;">
+ {% csrf_token %}
+ <button type="submit"
+ style="display:flex;align-items:center;gap:8px;padding:9px 14px;font-size:12px;color:#002583;background:transparent;border:0;cursor:pointer;width:100%;text-align:left;"
+ onmouseover="this.style.background='#ffffff'" onmouseout="this.style.background=''">
+ <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="2">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75"/>
+ </svg>
+ Sign out
+ </button>
+ </form>
+ </div>
+</div>
+{% endif %}

@@ -1,0 +1,456 @@
+{% comment %}Copilot slide-in v3. HTMX POST /copilot/message/ → #cp-messages.{% endcomment %}
+<div x-show="copilotOpen"
+     x-cloak
+     x-transition:enter="transition ease-out duration-200"
+     x-transition:enter-start="translate-x-full opacity-0"
+     x-transition:enter-end="translate-x-0 opacity-100"
+     x-transition:leave="transition ease-in duration-150"
+     x-transition:leave-start="translate-x-0 opacity-100"
+     x-transition:leave-end="translate-x-full opacity-0"
+     class="fixed inset-y-0 right-0 bg-white shadow-2xl border-l border-gray-200 flex flex-col z-40"
+     style="font-family:inherit;width:460px !important;max-width:460px !important;min-width:460px !important;box-sizing:border-box;overflow:hidden;contain:inline-size;"
+     x-data="{ mode: localStorage.getItem('copilot_mode') || 'approved' }"
+     x-init="$watch('mode', v => localStorage.setItem('copilot_mode', v))">
+
+ {# ── Header ────────────────────────────────────────────────────────── #}
+ <div style="background:#fff;border-bottom:1px solid #E5E8EF;padding:14px 18px;flex-shrink:0;display:flex;align-items:center;gap:10px;">
+  <div style="width:34px;height:34px;border-radius:10px;background:#002583;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 8px rgba(0,37,131,.18);">
+   <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z"/>
+   </svg>
+  </div>
+  <div style="flex:1;min-width:0;">
+   <p style="font-size:14px;font-weight:800;color:#002583;margin:0;letter-spacing:-.01em;">Copilot</p>
+   <p style="font-size:10.5px;color:#7B8499;margin:1px 0 0;">Grounded compliance assistant</p>
+  </div>
+  <button title="Clear conversation"
+          hx-post="{% url 'copilot-clear' %}"
+          hx-target="#cp-messages"
+          hx-swap="innerHTML"
+          hx-on::after-request="localStorage.removeItem('copilotHistory');localStorage.removeItem('copilotHistory_v2');"
+          style="padding:6px;border-radius:7px;background:#F4F6FB;border:1px solid #E5E8EF;cursor:pointer;color:#7B8499;transition:background .12s,color .12s;flex-shrink:0;"
+          onmouseover="this.style.background='#E5EBF5';this.style.color='#002583'"
+          onmouseout="this.style.background='#F4F6FB';this.style.color='#7B8499'">
+   <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/>
+   </svg>
+  </button>
+  <button @click="copilotOpen = false"
+          style="padding:6px;border-radius:7px;background:#F4F6FB;border:1px solid #E5E8EF;cursor:pointer;color:#7B8499;transition:background .12s,color .12s;flex-shrink:0;"
+          onmouseover="this.style.background='#E5EBF5';this.style.color='#002583'"
+          onmouseout="this.style.background='#F4F6FB';this.style.color='#7B8499'">
+   <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+   </svg>
+  </button>
+ </div>
+
+ {# Mode toggle. #}
+ <div style="padding:10px 16px 6px;border-bottom:1px solid #E5E8EF;flex-shrink:0;background:#fff;">
+  <div style="display:inline-flex;gap:3px;background:#F4F6FB;border-radius:999px;padding:3px;border:1px solid #E5E8EF;">
+   <button type="button" @click="mode = 'approved'"
+           :class="mode === 'approved' ? 'cp-mode cp-mode-active' : 'cp-mode'">
+    Approved
+   </button>
+   <button type="button" @click="mode = 'document'"
+           :class="mode === 'document' ? 'cp-mode cp-mode-active' : 'cp-mode'">
+    Document Q&amp;A
+   </button>
+  </div>
+  <p style="font-size:10px;color:#7B8499;line-height:1.5;margin:7px 2px 0;">
+   <span x-show="mode === 'approved'" x-cloak>Answers from reviewer-approved comparison + mapping results, with raw regulation text as fallback.</span>
+   <span x-show="mode === 'document'" x-cloak>Pick one document below, then ask questions about its content — strictly grounded in that doc's chunks.</span>
+  </p>
+ </div>
+
+ {# Hidden field carrying the mode to HTMX submissions. #}
+ <input type="hidden" form="cp-form" name="copilot_mode" :value="mode">
+
+ {# Scope chip row (Document Q&A only). #}
+ <div x-show="mode === 'document'" x-cloak
+      style="padding:10px 18px;border-bottom:1px solid #E5E8EF;flex-shrink:0;background:#FAFBFD;display:flex;align-items:center;gap:8px;flex-wrap:wrap;position:relative;"
+      x-data="{
+        scopeOpen: false,
+        selectedDoc: '',
+        selectedLabel: 'All documents',
+        pick(value, label) {
+          this.selectedDoc = value;
+          this.selectedLabel = label || 'All documents';
+          this.scopeOpen = false;
+          const sel = document.getElementById('copilot_doc_select');
+          if (sel) sel.value = value;
+          console.debug('[copilot] scope picked:', value);
+        }
+      }">
+  <span style="font-size:9px;font-weight:800;color:#7B8499;text-transform:uppercase;letter-spacing:.07em;">Scope</span>
+  <button @click="scopeOpen = !scopeOpen" type="button"
+          style="display:inline-flex;align-items:center;gap:6px;padding:4px 11px;border-radius:50px;background:#fff;border:1px solid #E5E8EF;font-size:11px;color:#002583;cursor:pointer;font-weight:600;font-family:inherit;max-width:280px;">
+   <span x-text="selectedLabel" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+   <svg width="9" height="9" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0;"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg>
+  </button>
+
+  {# Dropdown — flush under the scope row. #}
+  <div x-show="scopeOpen" x-cloak @click.outside="scopeOpen = false"
+       style="position:absolute;top:calc(100% - 1px);left:0;right:0;background:#fff;border:1px solid #E5E8EF;border-top:none;box-shadow:0 8px 24px rgba(0,37,131,.12);z-index:50;max-height:320px;overflow-y:auto;">
+   <button type="button" @click="pick('', 'All documents')"
+           style="width:100%;text-align:left;padding:9px 18px;background:#fff;border:none;border-bottom:1px solid #F0F3F9;font-size:11px;color:#002583;cursor:pointer;font-family:inherit;font-weight:600;"
+           onmouseover="this.style.background='#F4F6FB'" onmouseout="this.style.background='#fff'">
+    All documents (whole corpus)
+   </button>
+   {% if copilot_doc_options %}
+   {% for d in copilot_doc_options %}
+   <button type="button"
+           @click="pick('{{ d.chunk_title|escapejs }}', '[{{ d.jurisdiction|capfirst|slice:":3" }}] {{ d.name|truncatechars:42|escapejs }}')"
+           style="width:100%;text-align:left;padding:8px 18px;background:#fff;border:none;border-bottom:1px solid #F0F3F9;font-size:11px;color:#002583;cursor:pointer;font-family:inherit;"
+           onmouseover="this.style.background='#F4F6FB'" onmouseout="this.style.background='#fff'">
+    <span style="font-size:9px;font-weight:700;color:#7B8499;text-transform:uppercase;letter-spacing:.05em;margin-right:5px;">[{{ d.jurisdiction|capfirst|slice:":3" }}]</span>{{ d.name|truncatechars:50 }}
+   </button>
+   {% endfor %}
+   {% endif %}
+  </div>
+ </div>
+
+ {% comment %}
+ Hidden input carries the chosen doc to HTMX submissions. We use a plain
+ input (not a <select>) so any chunk_title value can be set programmatically
+ without it being silently dropped because no matching <option> existed at
+ page load.
+ {% endcomment %}
+ <input type="hidden" name="copilot_doc_select" id="copilot_doc_select" value="">
+
+ {# ── Messages thread ──────────────────────────────────────────────── #}
+ <div id="cp-messages"
+      style="flex:1;overflow-y:auto;overflow-x:hidden;padding:14px 16px;display:flex;flex-direction:column;gap:12px;background:#fff;word-break:break-word;overflow-wrap:break-word;">
+  <div id="cp-empty-state" style="margin:auto;text-align:center;padding:24px 12px;">
+   <div style="width:42px;height:42px;border-radius:14px;background:#F4F6FB;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;">
+    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg>
+   </div>
+   <p style="font-size:13px;font-weight:700;color:#002583;margin:0 0 4px;" x-show="mode === 'approved'" x-cloak>Ask from approved analysis</p>
+   <p style="font-size:13px;font-weight:700;color:#002583;margin:0 0 4px;" x-show="mode === 'document'" x-cloak>Ask a document directly</p>
+   <p style="font-size:11px;color:#7B8499;margin:0 0 16px;line-height:1.55;" x-show="mode === 'approved'" x-cloak>Answers come from reviewer-approved comparison + mapping results, with raw regulation text as fallback. Every answer cites the source chunk.</p>
+   <p style="font-size:11px;color:#7B8499;margin:0 0 16px;line-height:1.55;" x-show="mode === 'document'" x-cloak>Pick a document in the scope chip above, then ask questions about its content. Strictly grounded in the chunks of that one document.</p>
+
+   {# Approved-analysis suggested chips #}
+   <div x-show="mode === 'approved'" x-cloak style="display:flex;flex-direction:column;gap:6px;text-align:left;">
+    <button class="cp-suggested"
+            hx-post="{% url 'copilot-message' %}"
+            hx-target="#cp-messages"
+            hx-swap="beforeend"
+            hx-include="#copilot_doc_select, [name=copilot_mode]"
+            hx-on::before-request="window.cpOnSubmit && window.cpOnSubmit(event);"
+            hx-on::after-request="window.cpOnResponse && window.cpOnResponse(event);"
+            hx-vals='{"message": "What are the key differences between Bahrain PDPL and India DPDPA on data subject rights?"}'>
+     Bahrain PDPL vs India DPDPA — data subject rights
+    </button>
+    <button class="cp-suggested"
+            hx-post="{% url 'copilot-message' %}" hx-target="#cp-messages" hx-swap="beforeend"
+            hx-include="#copilot_doc_select, [name=copilot_mode]"
+            hx-on::before-request="window.cpOnSubmit && window.cpOnSubmit(event);"
+            hx-on::after-request="window.cpOnResponse && window.cpOnResponse(event);"
+            hx-vals='{"message": "Summarise the consent requirements across all indexed regulations."}'
+            >
+     Consent requirements across regulations
+    </button>
+    <button class="cp-suggested"
+            hx-post="{% url 'copilot-message' %}" hx-target="#cp-messages" hx-swap="beforeend"
+            hx-include="#copilot_doc_select, [name=copilot_mode]"
+            hx-on::before-request="window.cpOnSubmit && window.cpOnSubmit(event);"
+            hx-on::after-request="window.cpOnResponse && window.cpOnResponse(event);"
+            hx-vals='{"message": "Which BBK policies have gaps and what is the recommended remediation?"}'
+            >
+     BBK policy gaps and recommended remediation
+    </button>
+   </div>
+
+   {# Document-Q&A suggested chips #}
+   <div x-show="mode === 'document'" x-cloak style="display:flex;flex-direction:column;gap:6px;text-align:left;">
+    <button class="cp-suggested"
+            hx-post="{% url 'copilot-message' %}" hx-target="#cp-messages" hx-swap="beforeend"
+            hx-include="#copilot_doc_select, [name=copilot_mode]"
+            hx-on::before-request="window.cpOnSubmit && window.cpOnSubmit(event);"
+            hx-on::after-request="window.cpOnResponse && window.cpOnResponse(event);"
+            hx-vals='{"message": "What is this document about?"}'
+            >
+     What is this document about?
+    </button>
+    <button class="cp-suggested"
+            hx-post="{% url 'copilot-message' %}" hx-target="#cp-messages" hx-swap="beforeend"
+            hx-include="#copilot_doc_select, [name=copilot_mode]"
+            hx-on::before-request="window.cpOnSubmit && window.cpOnSubmit(event);"
+            hx-on::after-request="window.cpOnResponse && window.cpOnResponse(event);"
+            hx-vals='{"message": "List the main obligations this document imposes."}'
+            >
+     List the main obligations
+    </button>
+    <button class="cp-suggested"
+            hx-post="{% url 'copilot-message' %}" hx-target="#cp-messages" hx-swap="beforeend"
+            hx-include="#copilot_doc_select, [name=copilot_mode]"
+            hx-on::before-request="window.cpOnSubmit && window.cpOnSubmit(event);"
+            hx-on::after-request="window.cpOnResponse && window.cpOnResponse(event);"
+            hx-vals='{"message": "What does this document say about consent or data subject rights?"}'
+            >
+     What does it say about consent / rights?
+    </button>
+   </div>
+  </div>
+ </div>
+
+ {# ── Input area ───────────────────────────────────────────────────── #}
+ <form id="cp-form"
+       style="padding:12px 14px;border-top:1px solid #E5E8EF;flex-shrink:0;background:#fff;"
+       hx-post="{% url 'copilot-message' %}"
+       hx-target="#cp-messages"
+       hx-swap="beforeend"
+       hx-include="#copilot_doc_select"
+       hx-on::before-request="window.cpOnSubmit && window.cpOnSubmit(event);"
+       hx-on::after-request="window.cpOnResponse && window.cpOnResponse(event);"
+       hx-on::response-error="window.cpOnError && window.cpOnError(event);">
+  {% csrf_token %}
+  <div style="display:flex;align-items:flex-end;gap:8px;background:#F4F6FB;border:1px solid #E5E8EF;border-radius:14px;padding:7px 8px 7px 12px;transition:border-color .15s,background .15s;"
+       onfocusin="this.style.borderColor='#002583';this.style.background='#fff'"
+       onfocusout="this.style.borderColor='#E5E8EF';this.style.background='#F4F6FB'">
+   <textarea id="cp-input" name="message"
+             rows="1"
+             placeholder="Ask about regulations…"
+             style="flex:1;min-width:0;resize:none;border:none;background:transparent;padding:6px 0;font-size:12px;font-family:inherit;outline:none;color:#002583;max-height:120px;"
+             oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
+   <button type="submit"
+           style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:10px;background:#002583;color:#fff;border:none;cursor:pointer;flex-shrink:0;box-shadow:0 2px 6px rgba(0,37,131,.22);transition:background .15s;"
+           onmouseover="this.style.background='#001a5e'" onmouseout="this.style.background='#002583'"
+           title="Send (Enter)">
+    <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+     <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.125A59.769 59.769 0 0121.485 12 59.768 59.768 0 013.27 20.875L5.999 12zm0 0h7.5"/>
+    </svg>
+   </button>
+  </div>
+  <p style="font-size:9.5px;color:#7B8499;margin:6px 4px 0;line-height:1.4;">
+   Enter to send. Answers are grounded; verify citations before relying on them.
+  </p>
+ </form>
+
+</div>
+
+<style>
+ @keyframes cp-spin { to { transform: rotate(360deg); } }
+
+ /* Width-safety for descendants. Bubbles set their own narrower caps
+    inline; this rule only enforces wrapping behaviour, NOT a max-width
+    (which would override the per-bubble cap). */
+ #cp-messages, #cp-messages * {
+   min-width: 0;
+   word-break: break-word;
+   overflow-wrap: anywhere;
+ }
+ #cp-messages pre, #cp-messages code {
+   white-space: pre-wrap;
+ }
+ /* Explicit per-bubble caps so they DON'T span the panel. */
+ #cp-messages .cp-user-bubble { max-width: 320px !important; }
+ #cp-messages .cp-ai-wrap     { max-width: 360px; }
+
+ .cp-suggested {
+   text-align:left; font-size:11px; color:#002583; background:#F4F6FB; border:1px solid #E5E8EF;
+   border-radius:9px; padding:8px 11px; cursor:pointer; line-height:1.4; transition:background .12s,border-color .12s;
+   font-family:inherit;
+ }
+ .cp-suggested:hover { background:#E5EBF5; border-color:#C8D1E0; }
+
+ .cp-mode {
+   padding:4px 11px; border:none; cursor:pointer; font-family:inherit;
+   font-size:10.5px; font-weight:700; color:#7B8499; background:transparent;
+   border-radius:999px; transition:background .12s,color .12s,box-shadow .12s;
+   white-space:nowrap;
+ }
+ .cp-mode:hover:not(.cp-mode-active) { color:#002583; }
+ .cp-mode-active { background:#002583; color:#fff; box-shadow:0 1px 4px rgba(0,37,131,.22); }
+
+ /* Citation collapse */
+ .cp-cite-toggle {
+   display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:20px;
+   background:#F4F6FB; border:1px solid #E5E8EF; color:#002583; font-size:10px; font-weight:700;
+   cursor:pointer; font-family:inherit; transition:background .12s;
+ }
+ .cp-cite-toggle:hover { background:#E5EBF5; }
+ .cp-cite-chip {
+   padding:2px 8px; border-radius:20px; font-size:9px; font-weight:600; cursor:pointer;
+   background:#fff; color:#002583; border:1px solid #E5E8EF; font-family:inherit;
+   transition:opacity .12s;
+ }
+ .cp-cite-chip:hover { opacity:.75; }
+ .cp-cite-draft { border-color:#FFB800; color:#B07A00; background:#FFF6E0; }
+
+ /* Typing dots — iMessage-style. */
+ .cp-typing { display:inline-flex; gap:3px; padding:6px 10px; }
+ .cp-typing > span {
+   width:5px; height:5px; border-radius:50%; background:#9CA3AF;
+   animation:cp-dot 1.2s infinite ease-in-out;
+ }
+ .cp-typing > span:nth-child(2) { animation-delay:.15s; }
+ .cp-typing > span:nth-child(3) { animation-delay:.30s; }
+ @keyframes cp-dot {
+   0%,80%,100% { transform:translateY(0); opacity:.4; }
+   40% { transform:translateY(-3px); opacity:1; }
+ }
+</style>
+
+<script>
+(function () {
+ const STORAGE_KEY = 'copilotHistory_v2';
+ const TYPING_ID   = 'cp-typing-bubble';
+ try { localStorage.removeItem('copilotHistory'); } catch (e) {}
+
+ // Enter-to-send. Capture phase so Alpine / form bindings can't swallow it.
+ document.addEventListener('keydown', function(ev) {
+   if (ev.key !== 'Enter') return;
+   if (ev.shiftKey || ev.altKey || ev.ctrlKey || ev.metaKey || ev.isComposing) return;
+   const t = ev.target;
+   if (!t || t.id !== 'cp-input') return;
+   ev.preventDefault();
+   ev.stopPropagation();
+   const val = (t.value || '').trim();
+   if (!val) return;
+   const form = document.getElementById('cp-form');
+   if (!form) return;
+   if (typeof form.requestSubmit === 'function') {
+     form.requestSubmit();
+   } else {
+     // Fallback: click the submit button so HTMX runs its form-submit pipeline.
+     const btn = form.querySelector('button[type="submit"]');
+     if (btn) btn.click();
+   }
+ }, true);
+
+ function escapeHtml(s) {
+   return String(s).replace(/[&<>"']/g, c => ({
+     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+   }[c]));
+ }
+
+ function scrollToBottom() {
+   const m = document.getElementById('cp-messages');
+   if (m) m.scrollTop = m.scrollHeight;
+ }
+
+ function currentScopeLabel() {
+   try {
+     const sel = document.getElementById('copilot_doc_select');
+     const v = sel ? (sel.value || '').trim() : '';
+     if (!v) return 'All documents';
+     // Strip the file-extension-style prefix to keep the badge short.
+     const short = v.length > 42 ? v.slice(0, 40) + '…' : v;
+     return short;
+   } catch (e) { return ''; }
+ }
+
+ function currentMode() {
+   try {
+     const inp = document.querySelector('input[name="copilot_mode"]');
+     return inp ? (inp.value || 'approved') : 'approved';
+   } catch (e) { return 'approved'; }
+ }
+
+ function appendUserBubble(text) {
+   const m = document.getElementById('cp-messages');
+   if (!m) return;
+   const mode  = currentMode();
+   const scope = currentScopeLabel();
+   const showScope = (mode === 'document');
+   const div = document.createElement('div');
+   div.className = 'flex flex-col items-end gap-1';
+   div.innerHTML =
+     (showScope
+       ? '<span style="font-size:9px;color:#7B8499;font-weight:600;padding:0 2px;">'
+         + 'Scope: ' + escapeHtml(scope) + '</span>'
+       : '')
+     + '<div class="cp-user-bubble bg-[#002583] text-white rounded-xl rounded-tr-sm px-3 py-2 text-xs leading-relaxed" '
+     + 'style="max-width:330px;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;">'
+     + escapeHtml(text) + '</div>';
+   m.appendChild(div);
+ }
+
+ function appendTypingBubble() {
+   const m = document.getElementById('cp-messages');
+   if (!m) return;
+   const div = document.createElement('div');
+   div.id = TYPING_ID;
+   div.className = 'flex gap-2';
+   div.innerHTML =
+     '<div class="w-6 h-6 rounded-md bg-[#002583] flex items-center justify-center flex-shrink-0 mt-0.5">'
+     +  '<svg class="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">'
+     +   '<path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>'
+     +  '</svg>'
+     + '</div>'
+     + '<div class="cp-ai-wrap"><div class="bg-gray-50 border border-gray-100 rounded-xl rounded-tl-sm">'
+     +  '<div class="cp-typing"><span></span><span></span><span></span></div>'
+     + '</div></div>';
+   m.appendChild(div);
+ }
+
+ function removeTypingBubble() {
+   const t = document.getElementById(TYPING_ID);
+   if (t) t.remove();
+ }
+
+ // Pull message from either the textarea or hx-vals (for suggested chips).
+ function extractMessage(evt) {
+   try {
+     const params = evt.detail && evt.detail.parameters;
+     if (params && params.message) return String(params.message);
+   } catch (e) { /* fall through */ }
+   const ta = document.getElementById('cp-input');
+   return ta ? ta.value.trim() : '';
+ }
+
+ window.cpOnSubmit = function(evt) {
+   const text = extractMessage(evt);
+   if (!text) return;
+   const empty = document.getElementById('cp-empty-state');
+   if (empty) empty.remove();
+   appendUserBubble(text);
+   appendTypingBubble();
+   scrollToBottom();
+   const ta = document.getElementById('cp-input');
+   if (ta) { ta.value = ''; ta.style.height = 'auto'; }
+ };
+
+ window.cpOnResponse = function(evt) {
+   removeTypingBubble();
+   setTimeout(scrollToBottom, 30);
+   saveHistory();
+ };
+
+ window.cpOnError = function(evt) {
+   removeTypingBubble();
+   const m = document.getElementById('cp-messages');
+   if (m) {
+     const div = document.createElement('div');
+     div.className = 'flex gap-2';
+     div.innerHTML =
+       '<div class="flex-1 bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs text-red-700">'
+       + 'Could not reach Copilot. Try again in a moment.'
+       + '</div>';
+     m.appendChild(div);
+   }
+ };
+
+ function saveHistory() {
+   const msgs = document.getElementById('cp-messages');
+   if (!msgs) return;
+   const empty = document.getElementById('cp-empty-state');
+   const hasReal = msgs.children.length > 1 || (msgs.children.length === 1 && !empty);
+   if (hasReal) localStorage.setItem(STORAGE_KEY, msgs.innerHTML);
+ }
+
+ function restoreHistory() {
+   const saved = localStorage.getItem(STORAGE_KEY);
+   if (!saved) return;
+   const msgs = document.getElementById('cp-messages');
+   if (msgs) msgs.innerHTML = saved;
+ }
+
+ document.addEventListener('DOMContentLoaded', restoreHistory);
+ document.body.addEventListener('htmx:afterSwap', function(e) {
+   if (e.target && e.target.id === 'cp-messages') saveHistory();
+ });
+})();
+</script>

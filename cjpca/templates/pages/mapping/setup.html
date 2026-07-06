@@ -1,0 +1,638 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Mapping Setup — {{ policy.name }} — CJPCA{% endblock %}
+
+{% block extra_head %}
+<style>
+ /* ── Design tokens ─────────────────────────────────────────── */
+ :root {
+   --c-navy:        #002583;
+   --c-navy-soft:   #1F3FA0;
+   --c-amber:       #FFB800;
+   --c-line:        #E5E8EF;
+   --c-line-strong: #C8CFE0;
+   --c-bg-soft:     #F4F6FB;
+   --c-bg-tint:     #EDF1FA;
+   --c-bg-warn:     #FFF6DD;
+   --c-text:        #1A2440;
+   --c-text-muted:  #5A6685;
+   --c-success:     #1E7E48;
+   --c-success-bg:  #E6F5EC;
+   --c-warn:        #B86E00;
+   --c-warn-bg:     #FFF1D6;
+   --c-danger:      #B33;
+   --c-danger-bg:   #FCE8E8;
+ }
+
+ /* ── Regulation rows (selected vs idle vs disabled) ────────── */
+ .reg-item {
+   display: flex; align-items: center; gap: 10px;
+   padding: 9px 11px; border-radius: 8px;
+   border: 1.5px solid var(--c-line);
+   background: #fff; cursor: pointer; user-select: none;
+   margin-bottom: 4px;
+   transition: border-color .12s, background .12s, box-shadow .12s, opacity .12s;
+ }
+ .reg-item:hover:not(.is-disabled) {
+   border-color: var(--c-line-strong);
+   background: var(--c-bg-soft);
+ }
+ .reg-item.is-selected {
+   border-color: var(--c-navy);
+   background: var(--c-bg-tint);
+   box-shadow: 0 0 0 1px var(--c-navy) inset;
+ }
+ .reg-item.is-disabled { opacity: .42; cursor: not-allowed; }
+ .reg-item input[type="checkbox"] { pointer-events: none; }
+
+ /* ── Topic chips (manual mode) ─────────────────────────────── */
+ .topic-chip {
+   padding: 5px 12px; border-radius: 999px;
+   font-size: 11px; font-weight: 600;
+   border: 1.5px solid var(--c-line);
+   background: #fff; color: var(--c-text);
+   cursor: pointer; font-family: inherit; white-space: nowrap;
+   transition: border-color .12s, background .12s, color .12s;
+ }
+ .topic-chip:hover:not(.is-active) {
+   border-color: var(--c-line-strong);
+   background: var(--c-bg-soft);
+ }
+ .topic-chip.is-active {
+   border-color: var(--c-navy);
+   background: var(--c-navy);
+   color: #fff;
+ }
+
+ /* ── Scope mode tabs ───────────────────────────────────────── */
+ .scope-tabs {
+   display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;
+   padding: 3px; border-radius: 10px;
+   background: var(--c-bg-soft);
+   margin-bottom: 16px;
+ }
+ .scope-tab {
+   padding: 8px 6px; border: none; background: transparent;
+   border-radius: 7px; cursor: pointer; font-family: inherit;
+   font-size: 11px; font-weight: 600; color: var(--c-text-muted);
+   transition: background .12s, color .12s, box-shadow .12s;
+ }
+ .scope-tab:hover:not(.is-active) { color: var(--c-text); }
+ .scope-tab.is-active {
+   background: #fff; color: var(--c-navy);
+   box-shadow: 0 1px 3px rgba(0,37,131,0.10);
+ }
+
+ /* ── Topic intersection card ───────────────────────────────── */
+ .topic-row {
+   display: flex; align-items: center; gap: 8px;
+   padding: 7px 10px; border-radius: 7px;
+   font-size: 11px; color: var(--c-text);
+   margin-bottom: 4px;
+   transition: background .12s;
+ }
+ .topic-row.will-map { background: var(--c-success-bg); }
+ .topic-row.will-map .dot { background: var(--c-success); }
+ .topic-row.skipped  { background: var(--c-warn-bg); color: var(--c-warn); }
+ .topic-row.skipped  .dot { background: var(--c-warn); }
+ .topic-row.skipped .reason { color: var(--c-warn); font-size: 10px; }
+ .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+ .topic-count {
+   margin-left: auto; font-weight: 700; font-size: 10px;
+   font-variant-numeric: tabular-nums;
+ }
+
+ /* ── Section labels ────────────────────────────────────────── */
+ .label-eyebrow {
+   font-size: 9px; font-weight: 800; text-transform: uppercase;
+   letter-spacing: .08em; color: var(--c-navy); margin: 0 0 10px;
+ }
+
+ /* ── Jurisdiction header (in search-mode list) ─────────────── */
+ .jur-header {
+   display: flex; align-items: center; gap: 6px;
+   padding: 4px 2px 6px;
+ }
+
+ /* ── Jurisdiction tabs (default view in regulations column) ── */
+ .jur-tabs {
+   display: flex; gap: 4px; padding: 3px;
+   border-radius: 10px; background: var(--c-bg-soft);
+   margin-bottom: 12px;
+ }
+ .jur-tab {
+   flex: 1; display: flex; align-items: center; justify-content: center;
+   gap: 6px; padding: 7px 6px; border: none; background: transparent;
+   border-radius: 7px; cursor: pointer; font-family: inherit;
+   font-size: 11px; font-weight: 600; color: var(--c-text-muted);
+   transition: background .12s, color .12s, box-shadow .12s;
+ }
+ .jur-tab:hover:not(.is-active) { color: var(--c-text); }
+ .jur-tab.is-active {
+   background: #fff; color: var(--c-navy);
+   box-shadow: 0 1px 3px rgba(0,37,131,0.10);
+ }
+ .jur-tab img { border-radius: 2px; flex-shrink: 0; }
+ .jur-tab .count {
+   font-size: 9px; font-weight: 700; color: var(--c-text-muted);
+   margin-left: 2px;
+ }
+ .jur-tab.is-active .count { color: var(--c-navy); }
+
+ /* ── Regulation grid (2-up, no scroll for typical 9-12 docs) ─ */
+ .reg-grid {
+   display: grid;
+   grid-template-columns: repeat(2, minmax(0, 1fr));
+   gap: 6px;
+ }
+ .reg-grid .reg-item {
+   margin-bottom: 0;          /* grid gap handles spacing */
+   padding: 8px 10px;
+ }
+
+ /* ── Methodology callout (auto mode) ───────────────────────── */
+ .auto-callout {
+   padding: 10px 12px; border-radius: 8px;
+   background: var(--c-bg-tint); border: 1px solid var(--c-line);
+   font-size: 11px; color: var(--c-text); line-height: 1.5;
+   margin-bottom: 14px;
+ }
+ .auto-callout strong { color: var(--c-navy); }
+
+ /* ── Empty / placeholder ───────────────────────────────────── */
+ .scope-empty {
+   text-align: center; padding: 32px 16px;
+   color: var(--c-text-muted);
+ }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="flex flex-col h-full overflow-hidden" style="background:#fff;">
+
+ {# ── Header ── #}
+ <div style="background:#fff;border-bottom:1px solid var(--c-line);padding:14px 28px;flex-shrink:0;display:flex;align-items:center;gap:12px;">
+   <a href="{% url 'mapping' %}"
+      style="width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--c-navy);flex-shrink:0;border:1px solid var(--c-line);background:#fff;transition:background .12s;"
+      onmouseover="this.style.background='var(--c-bg-soft)';"
+      onmouseout="this.style.background='#fff';">
+     <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+       <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"/>
+     </svg>
+   </a>
+   <div style="flex:1;min-width:0;">
+     <h1 style="font-size:14px;font-weight:700;color:var(--c-navy);margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ policy.name }}</h1>
+     <p style="font-size:10px;color:var(--c-text-muted);margin:0;">Pick regulations and how the policy should be mapped against them.</p>
+   </div>
+ </div>
+
+ {# ── 3-column body ── #}
+ <form method="post" action="{% url 'mapping-run' policy.pk %}" id="setup-form"
+       style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+   {% csrf_token %}
+   <input type="hidden" name="scope_mode" id="scope-mode-input" value="auto">
+   <input type="hidden" name="topic" id="topic-input" value="">
+
+   <div style="flex:1;overflow:hidden;display:grid;grid-template-columns:240px 1fr 1.15fr;gap:0;">
+
+     {# ════════════════════════════════════════════════════════ #}
+     {# Col 1: Policy preview                                      #}
+     {# ════════════════════════════════════════════════════════ #}
+     <div style="border-right:1px solid var(--c-line);overflow-y:auto;padding:20px;">
+       <p class="label-eyebrow">Policy</p>
+
+       <div style="background:var(--c-bg-soft);border-radius:10px;padding:12px;margin-bottom:14px;">
+         <p style="font-size:12px;font-weight:700;color:var(--c-navy);margin:0 0 3px;line-height:1.3;">{{ policy.name }}</p>
+         <p style="font-size:10px;color:var(--c-text-muted);margin:0;">
+           {% if policy.version %}v{{ policy.version }} · {% endif %}{{ policy.chunk_count }} sections
+         </p>
+       </div>
+
+       {# Classified topics — drawn from chunk_tags, the same source of truth used by auto-routing. #}
+       {% if policy_topics_classified %}
+       <div style="margin-bottom:14px;">
+         <p style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--c-navy);margin:0 0 7px;">
+           Topics found in policy
+         </p>
+         <div style="display:flex;flex-direction:column;gap:3px;">
+           {% for t in policy_topics_classified %}
+           <div style="display:flex;align-items:center;gap:7px;font-size:11px;color:var(--c-text);">
+             <span class="dot" style="background:var(--c-navy);"></span>
+             <span style="flex:1;">{{ t.label }}</span>
+             <span style="color:var(--c-text-muted);font-variant-numeric:tabular-nums;">{{ t.count }}</span>
+           </div>
+           {% endfor %}
+         </div>
+       </div>
+       {% else %}
+       <div style="margin-bottom:14px;padding:10px;border-radius:8px;background:var(--c-bg-warn);border:1px solid var(--c-amber);">
+         <p style="font-size:10px;color:var(--c-warn);margin:0;line-height:1.5;">
+           No classified topics yet. Auto-routing will run the classifier on first use.
+         </p>
+       </div>
+       {% endif %}
+
+       {% if policy.notes %}
+       <div style="background:#fff;border:1px solid var(--c-line);border-radius:8px;padding:10px;margin-bottom:12px;">
+         <p style="font-size:10px;color:var(--c-text);line-height:1.5;margin:0;">{{ policy.notes }}</p>
+       </div>
+       {% endif %}
+
+       {% if policy.file %}
+       <button type="button" onclick="openViewer({{ policy.id }})"
+               style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px;padding:8px;border-radius:8px;border:1px solid var(--c-line);font-size:11px;font-weight:600;color:var(--c-navy);background:#fff;cursor:pointer;transition:background .12s;"
+               onmouseover="this.style.background='var(--c-bg-soft)';"
+               onmouseout="this.style.background='#fff';">
+         <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+           <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><circle cx="12" cy="12" r="3"/>
+         </svg>
+         View document
+       </button>
+       {% endif %}
+     </div>
+
+     {# ════════════════════════════════════════════════════════ #}
+     {# Col 2: Regulation selection                                #}
+     {# Layout: jurisdiction tabs (Bahrain / India / Kuwait) +     #}
+     {# 2-column grid of compact reg cards. Each tab shows ~9-12   #}
+     {# regs which fits the column without scrolling. Search       #}
+     {# overrides tabs and shows a flat list of matches across     #}
+     {# all jurisdictions.                                          #}
+     {# ════════════════════════════════════════════════════════ #}
+     <div style="border-right:1px solid var(--c-line);padding:20px;display:flex;flex-direction:column;min-height:0;">
+       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;">
+         <p class="label-eyebrow" style="margin:0;">Regulations</p>
+         <span id="reg-count-badge" style="font-size:9px;font-weight:700;color:var(--c-text-muted);flex-shrink:0;">0 regulations selected</span>
+       </div>
+
+       {# Search — typing here flips the column to flat-list mode #}
+       <div style="position:relative;margin-bottom:10px;">
+         <svg style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--c-text-muted);pointer-events:none;" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+           <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+         </svg>
+         <input id="reg-search" type="text" placeholder="Search across all regulations…" autocomplete="off"
+                style="width:100%;padding:7px 10px 7px 28px;border:1px solid var(--c-line);border-radius:8px;font-size:11px;outline:none;background:#fff;font-family:inherit;box-sizing:border-box;"
+                oninput="filterRegs(this.value)">
+       </div>
+
+       {# Jurisdiction tabs — only one jurisdiction's regs shown at a time #}
+       <div id="jur-tabs" class="jur-tabs" role="tablist">
+         {% for group in reg_groups %}
+         <button type="button" class="jur-tab {% if forloop.first %}is-active{% endif %}"
+                 data-jur="{{ group.jur }}" onclick="setJurTab('{{ group.jur|escapejs }}')" role="tab">
+           {% if group.flag %}
+             <img src="https://flagcdn.com/24x18/{{ group.flag }}.png" width="16" height="12" alt="{{ group.label }}">
+           {% endif %}
+           <span>{{ group.label }}</span>
+           <span class="count" title="Indexed regulation documents in this jurisdiction">{{ group.regs|length }} reg{{ group.regs|length|pluralize }}</span>
+         </button>
+         {% endfor %}
+       </div>
+
+       {# Default mode: per-jurisdiction grids (only the active one is visible) #}
+       <div id="reg-tabbed-view">
+         {% for group in reg_groups %}
+         <div class="reg-grid jur-block" data-jur="{{ group.jur }}"
+              {% if not forloop.first %}style="display:none;"{% endif %}>
+           {% for reg in group.regs %}
+           <label class="reg-item" id="reg-label-{{ reg.id }}" data-name="{{ reg.name|lower }}" data-jur="{{ reg.jurisdiction }}">
+             <input type="checkbox" name="regulations" value="{{ reg.id }}"
+                    class="reg-cb" onchange="onRegChange()"
+                    style="width:14px;height:14px;accent-color:var(--c-navy);flex-shrink:0;pointer-events:none;">
+             <div style="flex:1;min-width:0;">
+               <span style="font-size:11px;font-weight:600;color:var(--c-text);display:block;line-height:1.3;">{{ reg.name }}</span>
+               <span style="font-size:10px;color:var(--c-text-muted);display:block;margin-top:1px;">{{ reg.chunk_count }} sections</span>
+             </div>
+           </label>
+           {% endfor %}
+         </div>
+         {% empty %}
+         <p style="font-size:12px;color:var(--c-text-muted);text-align:center;padding:28px 0;line-height:1.5;">No indexed regulations found.<br>Upload regulations in the Regulations library.</p>
+         {% endfor %}
+       </div>
+
+       {# Search-results mode: flat list across all jurisdictions; only shown while user is typing #}
+       <div id="reg-search-view" class="reg-grid" style="display:none;"></div>
+
+       <p id="reg-no-results" style="display:none;font-size:11px;color:var(--c-text-muted);text-align:center;padding:16px 0;">No regulations match your search.</p>
+     </div>
+
+     {# ════════════════════════════════════════════════════════ #}
+     {# Col 3: Scope                                                #}
+     {# ════════════════════════════════════════════════════════ #}
+     <div style="overflow-y:auto;padding:20px;">
+       <p class="label-eyebrow">Scope</p>
+
+       {# Empty state #}
+       <div id="scope-placeholder" class="scope-empty">
+         <svg width="36" height="36" fill="none" viewBox="0 0 24 24" stroke="var(--c-line-strong)" stroke-width="1.5" style="margin:0 auto 10px;display:block;">
+           <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2"/>
+         </svg>
+         <p style="font-size:11px;line-height:1.5;margin:0;">Select at least one regulation<br>to configure scope.</p>
+       </div>
+
+       {% comment %}
+       Active scope panel — Auto-route only. Full scan / Pick topics were
+       legacy paths that did keyword-soup retrieval with no taxonomy filter
+       and produced noisy "Not Covered" verdicts on obligations the policy
+       was never about. Removed from the UI; backend now forces SCOPE_AUTO.
+       {% endcomment %}
+       <div id="scope-panel" style="display:none;">
+
+         <div id="mode-auto" class="scope-mode">
+           <div class="auto-callout">
+             <strong>Auto-route mapping.</strong> The policy classifies itself; the mapper only runs
+             on topics that both the policy and your selected regulations cover. Topics the regulation
+             doesn't cover are surfaced as <em>Skipped</em> rather than fabricated as &ldquo;Not Covered&rdquo;.
+           </div>
+
+           <p style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--c-navy);margin:0 0 8px;">
+             Will map (intersection)
+           </p>
+           <div id="will-map-list">
+             <div class="topic-row" style="background:var(--c-bg-soft);color:var(--c-text-muted);">
+               <span class="dot" style="background:var(--c-line-strong);"></span>
+               <span style="font-style:italic;">No regulations selected yet.</span>
+             </div>
+           </div>
+
+           <p id="skipped-header" style="display:none;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--c-warn);margin:14px 0 8px;">
+             Skipped (no clauses on this topic in target jurisdiction)
+           </p>
+           <div id="skipped-list"></div>
+         </div>
+
+       </div>
+     </div>
+
+   </div>
+
+   {# ── Action bar ── #}
+   <div style="background:#fff;border-top:1px solid var(--c-line);padding:12px 28px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+     <p id="action-estimate" style="font-size:11px;color:var(--c-text-muted);margin:0;">Select regulations to continue.</p>
+     <div style="display:flex;gap:8px;">
+       <a href="{% url 'mapping' %}"
+          style="padding:9px 18px;border-radius:9px;font-size:12px;font-weight:600;border:1px solid var(--c-line);color:var(--c-text);text-decoration:none;background:#fff;display:inline-flex;align-items:center;transition:background .12s;"
+          onmouseover="this.style.background='var(--c-bg-soft)';"
+          onmouseout="this.style.background='#fff';">
+         Cancel
+       </a>
+       <button type="submit" id="start-btn" disabled
+               style="padding:9px 22px;border-radius:9px;font-size:12px;font-weight:700;background:var(--c-line);color:#fff;border:none;cursor:not-allowed;transition:background .12s;">
+         Start mapping
+       </button>
+     </div>
+   </div>
+ </form>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const CHUNKS_PER_REG    = {{ reg_chunks_json|safe }};
+const REG_JURISDICTIONS = {{ reg_jurisdictions_json|safe }};
+const REG_TOPICS_BY_JUR = {{ reg_topics_by_jur_json|safe }};
+// Per-regulation topic counts — keyed by regulation pk (as string).
+// This is the canonical source for the auto-route intersection panel.
+const REG_TOPICS_BY_DOC = {{ reg_topics_by_doc_json|safe }};
+const POLICY_TOPICS     = [
+  {% for t in policy_topics_classified %}
+    { tag: "{{ t.tag|escapejs }}", label: "{{ t.label|escapejs }}", count: {{ t.count }} }{% if not forloop.last %},{% endif %}
+  {% endfor %}
+];
+
+let scopeMode      = 'auto';
+let selectedTopics = new Set();
+
+/* ── Regulation list ─────────────────────────────────────────── */
+
+function getSelectedRegs() {
+  return [...document.querySelectorAll('.reg-cb:checked')].map(cb => cb.value);
+}
+
+function updateRegStyles() {
+  const selected = new Set(getSelectedRegs());
+  document.querySelectorAll('.reg-item').forEach(item => {
+    const cb = item.querySelector('input.reg-cb');
+    item.classList.toggle('is-selected', selected.has(cb.value));
+    item.classList.toggle('is-disabled', false);
+    cb.disabled = false;
+  });
+  const badge = document.getElementById('reg-count-badge');
+  if (badge) {
+    badge.textContent = selected.size + (selected.size === 1 ? ' regulation selected' : ' regulations selected');
+  }
+}
+
+function onRegChange() {
+  updateRegStyles();
+  const hasRegs = getSelectedRegs().length > 0;
+  document.getElementById('scope-placeholder').style.display = hasRegs ? 'none' : '';
+  document.getElementById('scope-panel').style.display       = hasRegs ? 'block' : 'none';
+  refreshAutoIntersection();
+  updateStartBtn();
+  updateActionEstimate();
+}
+
+function setJurTab(jur) {
+  // Ignored when the search view is active (no jurisdiction tabs there).
+  document.querySelectorAll('.jur-tab').forEach(t => {
+    t.classList.toggle('is-active', t.dataset.jur === jur);
+  });
+  document.querySelectorAll('#reg-tabbed-view .jur-block').forEach(block => {
+    block.style.display = (block.dataset.jur === jur) ? '' : 'none';
+  });
+}
+
+function filterRegs(q) {
+  const lq = q.toLowerCase().trim();
+  const tabs        = document.getElementById('jur-tabs');
+  const tabbedView  = document.getElementById('reg-tabbed-view');
+  const searchView  = document.getElementById('reg-search-view');
+  const noResults   = document.getElementById('reg-no-results');
+
+  if (!lq) {
+    // empty search — back to jurisdiction-tab mode
+    tabs.style.display       = '';
+    tabbedView.style.display = '';
+    searchView.style.display = 'none';
+    searchView.innerHTML     = '';
+    noResults.style.display  = 'none';
+    return;
+  }
+
+  // search-mode: flat list of items matching the query, across all jurs.
+  // we move the matching <label> elements into the search container so
+  // their checkboxes and selection state stay live (no DOM duplication).
+  tabs.style.display       = 'none';
+  tabbedView.style.display = 'none';
+  searchView.style.display = '';
+
+  const matches = [...document.querySelectorAll('#reg-tabbed-view .reg-item')]
+    .filter(el => el.dataset.name.includes(lq));
+
+  searchView.innerHTML = '';   // clears prior search results from view
+  matches.forEach(el => searchView.appendChild(el));
+  noResults.style.display = matches.length === 0 ? '' : 'none';
+}
+
+// Restore tabbed layout if user clears the search (e.g. via X) — keeps the
+// matched <label>s wherever they currently live, so we move them back into
+// their original jur-block on Esc/clear.
+function restoreTabbedLayoutFromSearch() {
+  document.querySelectorAll('#reg-search-view .reg-item').forEach(el => {
+    const home = document.querySelector(`#reg-tabbed-view .jur-block[data-jur="${el.dataset.jur}"]`);
+    if (home) home.appendChild(el);
+  });
+  document.getElementById('reg-search-view').innerHTML = '';
+}
+// Patch filterRegs's empty-query branch to also reseat any nodes that got
+// hoisted into the search view, so toggling search → empty → tab works.
+const _origFilterRegs = filterRegs;
+filterRegs = function(q) {
+  if (!q || !q.trim()) restoreTabbedLayoutFromSearch();
+  return _origFilterRegs(q);
+};
+
+/* Scope mode is hard-coded to Auto-route now — Full scan and Pick topics
+   were retired because they did keyword-based retrieval with no taxonomy
+   filter, producing noisier output than Auto-route. The hidden input still
+   carries 'auto' so the backend contract is unchanged. */
+
+/* ── Auto-route intersection (live, methodologically transparent) ── */
+
+function refreshAutoIntersection() {
+  const willEl = document.getElementById('will-map-list');
+  const skipEl = document.getElementById('skipped-list');
+  const skipHeader = document.getElementById('skipped-header');
+
+  const regIds = getSelectedRegs();
+  if (regIds.length === 0) {
+    willEl.innerHTML = `
+      <div class="topic-row" style="background:var(--c-bg-soft);color:var(--c-text-muted);">
+        <span class="dot" style="background:var(--c-line-strong);"></span>
+        <span style="font-style:italic;">No regulations selected yet.</span>
+      </div>`;
+    skipEl.innerHTML = '';
+    skipHeader.style.display = 'none';
+    return;
+  }
+
+  if (POLICY_TOPICS.length === 0) {
+    willEl.innerHTML = `
+      <div class="topic-row" style="background:var(--c-bg-warn);color:var(--c-warn);">
+        <span class="dot" style="background:var(--c-warn);"></span>
+        <span>The policy hasn't been classified yet — auto-route will classify it on first run.</span>
+      </div>`;
+    skipEl.innerHTML = '';
+    skipHeader.style.display = 'none';
+    return;
+  }
+
+  // Pool: per-topic chunk count summed over the ACTUAL selected regs.
+  // Previously this iterated regs but looked up topics per-jurisdiction,
+  // so picking 2 Bahrain regs double-counted every Bahrain topic. We now
+  // use REG_TOPICS_BY_DOC keyed by regulation pk so a regulation's chunks
+  // are counted exactly once.
+  const regTopicPool = {};
+  regIds.forEach(id => {
+    const topics = REG_TOPICS_BY_DOC[String(id)] || {};
+    for (const tag in topics) {
+      regTopicPool[tag] = (regTopicPool[tag] || 0) + topics[tag];
+    }
+  });
+
+  const willMap = [];
+  const skipped = [];
+  POLICY_TOPICS.forEach(t => {
+    if ((regTopicPool[t.tag] || 0) > 0) {
+      willMap.push({ ...t, regCount: regTopicPool[t.tag] });
+    } else {
+      skipped.push(t);
+    }
+  });
+
+  const regCountSuffix = regIds.length === 1 ? '1 regulation' : `${regIds.length} regulations`;
+  willEl.innerHTML = willMap.length ? willMap.map(t => `
+    <div class="topic-row will-map" title="The mapper will compare ${t.count} policy section${t.count === 1 ? '' : 's'} on ${escapeHtml(t.label)} against ${t.regCount} matching section${t.regCount === 1 ? '' : 's'} in ${regCountSuffix}.">
+      <span class="dot"></span>
+      <span style="flex:1;font-weight:600;">${escapeHtml(t.label)}</span>
+      <span style="display:inline-flex;align-items:center;gap:6px;font-size:10px;">
+        <span style="padding:2px 7px;border-radius:20px;background:#EDF1FA;color:var(--c-navy);font-weight:700;">${t.count}<span style="font-weight:500;opacity:.7;"> policy</span></span>
+        <span style="color:var(--c-text-muted);font-weight:700;">↔</span>
+        <span style="padding:2px 7px;border-radius:20px;background:#E1F4E5;color:#1B7F3A;font-weight:700;">${t.regCount}<span style="font-weight:500;opacity:.7;"> regulation</span></span>
+      </span>
+    </div>
+  `).join('') : `
+    <div class="topic-row skipped">
+      <span class="dot"></span>
+      <span style="flex:1;">No overlap between policy and selected regulations.</span>
+    </div>`;
+
+  skipHeader.style.display = skipped.length ? '' : 'none';
+  skipEl.innerHTML = skipped.map(t => `
+    <div class="topic-row skipped"
+         title="The policy has ${t.count} section${t.count === 1 ? '' : 's'} on this topic but none of the selected regulations cover it. Skipped to avoid fabricating Not-Covered verdicts.">
+      <span class="dot"></span>
+      <span style="flex:1;">${escapeHtml(t.label)}</span>
+      <span class="reason">${t.count} in policy · 0 in regs</span>
+    </div>
+  `).join('');
+}
+
+/* ── Submit gating + footer estimate ─────────────────────────── */
+
+function updateStartBtn() {
+  const regs = getSelectedRegs();
+  const canStart = regs.length > 0;
+  const btn = document.getElementById('start-btn');
+  btn.disabled = !canStart;
+  btn.style.background = canStart ? 'var(--c-navy)' : 'var(--c-line)';
+  btn.style.cursor     = canStart ? 'pointer'      : 'not-allowed';
+}
+
+function updateActionEstimate() {
+  const regs = getSelectedRegs();
+  const el = document.getElementById('action-estimate');
+  if (regs.length === 0) {
+    el.textContent = 'Select regulations to continue.';
+    return;
+  }
+  // Per-regulation cost in auto mode = ~1 LLM call per overlapping topic.
+  // We compute the overlap PER REG (so a reg that only covers one of the
+  // policy's topics is correctly counted as 1 call, not as N calls just
+  // because its jurisdiction has more topics elsewhere).
+  let totalCalls = 0;
+  let anyOverlap = false;
+  regs.forEach(id => {
+    const topics = REG_TOPICS_BY_DOC[String(id)] || {};
+    const overlap = POLICY_TOPICS.filter(t => (topics[t.tag] || 0) > 0).length;
+    if (overlap > 0) anyOverlap = true;
+    totalCalls += Math.max(overlap, overlap === 0 ? 0 : 1);
+  });
+  if (!anyOverlap) {
+    el.textContent = `${regs.length} regulation${regs.length === 1 ? '' : 's'} selected — but no topic overlap with the policy.`;
+  } else {
+    el.textContent = `~${totalCalls} mapping pass${totalCalls === 1 ? '' : 'es'} across ${regs.length} regulation${regs.length === 1 ? '' : 's'}`;
+  }
+}
+
+/* ── Utilities ───────────────────────────────────────────────── */
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+function openViewer(pk) {
+  const root = document.querySelector('[x-data]');
+  if (root && root.__x) {
+    root.__x.$data.docViewerDoc = pk;
+    root.__x.$data.docViewerOpen = true;
+  }
+}
+</script>
+{% endblock %}

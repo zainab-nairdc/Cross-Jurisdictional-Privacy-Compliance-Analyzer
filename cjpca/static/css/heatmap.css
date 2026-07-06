@@ -1,0 +1,226 @@
+/* ── Coverage Heatmap ─────────────────────────────────────────────────────────
+ Design tokens used (all from tailwind.css @theme / Tailwind v4 defaults):
+ --color-cov-green : #002583 → covered cells
+ --color-cov-amber : #002583 → partial cells
+ --color-cov-red : #002583 → not-covered cells
+ --color-accent-blue : #002583 → selected border / focus ring
+ --font-sans : DM Sans → row labels, tooltips
+ --font-mono : DM Mono → counts, jurisdiction codes
+ Neutral colours use Tailwind v4's emitted --color-gray-* custom properties.
+ No hex literals except as var() fallbacks for browsers that haven't parsed
+ the Tailwind output yet.
+ ─────────────────────────────────────────────────────────────────────────── */
+
+/* ── Grid layout ──────────────────────────────────────────────────────────── */
+.hm-grid {
+ display: grid;
+ /* 190 px label column + 3 × 60 px cell columns */
+ grid-template-columns: 190px repeat(3, 60px);
+ gap: 4px;
+ width: fit-content;
+}
+
+/* ── Column headers (jurisdiction codes) ──────────────────────────────────── */
+.hm-col-header {
+ width: 60px;
+ height: 28px;
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ font-family: var(--font-mono);
+ font-size: 11px;
+ font-weight: 700;
+ letter-spacing: 0.08em;
+ color: var(--color-gray-400, #002583);
+ text-transform: uppercase;
+ user-select: none;
+}
+
+/* ── Row labels (principle names) ─────────────────────────────────────────── */
+.hm-row-label {
+ height: 60px;
+ display: flex;
+ align-items: center;
+ justify-content: flex-end;
+ padding-right: 12px;
+ font-family: var(--font-sans);
+ font-size: 12px;
+ font-weight: 500;
+ color: var(--color-gray-700, #002583);
+ text-align: right;
+ line-height: 1.3;
+ user-select: none;
+}
+
+/* ── Base cell ────────────────────────────────────────────────────────────── */
+.hm-cell {
+ width: 60px;
+ height: 60px;
+ border-radius: 5px;
+ display: flex;
+ flex-direction: column;
+ align-items: center;
+ justify-content: center;
+ gap: 3px;
+ cursor: pointer;
+ border: 1.5px solid transparent;
+ transition:
+ transform 0.13s ease,
+ box-shadow 0.13s ease,
+ border-color 0.13s ease;
+ position: relative;
+ padding: 0;
+ background: none;
+ /* allow tooltip to overflow card boundary */
+ overflow: visible;
+}
+
+.hm-cell:focus-visible {
+ outline: 2px solid var(--color-accent-blue, #002583);
+ outline-offset: 2px;
+}
+
+.hm-cell:hover {
+ transform: translateY(-2px);
+ box-shadow: 0 5px 16px rgba(0, 0, 0, 0.14);
+ z-index: 10;
+}
+
+.hm-cell:hover .hm-tip {
+ display: block;
+}
+
+/* Selected state — ring matches accent-blue */
+.hm-cell[data-selected="true"] {
+ border-color: var(--color-accent-blue, #002583);
+ box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent-blue, #002583) 18%, transparent);
+}
+
+/* ── Cell status colours ──────────────────────────────────────────────────── */
+.hm-cell[data-status="green"] {
+ background-color: var(--color-cov-green, #002583);
+ color: #fff;
+}
+
+.hm-cell[data-status="amber"] {
+ background-color: var(--color-cov-amber, #002583);
+ color: #fff;
+}
+
+.hm-cell[data-status="red"] {
+ background-color: var(--color-cov-red, #002583);
+ color: #fff;
+}
+
+/* No-data: light grey with diagonal stripe */
+.hm-cell[data-status="grey"] {
+ background-color: var(--color-gray-100, #ffffff);
+ background-image: #002583 4px,
+ rgba(0, 0, 0, 0.045) 8px
+ );
+ color: var(--color-gray-400, #002583);
+}
+
+/* ── Cell content ─────────────────────────────────────────────────────────── */
+.hm-icon {
+ width: 13px;
+ height: 13px;
+ flex-shrink: 0;
+ opacity: 0.88;
+}
+
+.hm-count {
+ font-family: var(--font-mono);
+ font-size: 13px;
+ font-weight: 700;
+ line-height: 1;
+}
+
+/* ── Tooltip ──────────────────────────────────────────────────────────────── */
+.hm-tip {
+ display: none;
+ position: absolute;
+ bottom: calc(100% + 9px);
+ left: 50%;
+ transform: translateX(-50%);
+ background: var(--color-gray-900, #002583);
+ color: #fff;
+ font-family: var(--font-sans);
+ font-size: 11px;
+ line-height: 1.55;
+ padding: 7px 12px;
+ border-radius: 7px;
+ white-space: nowrap;
+ pointer-events: none;
+ z-index: 50;
+ box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+ text-align: center;
+}
+
+.hm-tip strong {
+ font-weight: 700;
+ display: block;
+ margin-bottom: 2px;
+}
+
+/* Downward arrow */
+.hm-tip::after {
+ content: '';
+ position: absolute;
+ top: 100%;
+ left: 50%;
+ transform: translateX(-50%);
+ border: 5px solid transparent;
+ border-top-color: var(--color-gray-900, #002583);
+}
+
+/* ── Skeleton shimmer (shown while HTMX loads) ───────────────────────────── */
+@keyframes hm-shimmer {
+ 0% { background-position: -400px 0; }
+ 100% { background-position: calc(400px + 100%) 0; }
+}
+
+.hm-skeleton .hm-cell {
+ background: #ffffff 25%,
+ var(--color-gray-200, #ffffff) 50%,
+ var(--color-gray-100, #ffffff) 75%
+ ) !important;
+ background-size: 400px 100% !important;
+ animation: hm-shimmer 1.5s ease-in-out infinite;
+ cursor: default;
+ pointer-events: none;
+}
+
+.hm-skeleton .hm-row-label {
+ color: transparent;
+}
+
+.hm-skeleton .hm-row-label::after {
+ content: '';
+ display: block;
+ height: 12px;
+ width: 110px;
+ margin-left: auto;
+ border-radius: 3px;
+ background: #ffffff 25%,
+ var(--color-gray-100, #ffffff) 50%,
+ var(--color-gray-200, #ffffff) 75%
+ );
+ background-size: 400px 100%;
+ animation: hm-shimmer 1.5s ease-in-out infinite;
+}
+
+.hm-skeleton .hm-col-header {
+ color: transparent;
+}
+
+/* ── Error state ──────────────────────────────────────────────────────────── */
+.hm-error {
+ display: flex;
+ flex-direction: column;
+ align-items: center;
+ justify-content: center;
+ padding: 48px 24px;
+ gap: 10px;
+ text-align: center;
+}

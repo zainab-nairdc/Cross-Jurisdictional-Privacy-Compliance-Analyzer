@@ -1,0 +1,166 @@
+{% comment %}
+Document preparation widget — plain English for compliance team.
+display_step (1–4) is set by IngestionWidgetView, mapping internal stages 1–6:
+ 1 → Received | 2 → Reading | 3 → Understanding | 4 → Ready to use
+Polled every 3s via HTMX from home.html #ingestion-widget.
+{% endcomment %}
+{% load static %}
+
+{% if active_jobs %}
+
+<div class="bg-white rounded-lg border border-gray-100 px-5 py-4">
+ <p class="text-[10px] font-bold uppercase tracking-[0.07em] text-gray-400 mb-3 flex items-center gap-2">
+ Preparing documents
+ <span class="inline-block w-1.5 h-1.5 rounded-full bg-[#002583] animate-pulse"></span>
+ </p>
+
+ <div class="space-y-4">
+ {% for job in active_jobs %}
+ <div class="rounded-md border border-gray-100 p-3">
+
+ {# ── Header: document name + status pill ───────────────────── #}
+ <div class="flex items-center justify-between mb-3 gap-2">
+ <p class="text-xs font-medium text-gray-800 truncate">{{ job.document.name }}</p>
+ {% if job.status == 'running' %}
+ <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#002583]/10 text-[#002583] flex-shrink-0">Preparing</span>
+ {% elif job.status == 'queued' %}
+ <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-500 flex-shrink-0">Waiting</span>
+ {% elif job.status == 'failed' %}
+ <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#002583]/10 text-[#002583] flex-shrink-0">Needs attention</span>
+ {% elif job.status == 'complete' %}
+ <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#002583]/10 text-[#002583] flex-shrink-0">Ready</span>
+ {% endif %}
+ </div>
+
+ {% if job.status == 'complete' %}
+ {# ── READY STATE ──────────────────────────────────────────── #}
+ <div class="flex items-start gap-3">
+ <div class="w-8 h-8 rounded-full bg-[#002583]/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+ <svg class="w-4 h-4 text-[#002583]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+ </svg>
+ </div>
+ <div>
+ <p class="text-xs font-medium text-gray-800">Ready to use</p>
+ <p class="text-[11px] text-gray-500 mt-0.5 leading-relaxed">
+ {% if job.document.chunk_count %}
+ All {{ job.document.chunk_count }} sections are available for comparison and mapping.
+ {% else %}
+ This document is ready for comparison and mapping.
+ {% endif %}
+ </p>
+ </div>
+ </div>
+
+ {% elif job.status == 'failed' %}
+ {# ── ERROR STATE ──────────────────────────────────────────── #}
+ <div class="rounded-md bg-[#002583]/5 border border-[#002583]/20 px-3 py-3 mb-3">
+ <p class="text-xs font-semibold text-[#002583] mb-1">This document couldn't be read.</p>
+ {% if 'scan' in job.error_message|lower or 'image' in job.error_message|lower or 'ocr' in job.error_message|lower or '0 token' in job.error_message|lower %}
+ <p class="text-[11px] text-gray-600 leading-relaxed">
+ The PDF appears to be a scanned image rather than a text document.
+ Please upload a version where the text is selectable — for example, a copy downloaded directly from the regulator's website.
+ </p>
+ {% elif 'password' in job.error_message|lower or 'encrypt' in job.error_message|lower %}
+ <p class="text-[11px] text-gray-600 leading-relaxed">
+ This document is password-protected. Please remove the password and upload it again.
+ </p>
+ {% elif 'corrupt' in job.error_message|lower or 'invalid' in job.error_message|lower %}
+ <p class="text-[11px] text-gray-600 leading-relaxed">
+ The file appears to be damaged or incomplete. Try downloading the document again and re-uploading it.
+ </p>
+ {% else %}
+ <p class="text-[11px] text-gray-600 leading-relaxed">
+ Something went wrong while preparing this document. Please try uploading it again, or contact support if the problem continues.
+ </p>
+ {% endif %}
+ </div>
+ <div class="flex gap-2">
+ <a href="{% url 'library-regulations' %}"
+ class="px-3 py-1.5 rounded-md text-[11px] font-medium bg-[#002583] text-white hover:bg-[#002583] transition-colors">
+ Upload a readable version
+ </a>
+ <button class="px-3 py-1.5 rounded-md text-[11px] font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
+ Remove this document
+ </button>
+ </div>
+
+ {% elif job.status == 'queued' %}
+ {# ── QUEUED STATE ─────────────────────────────────────────── #}
+ <p class="text-[11px] text-gray-500 leading-relaxed mb-2">
+ Will start once the document above is ready.
+ </p>
+ <div class="w-full h-1 bg-gray-100 rounded-full"></div>
+
+ {% else %}
+ {# ── RUNNING STATE — 4-step progress ─────────────────────── #}
+
+ {# Step dots: Received → Reading → Understanding → Ready to use #}
+ <div class="flex items-center gap-0 mb-3">
+
+ {% for s in "1234" %}
+ {% with sn=forloop.counter %}
+
+ <div class="relative flex-shrink-0">
+ {% if sn < job.display_step %}
+ <div class="w-[22px] h-[22px] rounded-full bg-[#002583] flex items-center justify-center">
+ <svg class="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+ </svg>
+ </div>
+ {% elif sn == job.display_step %}
+ <div class="w-[22px] h-[22px] rounded-full bg-[#002583] flex items-center justify-center animate-pulse">
+ <span class="w-2 h-2 rounded-full bg-white"></span>
+ </div>
+ {% else %}
+ <div class="w-[22px] h-[22px] rounded-full bg-gray-200 flex items-center justify-center">
+ <span class="w-2 h-2 rounded-full bg-gray-400"></span>
+ </div>
+ {% endif %}
+
+ <p class="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[9px] whitespace-nowrap
+ {% if sn <= job.display_step %}text-gray-600{% else %}text-gray-300{% endif %}">
+ {% if sn == 1 %}Received
+ {% elif sn == 2 %}Reading
+ {% elif sn == 3 %}Understanding
+ {% else %}Ready to use{% endif %}
+ </p>
+ </div>
+
+ {% if not forloop.last %}
+ <div class="flex-1 h-0.5 {% if sn < job.display_step %}bg-[#002583]{% else %}bg-gray-200{% endif %}"></div>
+ {% endif %}
+
+ {% endwith %}
+ {% endfor %}
+
+ </div>
+
+ {# Progress bar + plain-English estimate #}
+ <div class="mt-6 mb-1">
+ <div class="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden mb-1.5">
+ <div class="h-full rounded-full bg-[#002583] transition-all duration-500"
+ style="width: {{ job.progress_pct }}%;"></div>
+ </div>
+ <p class="text-[11px] text-gray-400">
+ {% if job.progress_pct >= 90 %}Almost ready — just a few seconds left.
+ {% elif job.progress_pct >= 70 %}Ready in approximately 30 seconds.
+ {% elif job.progress_pct >= 45 %}Ready in approximately 1 minute.
+ {% elif job.progress_pct >= 20 %}Ready in approximately 2 minutes.
+ {% else %}This may take a few minutes.{% endif %}
+ </p>
+ </div>
+
+ {% endif %}{# end status branches #}
+
+ </div>
+ {% endfor %}
+ </div>
+</div>
+
+{% else %}
+
+{# No active jobs — invisible placeholder keeps the grid layout stable #}
+<div class="hidden"></div>
+
+{% endif %}

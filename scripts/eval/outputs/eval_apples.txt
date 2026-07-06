@@ -1,0 +1,121 @@
+D:\Cross-Jurisdictional Privacy Compliance Analyzer\.venv\Lib\site-packages\langchain_core\_api\deprecation.py:25: UserWarning: Core Pydantic V1 functionality isn't compatible with Python 3.14 or greater.
+  from pydantic.v1.fields import FieldInfo as FieldInfoV1
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+D:\Cross-Jurisdictional Privacy Compliance Analyzer\.venv\Lib\site-packages\huggingface_hub\file_download.py:138: UserWarning: `huggingface_hub` cache-system uses symlinks by default to efficiently store duplicated files but your machine does not support them in D:\Cross-Jurisdictional Privacy Compliance Analyzer\hf_cache\models--cross-encoder--ms-marco-MiniLM-L-6-v2. Caching files will still work but in a degraded version that might require more space on your disk. This warning can be disabled by setting the `HF_HUB_DISABLE_SYMLINKS_WARNING` environment variable. For more details, see https://huggingface.co/docs/huggingface_hub/how-to-cache#limitations.
+To support symlinks on Windows, you either need to activate Developer Mode or to run Python as an administrator. In order to activate developer mode, see this article: https://docs.microsoft.com/en-us/windows/apps/get-started/enable-your-device-for-development
+  warnings.warn(message)
+The Transformer `cache_dir` argument is deprecated. Please pass `cache_dir` via `model_kwargs`, `processor_kwargs`, and/or `config_kwargs` instead.
+================================================================================
+  RETRIEVAL EVALUATION (RetrieverEvaluator)
+================================================================================
+
+  loading chunks_inspect map (chunk_id -> node_id)...
+  loaded 1,280 chunk -> node mappings
+  hand-picked: 8 pairs
+  synthetic  : 32 pairs
+  total      : 40 ground-truth pairs
+
+  patching custom retriever's reranker to cross-encoder/ms-marco-MiniLM-L-6-v2
+Loading weights:   0%|          | 0/105 [00:00<?, ?it/s]Loading weights: 100%|██████████| 105/105 [00:00<00:00, 8148.20it/s]
+[1mBertForSequenceClassification LOAD REPORT[0m from: cross-encoder/ms-marco-MiniLM-L-6-v2
+Key                          | Status     |  | 
+-----------------------------+------------+--+-
+bert.embeddings.position_ids | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+
+  warming up retrievers...
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 8343.49it/s]
+[1mBertModel LOAD REPORT[0m from: BAAI/bge-small-en-v1.5
+Key                     | Status     |  | 
+------------------------+------------+--+-
+embeddings.position_ids | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+  [retriever] Loading embedding model: BAAI/bge-small-en-v1.5... Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 9227.12it/s]
+[1mBertModel LOAD REPORT[0m from: BAAI/bge-small-en-v1.5
+Key                     | Status     |  | 
+------------------------+------------+--+-
+embeddings.position_ids | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+done
+Loading weights:   0%|          | 0/105 [00:00<?, ?it/s]Loading weights: 100%|██████████| 105/105 [00:00<00:00, 8061.98it/s]
+[1mBertForSequenceClassification LOAD REPORT[0m from: cross-encoder/ms-marco-MiniLM-L-6-v2
+Key                          | Status     |  | 
+-----------------------------+------------+--+-
+bert.embeddings.position_ids | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+  done.
+
+================================================================================
+  running 40 queries through CUSTOM retriever...
+  custom done in 53.4s
+
+  running 40 queries through LLAMAINDEX retriever...
+  llamaindex done in 61.5s
+
+================================================================================
+  PER-QUERY DETAIL (rank = position of expected chunk in top-5; '-' = miss)
+================================================================================
+  query                                                        custom    llama
+  How long must banking companies retain KYC and transacti          -        4
+  What is the breach notification timeline to the Bahrain           -        1
+  Under what conditions can sensitive personal data be pro          -        3
+  How does a controller obtain prior authorization to tran          2        2
+  Where must Indian payment system data be stored?                  2        1
+  What does Kuwait DPPR require for data classification?            -        1
+  Can a data subject withdraw consent under Bahrain law?            -        2
+  What are BBK's internal retention periods for customer r          2        1
+  What is the process for the Chief Executive to make a de          2        1
+  What Legislative-Decree specifically governs electronic           1        3
+  Who is required to notify the Board in writing if a conf          1        1
+  What notifications are subject to simplified provisions           1        1
+  What is the timeframe for the Authority to respond to a           5        1
+  Does a holder of a Bachelor's Degree in information tech          2        1
+  What processing of personal data is allowed by law (Arti          4        1
+  What is the timeframe for notifying the Authority of cha          1        3
+  Who is the regulator that customers can contact if dissa          1        1
+  Does BBK determine the purposes and means of processing           -        1
+  What specific laws are violated when personal data is pr          -        -
+  Does the Bahrain PDPL explicitly designate health and me          2        1
+  Does the document supersede BBK-OPS-012's requirements f          1        1
+  Does the law require automated means of modifying person          1        2
+  What is the required timeframe for monitoring restored s          1        1
+  What is the contact for regulatory notification approval          -        1
+  Does law 8 require banks to provide a free monthly state          2        1
+  Does the regulated entity implement cryptographic techni          1        1
+  Does Article (8) require notification of a breach within          1        1
+  What specific security controls must Regulated Entities           1        1
+  Does the Entity have a cyber risk appetite approved by l          4        1
+  Who is responsible for implementing risk management stra          1        1
+  What specific laws were enacted in 2013 regarding combat          2        -
+  What specific laws regulate banks' handling of customer           2        -
+  Are KYC documents sufficient for opening accounts of eli          2        1
+  Does the amendment to Act 18 of 1891 omit its provisions          2        1
+  When were copies of the Official Gazette containing the           1        1
+  Does the Outsourcing of IT Services policy address the e          2        1
+  What is the definition of an intermediary in relation to          4        1
+  Is the subject of this document a Scheduled Commercial B          1        2
+  What specific records must REs preserve for at least fiv          1        1
+  Does the RE have procedures for mitigating country risk,          1        1
+
+================================================================================
+  AVERAGE METRICS (higher is better, all 0.0-1.0 range)
+================================================================================
+  metric              custom  llamaindex      winner
+  hit_rate            0.8000      0.9250       llama
+  mrr                 0.5737      0.8063       llama
+  precision           0.1600      0.1850       llama
+  recall              0.8000      0.9250       llama
+  ap                  0.5737      0.8063       llama
+  ndcg                0.6313      0.8364       llama
+
+  total latency:
+    custom     :   53.4s (1.33s per query)
+    llamaindex :   61.5s (1.54s per query)

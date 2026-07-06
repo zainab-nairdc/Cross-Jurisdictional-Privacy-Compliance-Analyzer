@@ -1,0 +1,796 @@
+﻿{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Internal Policies — CJPCA{% endblock %}
+
+{% block content %}
+<div x-data="policiesPage()" class="flex h-full bg-gray-50 overflow-hidden">
+
+ {# ── Main column ───────────────────────────────────────────────── #}
+ <div class="flex flex-col flex-1 min-w-0 overflow-hidden">
+
+ {# Top bar #}
+ <div class="bg-white border-b border-gray-100 px-6 py-2.5 flex items-center justify-between flex-shrink-0">
+ <div>
+ <h1 style="font-size:14px;font-weight:700;color:#002583;">Internal policies</h1>
+ <p style="font-size:11px;color:#002583;margin-top:1px;">BBK's internal policy documents mapped against regulatory obligations</p>
+ </div>
+ {% if is_admin %}
+ <button onclick="document.getElementById('upload-policy-modal').classList.remove('hidden')"
+ style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:7px;background:#002583;color:#fff;font-size:12px;font-weight:500;border:none;cursor:pointer;">
+ <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
+ </svg>
+ Add a policy
+ </button>
+ {% endif %}
+ </div>
+
+ {# Stats row — admin only (ingestion-state info belongs to whoever manages the corpus). #}
+ {% if is_admin %}
+ <div class="bg-white border-b border-gray-100 flex-shrink-0">
+ <div class="flex divide-x divide-gray-100">
+ <template x-for="tab in statTabs" :key="tab.val">
+ <button @click="if (statFilter !== tab.val) { statFilter = tab.val; selectedDoc = null; }"
+ class="flex-1 px-6 py-2.5 text-left transition-all relative">
+ <div style="position:absolute;bottom:0;left:0;right:0;height:2px;background:#002583;transition:opacity 0.15s;"
+ :style="statFilter === tab.val ? 'opacity:1' : 'opacity:0'"></div>
+ <p style="font-size:20px;font-weight:700;font-family:'Satoshi',sans-serif;line-height:1;color:#002583;" x-text="tab.count"></p>
+ <p style="margin-top:2px;"
+ :style="statFilter === tab.val ? 'font-size:11px;font-weight:700;color:#002583;' : 'font-size:11px;font-weight:500;color:#002583;'"
+ x-text="tab.label"></p>
+ <p style="font-size:10px;color:#002583;" x-text="tab.sub"></p>
+ </button>
+ </template>
+ </div>
+ </div>
+ {% endif %}
+
+ {# Toolbar #}
+ <div class="bg-white border-b border-gray-100 px-6 py-2 flex-shrink-0 flex items-center gap-3">
+ <div class="relative flex-1">
+ <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+ </svg>
+ <input x-model="search" type="text" placeholder="Search policies…"
+ class="w-full pl-8 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-[#002583] focus:ring-2 focus:ring-[#002583]/20 bg-gray-50">
+ </div>
+ {# Type filter #}
+ <div class="flex items-center gap-1.5 flex-shrink-0">
+ <template x-for="t in typeFilters" :key="t.val">
+ <button @click="typeFilter = (typeFilter === t.val ? 'all' : t.val); selectedDoc = null"
+ :class="typeFilter === t.val ? 'bg-[#002583] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+ class="px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors whitespace-nowrap"
+ x-text="t.label"></button>
+ </template>
+ </div>
+ </div>
+
+ {# Card grid #}
+ <div class="flex-1 overflow-y-auto px-6 py-3">
+ <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;align-items:start;">
+ {% for doc in policies %}
+ <div x-show="cardVisible('{{ doc.status }}', '{{ doc.name|escapejs }}', '{% if 'sop' in doc.name|lower or 'procedure' in doc.name|lower %}SOP{% elif 'guideline' in doc.name|lower or 'guide' in doc.name|lower %}Guideline{% elif 'standard' in doc.name|lower %}Standard{% else %}Policy{% endif %}')"
+ @click="selectDoc({{ doc.pk }})"
+ class="bg-white rounded-xl flex flex-col cursor-pointer transition-all"
+ style="overflow:hidden;border:1px solid #E5E8EF;"
+ :style="{{ doc.pk }} === selectedDoc?.id
+ ? {borderColor:'#002583', boxShadow:'0 0 0 2px rgba(244,121,32,0.18)', transform:'translateY(-1px)'}
+ : {borderColor:'#E5E8EF', boxShadow:'', transform:''}"
+ onmouseenter="if(this.style.borderColor !== 'rgb(244, 121, 32)'){this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 16px rgba(0,0,0,0.08)';}"
+ onmouseleave="if(this.style.borderColor !== 'rgb(244, 121, 32)'){this.style.transform='';this.style.boxShadow='';}">
+
+ <div style="padding:14px 14px 10px;">
+ {# Type badge + status #}
+ <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;">
+ <span style="display:inline-flex;align-items:center;justify-content:center;padding:2px 7px;border-radius:4px;background:#ffffff;font-size:10px;font-weight:700;color:#002583;">
+ {% if 'sop' in doc.name|lower or 'procedure' in doc.name|lower %}SOP
+ {% elif 'guideline' in doc.name|lower or 'guide' in doc.name|lower %}Guideline
+ {% elif 'standard' in doc.name|lower %}Standard
+ {% else %}Policy{% endif %}
+ </span>
+ {% if doc.status == 'failed' %}
+ <span style="padding:3px 9px;border-radius:20px;font-size:10px;font-weight:600;background:#ffffff;color:#002583;">Upload issue</span>
+ {% endif %}
+ </div>
+
+ {# Name #}
+ <p style="font-size:13px;font-weight:700;color:#002583;line-height:1.3;margin-bottom:3px;">{{ doc.name }}</p>
+ {% if doc.full_name and doc.full_name != doc.name %}
+ <p style="font-size:11px;color:#002583;line-height:1.4;margin-bottom:6px;">{{ doc.full_name|truncatechars:80 }}</p>
+ {% else %}<div style="margin-bottom:6px;"></div>{% endif %}
+
+ {# Topic stickers — LLM-classified per doc (manage.py classify_doc_topics) #}
+ {% if doc.topics %}
+ <div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px;">
+ {% for topic in doc.topics %}
+ <span style="padding:1px 7px;border-radius:10px;font-size:9px;font-weight:600;border:1px solid #E5E8EF;background:#ffffff;color:#002583;">{{ topic.label }}</span>
+ {% endfor %}
+ </div>
+ {% endif %}
+
+ {# User-added tags #}
+ {% if doc.tags %}
+ <div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:2px;">
+ {% for tag in doc.tags|slice:":3" %}
+ <span style="padding:1px 6px;border-radius:10px;font-size:9px;font-weight:500;background:#ffffff;color:#002583;"
+ title="{% if tag.by_name %}Added by {{ tag.by_name }}{% if tag.at %} · {{ tag.at|slice:':10' }}{% endif %}{% endif %}">{{ tag.label|default:tag }}</span>
+ {% endfor %}
+ </div>
+ {% endif %}
+ </div>
+
+ <div style="height:1px;background:#E5E8EF;margin:0 14px;"></div>
+
+ {% if doc.status == 'indexed' %}
+ <div style="padding:9px 14px;display:flex;align-items:center;justify-content:space-between;gap:6px;">
+ {% if doc.effective_date %}
+ <span style="font-size:11px;color:#002583;">{{ doc.effective_date|date:"d M Y" }}</span>
+ {% else %}
+ <span></span>
+ {% endif %}
+ <span style="font-size:11px;font-family:'Satoshi',sans-serif;color:#002583;font-weight:600;flex-shrink:0;">{{ doc.chunk_count }} sections</span>
+ </div>
+ {% elif doc.status == 'processing' %}
+ <div style="padding:10px 14px;display:flex;align-items:center;justify-content:space-between;">
+ <p style="font-size:11px;color:#002583;">Processing…</p>
+ <div style="display:flex;align-items:center;gap:3px;">
+ <span style="width:5px;height:5px;border-radius:50%;background:#002583;display:inline-block;animation:dot-bounce 1.2s ease-in-out infinite;"></span>
+ <span style="width:5px;height:5px;border-radius:50%;background:#002583;display:inline-block;animation:dot-bounce 1.2s ease-in-out 0.2s infinite;"></span>
+ <span style="width:5px;height:5px;border-radius:50%;background:#002583;display:inline-block;animation:dot-bounce 1.2s ease-in-out 0.4s infinite;"></span>
+ </div>
+ </div>
+ {% else %}
+ <div style="padding:10px 14px;">
+ <p style="font-size:11px;color:#002583;">We couldn't read this file. It may be scanned or have a formatting issue.</p>
+ </div>
+ {% endif %}
+ </div>
+ {% endfor %}
+ </div>
+
+ {# Empty state #}
+ <div x-show="visibleCount === 0" class="flex flex-col items-center justify-center py-20">
+ <svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="#ffffff" stroke-width="1.5" style="margin-bottom:12px;">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
+ </svg>
+ <p style="font-size:14px;font-weight:600;color:#002583;margin-bottom:4px;">No policies match your filters</p>
+ <p style="font-size:12px;color:#002583;">Try a different keyword or clear the filter</p>
+ <button @click="search='';statFilter='indexed';typeFilter='all';selectedDoc=null"
+ style="margin-top:12px;padding:6px 16px;border-radius:7px;border:1px solid #E5E8EF;font-size:12px;color:#002583;background:#fff;cursor:pointer;">
+ Clear filters
+ </button>
+ </div>
+ </div>
+ </div>
+
+ {# ── Detail panel ──────────────────────────────────────────────── #}
+ <div class="doc-detail-panel flex-shrink-0 border-l border-gray-100 bg-white flex flex-col transition-all duration-200 overflow-hidden"
+ :style="selectedDoc ? 'width:260px;' : 'width:0px;'">
+ <div x-show="selectedDoc" style="width:260px;flex:1;min-height:0;display:flex;flex-direction:column;">
+
+ {# Panel header — fixed at top so close button stays reachable while scrolling #}
+ <div style="padding:10px 14px 8px;border-bottom:1px solid #E5E8EF;display:flex;align-items:flex-start;justify-content:space-between;flex-shrink:0;">
+ <div style="min-width:0;flex:1;padding-right:8px;">
+ <p style="font-size:12px;font-weight:700;color:#002583;line-height:1.3;" x-text="selectedDoc?.name"></p>
+ <p style="font-size:10px;color:#002583;margin-top:1px;" x-text="selectedDoc?.issuing_authority || 'BBK Internal'"></p>
+ <p x-show="selectedDoc?.document_id"
+ style="font-size:9px;color:#002583;margin-top:2px;font-family:'Satoshi',sans-serif;font-weight:600;letter-spacing:0.04em;"
+ x-text="selectedDoc?.document_id"></p>
+ </div>
+ <button @click="selectedDoc = null" style="flex-shrink:0;color:#002583;background:none;border:none;cursor:pointer;padding:2px;">
+ <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+ </svg>
+ </button>
+ </div>
+
+ {# Single scroll region for metadata + tags + actions — keeps the whole panel reachable as fields grow #}
+ <div style="flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;">
+
+ {# Metadata — single flex column owns vertical rhythm; children don't set their own margin-top #}
+ <div style="padding:10px 14px;display:flex;flex-direction:column;gap:10px;">
+
+ {# Superseded badge — pin to top so reviewers don't miss it #}
+ <template x-if="selectedDoc?.superseded">
+ <div style="padding:8px 10px;border-radius:8px;background:#ffffff;border:1px solid #002583;display:flex;align-items:flex-start;gap:6px;">
+ <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="2" style="flex-shrink:0;margin-top:1px;">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
+ </svg>
+ <div style="min-width:0;">
+ <p style="font-size:10px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:0.06em;">Superseded</p>
+ <p x-show="selectedDoc?.superseded_by"
+ style="font-size:11px;color:#002583;line-height:1.5;margin-top:2px;"
+ x-text="'Replaced by: ' + selectedDoc?.superseded_by"></p>
+ </div>
+ </div>
+ </template>
+
+ <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
+ <colgroup>
+ <col style="width:96px;">
+ <col>
+ </colgroup>
+ <tbody>
+ <tr style="border-bottom:1px solid #E5E8EF;">
+ <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;vertical-align:middle;">Status</td>
+ <td style="padding:5px 0;vertical-align:middle;">
+ <span x-show="selectedDoc?.status === 'indexed'" style="font-size:10px;font-weight:600;color:#002583;">Ready to use</span>
+ <span x-show="selectedDoc?.status === 'processing'" style="font-size:10px;font-weight:600;color:#002583;" class="animate-pulse">Getting ready…</span>
+ <span x-show="selectedDoc?.status === 'failed'" style="font-size:10px;font-weight:600;color:#002583;">Upload issue</span>
+ </td>
+ </tr>
+ <tr style="border-bottom:1px solid #E5E8EF;">
+ <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;">Type</td>
+ <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;word-break:break-word;" x-text="selectedDoc?.type_label"></td>
+ </tr>
+ <template x-if="selectedDoc?.regulation_category">
+ <tr style="border-bottom:1px solid #E5E8EF;">
+ <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;">Category</td>
+ <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;word-break:break-word;text-transform:capitalize;" x-text="selectedDoc?.regulation_category"></td>
+ </tr>
+ </template>
+ <template x-if="selectedDoc?.privacy_relevance">
+ <tr style="border-bottom:1px solid #E5E8EF;">
+ <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;">Privacy relevance</td>
+ <td style="padding:5px 0;line-height:1;vertical-align:middle;">
+ <span :class="'rel-pill rel-pill-' + (selectedDoc?.privacy_relevance || 'none')">
+ <span class="rel-dot"></span>
+ <span x-text="selectedDoc?.privacy_relevance"></span>
+ </span>
+ </td>
+ </tr>
+ </template>
+ <template x-if="selectedDoc?.applicable_sector">
+ <tr style="border-bottom:1px solid #E5E8EF;">
+ <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;">Sector</td>
+ <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;word-break:break-word;text-transform:capitalize;" x-text="selectedDoc?.applicable_sector"></td>
+ </tr>
+ </template>
+ <template x-if="selectedDoc?.issuing_authority">
+ <tr style="border-bottom:1px solid #E5E8EF;">
+ <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;">Department</td>
+ <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;word-break:break-word;" x-text="selectedDoc?.issuing_authority"></td>
+ </tr>
+ </template>
+ <template x-if="selectedDoc?.effective_date">
+ <tr style="border-bottom:1px solid #E5E8EF;">
+ <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;">Effective</td>
+ <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;" x-text="selectedDoc?.effective_date"></td>
+ </tr>
+ </template>
+ <template x-if="selectedDoc?.publication_date">
+ <tr style="border-bottom:1px solid #E5E8EF;">
+ <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;">Approved</td>
+ <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;" x-text="selectedDoc?.publication_date"></td>
+ </tr>
+ </template>
+ <template x-if="selectedDoc?.last_updated">
+ <tr style="border-bottom:1px solid #E5E8EF;">
+ <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;">Last updated</td>
+ <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;" x-text="selectedDoc?.last_updated"></td>
+ </tr>
+ </template>
+ <template x-if="selectedDoc?.version">
+ <tr style="border-bottom:1px solid #E5E8EF;">
+ <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;">Version</td>
+ <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;word-break:break-word;" x-text="selectedDoc?.version"></td>
+ </tr>
+ </template>
+ <template x-if="selectedDoc?.section_identifiers">
+ <tr style="border-bottom:1px solid #E5E8EF;">
+ <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;">Sections</td>
+ <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;word-break:break-word;" x-text="selectedDoc?.section_identifiers"></td>
+ </tr>
+ </template>
+ <template x-if="selectedDoc?.parent_regulation">
+ <tr style="border-bottom:1px solid #E5E8EF;">
+ <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;">Maps to</td>
+ <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;word-break:break-word;font-family:'Satoshi',sans-serif;" x-text="selectedDoc?.parent_regulation"></td>
+ </tr>
+ </template>
+ <tr style="border-bottom:1px solid #E5E8EF;" x-show="selectedDoc?.chunk_count">
+ <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;">Chunks</td>
+ <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;" x-text="selectedDoc?.chunk_count"></td>
+ </tr>
+ <tr>
+ <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;">Added</td>
+ <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;" x-text="selectedDoc?.upload_date"></td>
+ </tr>
+ </tbody>
+ </table>
+
+ {# Scope — margin-top removed; parent flex gap owns vertical spacing #}
+ <template x-if="selectedDoc?.full_name">
+ <div style="padding:10px;border-radius:8px;background:#ffffff;border:1px solid #E5E8EF;">
+ <p style="font-size:10px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Scope</p>
+ <p style="font-size:10px;color:#002583;line-height:1.55;" x-text="selectedDoc?.full_name"></p>
+ </div>
+ </template>
+
+ {# Concept tags from CSV #}
+ <template x-if="selectedDoc?.concept_tags_csv && selectedDoc.concept_tags_csv.length">
+ <div>
+ <p style="font-size:10px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px;">Concepts</p>
+ <div style="display:flex;flex-wrap:wrap;gap:3px;">
+ <template x-for="ct in selectedDoc.concept_tags_csv" :key="ct">
+ <span style="padding:2px 7px;border-radius:10px;font-size:10px;background:#ffffff;color:#002583;font-weight:500;" x-text="ct"></span>
+ </template>
+ </div>
+ </div>
+ </template>
+
+ {# Cross references #}
+ <template x-if="selectedDoc?.cross_references">
+ <div style="padding:10px;border-radius:8px;background:#ffffff;border:1px solid #E5E8EF;">
+ <p style="font-size:10px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Cross-references</p>
+ <p style="font-size:10px;color:#002583;line-height:1.55;font-family:'Satoshi',sans-serif;" x-text="selectedDoc?.cross_references"></p>
+ </div>
+ </template>
+
+ {# Notes #}
+ <template x-if="selectedDoc?.notes">
+ <div style="padding:10px;border-radius:8px;background:#ffffff;border:1px solid #002583;">
+ <p style="font-size:10px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Internal notes</p>
+ <p style="font-size:10px;color:#002583;line-height:1.55;" x-text="selectedDoc?.notes"></p>
+ </div>
+ </template>
+
+ {# Source link — relevant for policies that reference an internal portal #}
+ <template x-if="selectedDoc?.source_url">
+ <a :href="selectedDoc?.source_url" target="_blank" rel="noopener"
+ style="display:inline-flex;align-items:center;gap:5px;font-size:10px;color:#002583;text-decoration:none;">
+ <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/>
+ </svg>
+ View source link
+ </a>
+ </template>
+
+ </div>
+
+ {# Tags section #}
+ <div style="padding:8px 14px;border-top:1px solid #E5E8EF;">
+ <p style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#002583;margin-bottom:7px;">Tags</p>
+
+ {# Current tags — shared across all users; tooltip shows author. #}
+ <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:7px;">
+ <template x-for="tag in currentTags" :key="tag.label">
+ <span :title="tag.by_name ? ('Added by ' + tag.by_name + (tag.at ? ' · ' + tag.at.slice(0,10) : '')) : ''"
+ style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:20px;background:#ffffff;font-size:10px;color:#002583;cursor:help;">
+ <span x-text="tag.label"></span>
+ <span x-show="tag.by_name" style="font-size:8.5px;color:#002583;font-weight:500;"
+ x-text="'· ' + (tag.by_name || '').split(' ')[0]"></span>
+ <button @click="removeTag(tag.label)" style="background:none;border:none;cursor:pointer;color:#002583;font-size:13px;line-height:1;padding:0;">&times;</button>
+ </span>
+ </template>
+ <template x-if="currentTags.length === 0">
+ <span style="font-size:10px;color:#ffffff;">No tags yet</span>
+ </template>
+ </div>
+
+ {# Preset tags #}
+ <div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px;">
+ {% for tag in preset_tags %}
+ <button @click="addTag('{{ tag }}')"
+ style="padding:2px 7px;border-radius:20px;font-size:9px;border:1px dashed #E5E8EF;color:#002583;background:none;cursor:pointer;"
+ onmouseover="this.style.borderColor='#002583';this.style.color='#002583';"
+ onmouseout="this.style.borderColor='#ffffff';this.style.color='#002583';">
+ + {{ tag }}
+ </button>
+ {% endfor %}
+ </div>
+
+ {# Custom tag input #}
+ <div style="display:flex;gap:4px;">
+ <input x-model="newTag" @keydown.enter="addTag(newTag)" type="text" placeholder="Custom tag…"
+ style="flex:1;padding:4px 8px;border:1px solid #E5E8EF;border-radius:6px;font-size:10px;outline:none;"
+ onfocus="this.style.borderColor='#002583';" onblur="this.style.borderColor='#ffffff';">
+ <button @click="addTag(newTag)" style="padding:4px 8px;border-radius:6px;background:#002583;color:#fff;border:none;font-size:10px;cursor:pointer;">Add</button>
+ </div>
+ </div>
+
+ </div>{# /scroll region — actions live below, pinned to panel bottom #}
+
+ {# Actions — flex-shrink:0 keeps these pinned at the bottom, no empty space when viewport is tall #}
+ <div style="padding:8px 14px 10px;border-top:1px solid #E5E8EF;display:flex;flex-direction:column;gap:5px;flex-shrink:0;">
+
+ {# View document #}
+ <button @click="openPolicyViewer(selectedDoc?.id)"
+ style="display:flex;align-items:center;justify-content:center;gap:6px;padding:7px;border-radius:7px;background:#002583;color:#fff;font-size:11px;font-weight:500;border:none;cursor:pointer;width:100%;">
+ <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><circle cx="12" cy="12" r="3"/>
+ </svg>
+ View document
+ </button>
+
+ {# Map this policy #}
+ <a :href="'/mapping/?policy=' + selectedDoc?.id"
+ style="display:flex;align-items:center;justify-content:center;gap:6px;padding:7px;border-radius:7px;border:1px solid #E5E8EF;color:#002583;font-size:11px;font-weight:500;text-decoration:none;background:#fff;">
+ <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0z"/>
+ </svg>
+ Map this policy
+ </a>
+
+ {# Download original #}
+ <template x-if="selectedDoc?.file_url">
+ <a :href="selectedDoc.file_url" target="_blank" rel="noopener"
+ style="display:flex;align-items:center;justify-content:center;gap:6px;padding:7px;border-radius:7px;border:1px solid #E5E8EF;color:#002583;font-size:11px;font-weight:500;text-decoration:none;background:#fff;">
+ <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M12 3v13.5m0 0l-3.75-3.75M12 16.5l3.75-3.75"/>
+ </svg>
+ Download original
+ </a>
+ </template>
+
+ {# Delete — admin only #}
+ {% if is_admin %}
+ <form :action="selectedDoc?.delete_url" method="post"
+ onsubmit="return confirm('Delete this policy? This cannot be undone.')">
+ {% csrf_token %}
+ <button type="submit"
+ style="display:flex;align-items:center;justify-content:center;gap:6px;padding:7px;border-radius:7px;border:1px solid #E5E8EF;color:#002583;font-size:11px;font-weight:500;background:#fff;cursor:pointer;width:100%;">
+ <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/>
+ </svg>
+ Delete from library
+ </button>
+ </form>
+ {% endif %}
+
+ </div>
+ </div>
+ </div>
+
+</div>
+
+{# ── Document viewer modal ─────────────────────────────────────────────────── #}
+<div id="policy-viewer-modal"
+ style="display:none;position:fixed;inset:0;z-index:60;background:rgba(0,0,0,0.4);backdrop-filter:blur(2px);"
+ onclick="if(event.target===this)closePolicyViewer()">
+ <div style="position:absolute;inset:5% 4%;background:#fff;border-radius:14px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 25px 60px rgba(0,0,0,0.18);">
+ <div style="padding:10px 16px;border-bottom:1px solid #E5E8EF;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+ <p style="font-size:11px;font-weight:700;color:#002583;">Document Viewer</p>
+ <button onclick="closePolicyViewer()" style="background:none;border:none;cursor:pointer;color:#002583;font-size:22px;line-height:1;padding:0;width:24px;height:24px;display:flex;align-items:center;justify-content:center;">&times;</button>
+ </div>
+ <div id="policy-viewer-body" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;">
+ <div style="display:flex;align-items:center;justify-content:center;height:100%;gap:8px;color:#002583;">
+ <div style="width:18px;height:18px;border:2px solid #E5E8EF;border-top-color:#002583;border-radius:50%;animation:viewer-spin .7s linear infinite;"></div>
+ <span style="font-size:11px;">Loading…</span>
+ </div>
+ </div>
+ </div>
+</div>
+
+<style>
+@keyframes dot-bounce {
+ 0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+ 40% { transform: translateY(-4px); opacity: 1; }
+}
+@keyframes viewer-spin { to { transform:rotate(360deg); } }
+
+/* Detail-panel viewport sizing — outer panel must have an explicit
+ height so the flex column inside can compute flex:1 / overflow-y:auto
+ correctly. Without this, the parent's flex-stretch alone doesn't make
+ percentage/vh heights resolve in all browsers. */
+.doc-detail-panel { height: 100vh; max-height: 100vh; }
+
+/* Privacy-relevance pill — kept as a real CSS class so :style/style merge
+ quirks in Alpine can't strip the layout properties. */
+.rel-pill {
+ display: inline-flex;
+ align-items: center;
+ gap: 5px;
+ padding: 3px 9px;
+ border-radius: 20px;
+ font-size: 10px;
+ font-weight: 600;
+ line-height: 1;
+ text-transform: capitalize;
+ white-space: nowrap;
+ vertical-align: middle;
+}
+.rel-pill .rel-dot {
+ width: 6px;
+ height: 6px;
+ border-radius: 50%;
+ flex-shrink: 0;
+}
+.rel-pill-high { background: #ffffff; color: #002583; }
+.rel-pill-high .rel-dot { background: #002583; }
+.rel-pill-partial { background: #ffffff; color: #002583; }
+.rel-pill-partial .rel-dot { background: #002583; }
+.rel-pill-low,
+.rel-pill-none { background: #ffffff; color: #002583; }
+.rel-pill-low .rel-dot,
+.rel-pill-none .rel-dot { background: #002583; }
+</style>
+
+<script>
+function getCookie(name) {
+ const m = document.cookie.match('(?:^|; )' + name + '=([^;]*)');
+ return m ? decodeURIComponent(m[1]) : '';
+}
+
+function policiesPage() {
+ const allDocs = {{ docs_json|safe }};
+
+ return {
+ search: '',
+ statFilter: 'indexed',
+ typeFilter: 'all',
+ selectedDoc: null,
+ currentTags: [],
+ newTag: '',
+
+ statTabs: [
+ { val:'indexed', label:'Ready to use', sub:'Available for mapping', count: {{ stats.indexed }} },
+ { val:'processing', label:'Being prepared', sub:'Almost ready', count: {{ stats.processing }} },
+ { val:'failed', label:'Needs attention',sub:'Upload issue', count: {{ stats.failed }} },
+ ],
+
+ typeFilters: [
+ { val:'Policy', label:'Policy' },
+ { val:'SOP', label:'SOP' },
+ { val:'Guideline', label:'Guideline' },
+ { val:'Standard', label:'Standard' },
+ ],
+
+ cardVisible(status, name, type) {
+ if (this.statFilter !== 'all' && status !== this.statFilter) return false;
+ if (this.typeFilter !== 'all' && type !== this.typeFilter) return false;
+ if (this.search && !name.toLowerCase().includes(this.search.toLowerCase())) return false;
+ return true;
+ },
+
+ selectDoc(id) {
+ const doc = allDocs.find(d => d.id === id);
+ this.selectedDoc = (this.selectedDoc?.id === id) ? null : (doc || null);
+ this.currentTags = this.selectedDoc ? [...(this.selectedDoc.tags || [])] : [];
+ this.newTag = '';
+ },
+
+ async addTag(tag) {
+ // tags carry author info ({label, by, ...}); accept string or object,
+ // server is keyed by label.
+ const label = (typeof tag === 'object' && tag !== null ? tag.label : tag || '').trim();
+ if (!label || !this.selectedDoc) return;
+ if (this.currentTags.some(t => (t.label || t).toLowerCase() === label.toLowerCase())) {
+ this.newTag = ''; return;
+ }
+ const res = await fetch(`/library/${this.selectedDoc.id}/tags/`, {
+ method: 'POST',
+ headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+ body: JSON.stringify({ action: 'add', tag: label }),
+ });
+ if (res.ok) {
+ const data = await res.json();
+ this.currentTags = data.tags;
+ const d = allDocs.find(x => x.id === this.selectedDoc.id);
+ if (d) d.tags = data.tags;
+ this.selectedDoc = { ...this.selectedDoc, tags: data.tags };
+ }
+ this.newTag = '';
+ },
+
+ async removeTag(tag) {
+ const label = (typeof tag === 'object' && tag !== null ? tag.label : tag || '').trim();
+ if (!label || !this.selectedDoc) return;
+ const res = await fetch(`/library/${this.selectedDoc.id}/tags/`, {
+ method: 'POST',
+ headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+ body: JSON.stringify({ action: 'remove', tag: label }),
+ });
+ if (res.ok) {
+ const data = await res.json();
+ this.currentTags = data.tags;
+ const d = allDocs.find(x => x.id === this.selectedDoc.id);
+ if (d) d.tags = data.tags;
+ this.selectedDoc = { ...this.selectedDoc, tags: data.tags };
+ }
+ },
+
+ get visibleCount() {
+ return allDocs.filter(d => this.cardVisible(d.status, d.name, d.type_label)).length;
+ },
+ };
+}
+
+function openPolicyViewer(docId) {
+ if (!docId) return;
+ document.getElementById('policy-viewer-modal').style.display = 'flex';
+ htmx.ajax('GET', '/library/view/' + docId + '/', { target: '#policy-viewer-body', swap: 'innerHTML' });
+}
+
+function closePolicyViewer() {
+ document.getElementById('policy-viewer-modal').style.display = 'none';
+ document.getElementById('policy-viewer-body').innerHTML =
+ '<div style="display:flex;align-items:center;justify-content:center;height:100%;gap:8px;color:#002583;">' +
+ '<div style="width:18px;height:18px;border:2px solid #E5E8EF;border-top-color:#002583;border-radius:50%;animation:viewer-spin .7s linear infinite;"></div>' +
+ '<span style="font-size:11px;">Loading\u2026</span></div>';
+}
+
+function closePolicyUploadModal() {
+ document.getElementById('upload-policy-modal').classList.add('hidden');
+}
+</script>
+
+{# ── Upload modal ─────────────────────────────────────────────────────────── #}
+<div id="upload-policy-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-[#002583]/30"
+ onclick="if(event.target===this)closePolicyUploadModal()">
+ <div x-data="policyUploadModal()" style="background:#fff;border-radius:14px;width:500px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.18);">
+
+ {# Modal header #}
+ <div style="padding:16px 20px 12px;border-bottom:1px solid #E5E8EF;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+ <div>
+ <p style="font-size:13px;font-weight:700;color:#002583;">Upload internal policy</p>
+ <p style="font-size:10px;color:#002583;margin-top:1px;">Drop a file or click to browse — PDF, DOCX or TXT.</p>
+ </div>
+ <button onclick="closePolicyUploadModal()" style="background:none;border:none;cursor:pointer;color:#002583;font-size:22px;line-height:1;">&times;</button>
+ </div>
+
+ <div style="overflow-y:auto;padding:16px 20px;flex:1;">
+
+ {# Drop zone #}
+ <div @dragover.prevent="dragging=true"
+ @dragleave="dragging=false"
+ @drop.prevent="onDrop($event)"
+ :style="dragging ? 'border-color:#002583;background:#ffffff;' : ''"
+ style="border:2px dashed #E5E8EF;border-radius:10px;padding:24px;text-align:center;cursor:pointer;transition:all .15s;margin-bottom:14px;"
+ onclick="document.getElementById('policy-file-input').click()">
+ <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="#ffffff" stroke-width="1.5" style="margin:0 auto 8px;">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
+ </svg>
+ <template x-if="!selectedFile">
+ <div>
+ <p style="font-size:12px;color:#002583;font-weight:500;">Drop file here or click to browse</p>
+ <p style="font-size:10px;color:#002583;margin-top:3px;">PDF, DOCX or TXT</p>
+ </div>
+ </template>
+ <template x-if="selectedFile">
+ <div style="display:flex;align-items:center;justify-content:center;gap:8px;">
+ <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+ <p style="font-size:12px;color:#002583;font-weight:500;" x-text="selectedFile.name"></p>
+ <span style="font-size:10px;color:#002583;" x-text="formatSize(selectedFile.size)"></span>
+ </div>
+ </template>
+ <input type="file" id="policy-file-input" accept=".pdf,.docx,.txt" class="hidden"
+ @change="onFileSelect($event)">
+ </div>
+
+ {# Fields #}
+ <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#002583;margin-bottom:10px;">Policy details</p>
+
+ <div style="margin-bottom:10px;">
+ <label style="display:block;font-size:10px;font-weight:600;color:#002583;margin-bottom:4px;">Policy name <span style="color:#002583;">*</span></label>
+ <input type="text" x-model="fields.name" placeholder="e.g. BBK Data Retention Policy v2.1"
+ style="width:100%;border:1px solid #E5E8EF;border-radius:7px;padding:6px 8px;font-size:11px;color:#002583;outline:none;box-sizing:border-box;">
+ </div>
+
+ <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+ <div>
+ <label style="display:block;font-size:10px;font-weight:600;color:#002583;margin-bottom:4px;">Effective date <span style="color:#002583;">*</span></label>
+ <input type="date" x-model="fields.effective_date"
+ style="width:100%;border:1px solid #E5E8EF;border-radius:7px;padding:6px 8px;font-size:11px;color:#002583;outline:none;box-sizing:border-box;">
+ </div>
+ <div>
+ <label style="display:block;font-size:10px;font-weight:600;color:#002583;margin-bottom:4px;">Version</label>
+ <input type="text" x-model="fields.version" placeholder="e.g. v2.1, 2024"
+ style="width:100%;border:1px solid #E5E8EF;border-radius:7px;padding:6px 8px;font-size:11px;color:#002583;outline:none;box-sizing:border-box;">
+ </div>
+ </div>
+
+ <div style="margin-bottom:10px;">
+ <label style="display:block;font-size:10px;font-weight:600;color:#002583;margin-bottom:4px;">Owning department <span style="color:#002583;">*</span></label>
+ <input type="text" x-model="fields.issuing_authority" placeholder="e.g. Compliance, Risk, IT"
+ style="width:100%;border:1px solid #E5E8EF;border-radius:7px;padding:6px 8px;font-size:11px;color:#002583;outline:none;box-sizing:border-box;">
+ </div>
+
+ <div style="margin-bottom:10px;">
+ <label style="display:block;font-size:10px;font-weight:600;color:#002583;margin-bottom:4px;">Scope / description <span style="color:#002583;">*</span></label>
+ <textarea x-model="fields.full_name" rows="2" placeholder="Brief summary of what this policy covers…"
+ style="width:100%;border:1px solid #E5E8EF;border-radius:7px;padding:6px 8px;font-size:11px;color:#002583;outline:none;resize:none;box-sizing:border-box;"></textarea>
+ </div>
+
+ <div style="margin-bottom:4px;">
+ <label style="display:block;font-size:10px;font-weight:600;color:#002583;margin-bottom:4px;">Internal notes</label>
+ <textarea x-model="fields.notes" rows="2"
+ style="width:100%;border:1px solid #E5E8EF;border-radius:7px;padding:6px 8px;font-size:11px;color:#002583;outline:none;resize:none;box-sizing:border-box;"></textarea>
+ </div>
+
+ <p x-show="errorMsg" x-text="errorMsg" style="font-size:10px;color:#002583;margin-top:8px;"></p>
+ </div>
+
+ {# Footer #}
+ <div style="padding:12px 20px;border-top:1px solid #E5E8EF;display:flex;gap:8px;flex-shrink:0;">
+ <button @click="submit()"
+ :disabled="uploading"
+ style="flex:1;padding:9px;border-radius:8px;background:#002583;color:#fff;font-size:12px;font-weight:600;border:none;cursor:pointer;"
+ :style="uploading ? 'opacity:0.6;cursor:not-allowed;' : ''">
+ <span x-show="!uploading">Upload &amp; Prepare</span>
+ <span x-show="uploading">Uploading…</span>
+ </button>
+ <button onclick="closePolicyUploadModal()" style="padding:9px 16px;border-radius:8px;border:1px solid #E5E8EF;color:#002583;font-size:12px;background:#fff;cursor:pointer;">Cancel</button>
+ </div>
+ </div>
+</div>
+
+<script>
+function policyUploadModal() {
+ return {
+ dragging: false,
+ selectedFile: null,
+ uploading: false,
+ errorMsg: '',
+ fields: {
+ name: '',
+ effective_date: '',
+ version: '',
+ issuing_authority: '',
+ full_name: '',
+ notes: '',
+ },
+
+ onDrop(event) {
+ this.dragging = false;
+ const file = event.dataTransfer.files[0];
+ if (file) {
+ this.selectedFile = file;
+ if (!this.fields.name) this.fields.name = file.name.replace(/\.[^.]+$/, '');
+ }
+ },
+
+ onFileSelect(event) {
+ const file = event.target.files[0];
+ if (file) {
+ this.selectedFile = file;
+ if (!this.fields.name) this.fields.name = file.name.replace(/\.[^.]+$/, '');
+ }
+ event.target.value = '';
+ },
+
+ formatSize(bytes) {
+ if (bytes < 1024) return bytes + ' B';
+ if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+ return (bytes / 1048576).toFixed(1) + ' MB';
+ },
+
+ async submit() {
+ const required = ['name', 'effective_date', 'issuing_authority', 'full_name'];
+ if (!this.selectedFile) { this.errorMsg = 'Please select a file.'; return; }
+ for (const f of required) {
+ if (!this.fields[f]) { this.errorMsg = 'Please fill in all required fields.'; return; }
+ }
+ this.errorMsg = '';
+ this.uploading = true;
+
+ const fd = new FormData();
+ fd.append('file', this.selectedFile);
+ fd.append('doc_type', 'policy');
+ fd.append('jurisdiction', 'bbk');
+ for (const [k, v] of Object.entries(this.fields)) {
+ if (v) fd.append(k, v);
+ }
+
+ try {
+ const res = await fetch('/library/upload/', {
+ method: 'POST',
+ headers: { 'X-CSRFToken': getCookie('csrftoken') },
+ body: fd,
+ });
+ if (res.ok) {
+ setTimeout(() => { window.location.reload(); }, 600);
+ } else {
+ this.errorMsg = 'Upload failed. Please try again.';
+ this.uploading = false;
+ }
+ } catch {
+ this.errorMsg = 'Network error. Please try again.';
+ this.uploading = false;
+ }
+ },
+ };
+}
+</script>
+{% endblock %}

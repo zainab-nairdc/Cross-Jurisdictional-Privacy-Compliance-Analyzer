@@ -1,0 +1,27 @@
+__pycache__/
+*.pyc
+chroma_data/
+pip-cache/
+.env
+.venv/
+venv/
+hf_cache/
+# Node / Tailwind CLI deps — reinstall with `npm install`
+node_modules/
+# Django collectstatic output — regenerated with `collectstatic`
+cjpca/staticfiles/
+.claude/
+cjpca/logs/
+*.log
+/media/
+# User-uploaded documents — never commit. Tests may also write here.
+cjpca/media/documents/
+# Local SQLite — use migrations + a fresh `migrate` instead of committing.
+cjpca/db.sqlite3
+# Coverage artifacts
+.coverage
+htmlcov/
+# DeepEval local install telemetry — regenerated on use, not project data
+.deepeval/
+# pytest last-run cache — regenerated on each test run
+.pytest_cache/

@@ -1,0 +1,94 @@
+D:\Cross-Jurisdictional Privacy Compliance Analyzer\.venv\Lib\site-packages\langchain_core\_api\deprecation.py:25: UserWarning: Core Pydantic V1 functionality isn't compatible with Python 3.14 or greater.
+  from pydantic.v1.fields import FieldInfo as FieldInfoV1
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+==============================================================================
+  RETRIEVAL EVALUATION (RetrieverEvaluator over retrieval.retriever)
+==============================================================================
+
+  loading chunks_inspect map (chunk_id -> node_id)...
+  loaded 1,280 chunk -> node mappings
+  hand-picked: 8 pairs
+  synthetic  : 32 pairs
+  total      : 40 ground-truth pairs
+
+  warming up retriever...
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 10642.46it/s]
+[1mBertModel LOAD REPORT[0m from: BAAI/bge-small-en-v1.5
+Key                     | Status     |  | 
+------------------------+------------+--+-
+embeddings.position_ids | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+Loading weights:   0%|          | 0/105 [00:00<?, ?it/s]Loading weights: 100%|██████████| 105/105 [00:00<00:00, 8270.92it/s]
+[1mBertForSequenceClassification LOAD REPORT[0m from: cross-encoder/ms-marco-MiniLM-L-6-v2
+Key                          | Status     |  | 
+-----------------------------+------------+--+-
+bert.embeddings.position_ids | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+  done.
+
+==============================================================================
+  running 40 queries through the retriever...
+  done in 43.2s (1.08s per query)
+
+==============================================================================
+  PER-QUERY RANK (position in top-5; '-' = miss)
+==============================================================================
+  query                                                                    rank
+  How long must banking companies retain KYC and transaction records u        5
+  What is the breach notification timeline to the Bahrain Personal Dat        1
+  Under what conditions can sensitive personal data be processed in Ba        3
+  How does a controller obtain prior authorization to transfer data ou        2
+  Where must Indian payment system data be stored?                            1
+  What does Kuwait DPPR require for data classification?                      3
+  Can a data subject withdraw consent under Bahrain law?                      2
+  What are BBK's internal retention periods for customer records?             1
+  What is the process for the Chief Executive to make a decision on te        1
+  What Legislative-Decree specifically governs electronic transactions        3
+  Who is required to notify the Board in writing if a conflict of inte        1
+  What notifications are subject to simplified provisions under Articl        1
+  What is the timeframe for the Authority to respond to a prior author        1
+  Does a holder of a Bachelor's Degree in information technology need         1
+  What processing of personal data is allowed by law (Article 1) for c        1
+  What is the timeframe for notifying the Authority of changes to the         3
+  Who is the regulator that customers can contact if dissatisfied with        1
+  Does BBK determine the purposes and means of processing sensitive pe        1
+  What specific laws are violated when personal data is processed inco        -
+  Does the Bahrain PDPL explicitly designate health and medical data a        1
+  Does the document supersede BBK-OPS-012's requirements for data hand        3
+  Does the law require automated means of modifying personal data?            2
+  What is the required timeframe for monitoring restored systems after        1
+  What is the contact for regulatory notification approvals within Leg        1
+  Does law 8 require banks to provide a free monthly statement of acco        1
+  Does the regulated entity implement cryptographic techniques for pro        1
+  Does Article (8) require notification of a breach within 72 hours or        1
+  What specific security controls must Regulated Entities include in t        1
+  Does the Entity have a cyber risk appetite approved by law or regula        1
+  Who is responsible for implementing risk management strategies accor        1
+  What specific laws were enacted in 2013 regarding combating money la        -
+  What specific laws regulate banks' handling of customer financial an        3
+  Are KYC documents sufficient for opening accounts of eligible Foreig        1
+  Does the amendment to Act 18 of 1891 omit its provisions under secti        1
+  When were copies of the Official Gazette containing the notification        1
+  Does the Outsourcing of IT Services policy address the entire lifecy        1
+  What is the definition of an intermediary in relation to electronic         1
+  Is the subject of this document a Scheduled Commercial Bank as defin        2
+  What specific records must REs preserve for at least five years afte        1
+  Does the RE have procedures for mitigating country risk, including c        1
+
+==============================================================================
+  AVERAGE METRICS (higher is better, 0.0-1.0 range)
+==============================================================================
+  hit_rate      0.9500  ######################################
+  mrr           0.7800  ###############################
+  precision     0.1900  #######
+  recall        0.9500  ######################################
+  ap            0.7800  ###############################
+  ndcg          0.8228  ################################
+
+  hits in top-5     : 38 / 40
+  total queries     : 40
+  avg latency       : 1079 ms

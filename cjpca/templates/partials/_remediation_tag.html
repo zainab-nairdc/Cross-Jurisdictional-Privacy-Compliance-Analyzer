@@ -1,0 +1,8 @@
+{% comment %}Source tag shown in gap card header. Returned by GapRemediationSaveView after save.{% endcomment %}
+{% if gap.remediation_source == 'ai' %}
+ <span style="padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;background:#ffffff;color:#002583;">AI suggested</span>
+{% elif gap.remediation_source == 'human' %}
+ <span style="padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;background:#ffffff;color:#002583;">Human written</span>
+{% else %}
+ <span style="padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;background:#ffffff;color:#002583;">AI + edited</span>
+{% endif %}

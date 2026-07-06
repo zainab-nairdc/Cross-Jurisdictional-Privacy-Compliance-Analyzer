@@ -1,0 +1,76 @@
+﻿{% load static %}
+<!DOCTYPE html>
+<html lang="en" class="h-full overflow-hidden">
+<head>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <title>{% block title %}CJPCA{% endblock %}</title>
+
+ {# Font: Satoshi — single font across the entire UI #}
+ <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap" rel="stylesheet">
+ <style>
+ *, *::before, *::after, code, pre { font-family: 'Satoshi', sans-serif; }
+ .font-mono { font-family: 'Satoshi', sans-serif !important; font-weight: 700 !important; letter-spacing: -0.02em; }
+ </style>
+
+ {# Tailwind compiled output — run: npx tailwindcss -i static/css/tailwind.css -o static/css/output.css --watch #}
+ <link rel="stylesheet" href="{% static 'css/output.css' %}">
+
+ {# HTMX 2.x #}
+ <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js" defer></script>
+
+ {# Alpine.js 3 — must load before defer scripts that reference x-data #}
+ <script defer src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js"></script>
+
+ {# Prevent Alpine x-cloak flash #}
+ <style>[x-cloak]{display:none!important}</style>
+
+ <style>
+ main .flex.items-center.justify-between.flex-shrink-0 { padding-right: 60px !important; }
+ main > * > div[style*="border-bottom"][style*="flex-shrink:0"]:first-child,
+ main > * > * > div[style*="border-bottom"][style*="flex-shrink:0"]:first-child {
+ padding-right: 60px !important;
+ }
+ </style>
+
+ {# Chart.js (loaded on pages that need it via {% block extra_head %}) #}
+ {% block extra_head %}{% endblock %}
+</head>
+
+{% comment %}Root Alpine state. docViewerChunkId pins the highlight to a specific chunk node_id (rock-solid match), while docViewerArt is the legacy verbatim-quote substring (used when no chunk_id is available).{% endcomment %}
+<body class="h-full font-sans text-sm bg-gray-50 text-gray-900"
+ x-data="{ copilotOpen: false, docViewerOpen: false, docViewerDoc: '', docViewerArt: '', docViewerChunkId: '', sidebarOpen: localStorage.getItem('sidebarOpen') !== 'false' }">
+
+ <div class="flex h-screen overflow-hidden">
+
+ {# Fixed 192px sidebar — always visible #}
+ {% include 'partials/_sidebar.html' %}
+
+ {# Main scrollable content area #}
+ <main class="flex-1 overflow-y-auto">
+
+ {# Contextual wizard banner (dismissible, per-page colour) #}
+ {% include 'partials/_wizard_banner.html' %}
+
+ {% block content %}{% endblock %}
+
+ </main>
+
+ {# Top-right floating profile widget — clickable avatar + dropdown #}
+ {% include 'partials/_profile_widget.html' %}
+
+ {# Global overlays — included once, toggled via Alpine state #}
+ {% include 'partials/_doc_viewer.html' %}
+ {# Copilot — available to every signed-in user #}
+ {% if request.user.is_authenticated %}
+   {% include 'partials/_copilot.html' %}
+ {% endif %}
+
+ </div>
+
+ {# Alpine.js init + custom JS #}
+ <script src="{% static 'js/app.js' %}"></script>
+
+ {% block extra_js %}{% endblock %}
+</body>
+</html>

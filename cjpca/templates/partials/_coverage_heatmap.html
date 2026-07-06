@@ -1,0 +1,97 @@
+{% load static %}
+{% comment %}
+ Coverage Heatmap partial — rendered by HeatmapPartialView.
+ Loaded lazily via HTMX: hx-get="{% url 'analytics-heatmap' %}" hx-trigger="load".
+
+ Context:
+ rows list of {principle, label, cells: [{status, covered, total,
+ not_covered, partial, coverage_pct, principle, jurisdiction,
+ jur_label, principle_label}]}
+ jurisdictions list of jurisdiction codes ["BH","IN","KW"]
+ all_grey bool — True when zero approved mappings exist
+{% endcomment %}
+
+{% if all_grey %}
+<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 24px;gap:10px;text-align:center;">
+ <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.5">
+ <path stroke-linecap="round" stroke-linejoin="round"
+ d="M9 17H7a5 5 0 0 1 0-10h2m6 0h2a5 5 0 0 1 0 10h-2M8 12h8"/>
+ </svg>
+ <p style="font-size:13px;font-weight:700;color:#002583;">No approved mappings yet</p>
+ <p style="font-size:11px;color:#002583;max-width:300px;line-height:1.65;">
+ Run analyses and approve them on the Review page to populate coverage
+ across all privacy principles and jurisdictions.
+ </p>
+</div>
+
+{% else %}
+<div x-data="coverageHeatmap()">
+ <div class="hm-grid" role="grid" aria-label="Regulatory coverage heatmap — principles × jurisdictions">
+
+ {# ── Header row ── #}
+ <div role="presentation"></div>
+ {% for code in jurisdictions %}
+ <div class="hm-col-header" role="columnheader" aria-label="{{ code }}">{{ code }}</div>
+ {% endfor %}
+
+ {# ── Data rows (one per principle) ── #}
+ {% for row in rows %}
+ <div class="hm-row-label" role="rowheader">{{ row.label }}</div>
+
+ {% for cell in row.cells %}
+ <button
+ class="hm-cell"
+ type="button"
+ role="gridcell"
+ data-status="{{ cell.status }}"
+ data-principle="{{ cell.principle }}"
+ data-jurisdiction="{{ cell.jurisdiction }}"
+ data-pct="{{ cell.coverage_pct|default:'' }}"
+ data-covered="{{ cell.covered }}"
+ data-total="{{ cell.total }}"
+ data-gaps="{{ cell.not_covered }}"
+ data-jur-label="{{ cell.jur_label }}"
+ data-principle-label="{{ cell.principle_label }}"
+ :data-selected="isSelected('{{ cell.principle }}', '{{ cell.jurisdiction }}')"
+ :aria-pressed="isSelected('{{ cell.principle }}', '{{ cell.jurisdiction }}')"
+ aria-label="{{ cell.jur_label }}, {{ cell.principle_label }}, {% if cell.coverage_pct %}{{ cell.coverage_pct }}% covered{% else %}no data{% endif %}, {{ cell.not_covered }} gap{{ cell.not_covered|pluralize }} open"
+ @click="handleCellClick($el)"
+ @keydown.enter.prevent="handleCellClick($el)"
+ >
+ {# Status icon (non-color cue for accessibility) #}
+ {% if cell.status == 'green' %}
+ <svg class="hm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+ <polyline points="20 6 9 17 4 12"/>
+ </svg>
+ {% elif cell.status == 'amber' %}
+ <svg class="hm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+ <path d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+ </svg>
+ {% elif cell.status == 'red' %}
+ <svg class="hm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+ <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+ </svg>
+ {% else %}
+ <svg class="hm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+ <line x1="5" y1="12" x2="19" y2="12"/>
+ </svg>
+ {% endif %}
+
+ {# Covered count (or em-dash for no-data cells) #}
+ <span class="hm-count">{% if cell.status == 'grey' %}—{% else %}{{ cell.covered }}{% endif %}</span>
+
+ {# CSS tooltip — appears on :hover via heatmap.css #}
+ <span class="hm-tip" aria-hidden="true">
+ <strong>{{ cell.jur_label }} × {{ cell.principle_label }}</strong>
+ {{ cell.covered }} of {{ cell.total }} covered
+ {% if cell.coverage_pct %}({{ cell.coverage_pct }}%){% else %}(no data){% endif %}
+ · {{ cell.not_covered }} gap{{ cell.not_covered|pluralize }} open
+ </span>
+
+ </button>
+ {% endfor %}
+ {% endfor %}
+
+ </div>
+</div>
+{% endif %}

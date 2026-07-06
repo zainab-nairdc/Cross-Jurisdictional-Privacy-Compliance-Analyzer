@@ -1,0 +1,151 @@
+D:\Cross-Jurisdictional Privacy Compliance Analyzer\.venv\Lib\site-packages\langchain_core\_api\deprecation.py:25: UserWarning: Core Pydantic V1 functionality isn't compatible with Python 3.14 or greater.
+  from pydantic.v1.fields import FieldInfo as FieldInfoV1
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+
+================================================================================================
+  REASONING LAYER LIVE DEMO — three workflows on real corpus queries
+================================================================================================
+
+================================================================================================
+  WORKFLOW 1 — compare_regulations
+================================================================================================
+  query : 'data breach notification obligations'
+  reg_a : Bahrain
+  reg_b : India
+
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3795.41it/s]
+[1mBertModel LOAD REPORT[0m from: BAAI/bge-small-en-v1.5
+Key                     | Status     |  | 
+------------------------+------------+--+-
+embeddings.position_ids | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+D:\Cross-Jurisdictional Privacy Compliance Analyzer\reasoning\workflows.py:67: UserWarning: WARNING! response_format is not default parameter.
+                response_format was transferred to model_kwargs.
+                Please confirm that response_format is what you intended.
+  llm        = _get_llm(),
+  ran in 190.6s
+  produced: 9 obligations
+
+  --- summary ---
+  Bahrain's PDPA Ministerial Order 43/2022 and India's Digital Personal Data Protection Rules 2025 establish partially equivalent but materially different data breach notification frameworks. Both require notification to regulatory authorities within 72 hours and mandate detailed breach documentation. However, Bahrain provides three significant exemptions from Data Subject notification (encrypted data, disproportionate effort, and risk mitigation) that India's framework does not appear to recognize, making India's regime stricter for individual notification obligations. India imposes more granular content requirements for authority notifications, including mandatory identification of breach causation and responsible parties. Bahrain uniquely requires controllers to establish breach reporting channels for Data Subjects and grants the Authority discretionary override power on exemptions. Key compliance risks include: (1) India's apparent lack of encryption exemptions requiring notification even for encrypted breaches; (2) Bahrain's stricter 72-hour deadline with no discretionary extension; and (3) India's requirement to identify breach causation and responsible parties. Organizations operating in both jurisdictions should implement the stricter requirements as baseline compliance.
+
+  --- obligations (first 5) ---
+
+  [1] Notification Timeline to Regulatory Authority  →  Partially Equivalent  (similarity 78, conf 92, OK)
+       Bahrain (PDPA Ministerial Order 43/2022 — Article (4) Breach or violation notification):
+         The Controller must establish procedures to inform the Authority of any violation or breach of data within a period not exceeding 72 hours from the date of its discovery. If the Controller fails to no
+       India (Digital Personal Data Protection Rules 2025 — MINISTRY OF ELECTRONICS AND INFORMATION TECHNOLOGY NOTIFICATION):
+         The Data Fiduciary shall intimate to the Board without delay a description of the breach, and within seventy-two hours of becoming aware of the breach, or within such longer period as the Board may al
+       difference: Bahrain imposes a strict 72-hour deadline with mandatory delay justification if missed. India requires 'without delay' notification initially, with detailed information due within 
+
+  [2] Notification Content to Data Subjects  →  Partially Equivalent  (similarity 72, conf 88, OK)
+       Bahrain (PDPA Ministerial Order 43/2022 — Article (4) Breach or violation notification):
+         The notification of the breach or infringement incident must include the following data as specified in Article (4)(4), though specific content elements are referenced but not fully detailed in the pr
+       India (Digital Personal Data Protection Rules 2025 — MINISTRY OF ELECTRONICS AND INFORMATION TECHNOLOGY NOTIFICATION):
+         The Data Fiduciary must intimate each affected Data Principal in a concise, clear and plain manner and without delay through her user account or any mode of communication registered by her, including:
+       difference: India specifies five detailed mandatory content elements that must be communicated to affected individuals in plain language. Bahrain references required notification data in Artic
+
+  [3] Exemption from Data Subject Notification — Encrypted/Unintelligible Data  →  Only in A  (similarity 0, conf 95, OK)
+       Bahrain (PDPA Ministerial Order 43/2022 — Article (4) Breach or violation notification):
+         The Controller is not obliged to notify the Data Subject of the breach if the breached personal data is unintelligible to any person who is not authorised to access it, such as encryption.
+       difference: Bahrain explicitly permits exemption from Data Subject notification when data is encrypted or otherwise unintelligible. India's provided chunks contain no equivalent exemption for 
+
+  [4] Exemption from Data Subject Notification — Disproportionate Effort  →  Only in A  (similarity 0, conf 93, OK)
+       Bahrain (PDPA Ministerial Order 43/2022 — Article (4) Breach or violation notification):
+         The Controller is not obliged to notify the Data Subject of the breach if it would involve disproportionate effort, provided that in such a case there shall instead be a public communication.
+       difference: Bahrain permits exemption from individual notification when disproportionate effort would result, with a substitute public communication requirement. India's provided chunks do not
+
+  [5] Exemption from Data Subject Notification — Risk Mitigation  →  Only in A  (similarity 0, conf 94, OK)
+       Bahrain (PDPA Ministerial Order 43/2022 — Article (4) Breach or violation notification):
+         The Controller is not obliged to notify the Data Subject of the breach if the Controller has taken subsequent measures which ensure that the high risk to the rights and freedoms of Data Subjects is no
+       difference: Bahrain exempts notification when post-breach remedial measures eliminate high risk to Data Subjects. India's provided chunks do not contain an equivalent risk-elimination exemptio
+
+================================================================================================
+  WORKFLOW 2 — map_policy_coverage
+================================================================================================
+  query        : 'data retention obligations'
+  jurisdiction : Bahrain
+
+  ran in 21.2s
+  produced: 2 mapping items
+
+  --- summary ---
+  Data retention obligations under Bahrain's regulatory framework (PDPA Ministerial Order 44/2022 and Personal Data Protection Law 30/2018) are **Not Covered** by the current internal policy suite. The existing policies (OPS-012-IN, OPS-012-KW, LGL-001) address India and Kuwait requirements but contain no explicit mapping to Bahrain's data retention, proportionality, or transparency obligations. The highest-risk gaps are: (1) absence of Bahrain-specific retention schedules by data category, (2) lack of documented legal bases for retention aligned with Bahrain law, and (3) no procedures for communicating retention periods to data subjects as required by Article (17). **Priority action:** Develop a dedicated Bahrain Data Handling SOP (OPS-012-BH) that establishes retention periods, authorization controls, and transparency mechanisms compliant with Bahrain's PDPA framework.
+
+  --- items (first 5) ---
+
+  [1] Data processors in Bahrain must ensure that processing is not excessive in relation to the purpose for which data was collected, and must restrict pro
+       coverage : Not Covered
+       reg cite : PDPA Ministerial Order 44/2022 — Article (5) Obligations of the authorized person to process
+       policy   : None identified
+       gap      : The provided internal policies (OPS-012-IN, OPS-012-KW, LGL-001) are tailored to India and Kuwait regulatory frameworks respectively. No internal policy document explicitly address
+       fix      : Develop a Bahrain-specific Data Handling SOP (e.g., OPS-012-BH) that maps PDPA Ministerial Order 44/2022 and Personal Data Protection Law 30/2018 requirements to retention schedule
+
+  [2] Under Bahrain's Personal Data Protection Law 30/2018, data subjects have rights to information about processing and must be informed of legal bases fo
+       coverage : Not Covered
+       reg cite : Personal Data Protection Law 30/2018 — Article (17) Information to be provided to the Data Subject
+       policy   : None identified
+       gap      : Internal policies do not address Bahrain-specific transparency and notification obligations regarding data retention. The India and Kuwait SOPs contain retention schedules but lack
+       fix      : Amend or create a Bahrain data retention policy that includes mandatory data subject notification templates, retention period disclosures in privacy notices, and documented legal b
+
+================================================================================================
+  WORKFLOW 3 — generate_gap_analysis
+================================================================================================
+  topic         : 'data subject rights — access, erasure, portability'
+  jurisdictions : Bahrain, India, Kuwait
+
+  ran in 54.7s
+  produced: 6 gaps
+
+  --- summary ---
+  BBK's internal policies provide foundational coverage of data subject rights but contain significant jurisdiction-specific gaps. Bahrain compliance requires alignment to 10-working-day statutory timelines and incorporation of blocking mechanisms. India procedures lack explicit handling of PMLA retention conflicts and DPDPA-specific summary format requirements for access requests. Kuwait has no documented data subject rights framework in provided regulatory sources. Cross-jurisdictional response timelines must be differentiated to avoid statutory violations.
+
+  --- gaps (sorted by priority) ---
+
+  GAP-001  [High]  (Bahrain)
+       source     : Personal Data Protection Law 30/2018 — Article (23) Right to request rectification, blocking and erasure of data
+       obligation : Bahrain law requires data controllers to respond to erasure requests within 10 working days with legally acceptable justification, free of charge.
+       coverage   : Not Covered
+       gap        : Internal policy specifies 30-day response timeline; Bahrain law mandates 10 working days. No jurisdiction-specific SLA differentiation documented.
+       remediation: Implement Bahrain-specific 10 working day response SLA; update master policy with jurisdiction-specific timelines.
+
+  GAP-003  [High]  (India)
+       source     : Digital Personal Data Protection Act 2023 — CHAPTER III — RIGHTS AND DUTIES OF DATA PRINCIPAL
+       obligation : India DPDPA requires data fiduciaries to erase personal data upon request unless retention is necessary for specified purpose or legal compliance.
+       coverage   : Partially Covered
+       gap        : Internal procedure does not explicitly address legal retention exceptions (e.g., Prevention of Money-Laundering Act 10-year KYC retention). Erasure policy lacks conflict-of-law guidance.
+       remediation: Document erasure exceptions in India procedure; cross-reference PMLA Section 12 retention obligations; establish conflict resolution protocol.
+
+  GAP-006  [High]  (Kuwait)
+       source     : None
+       obligation : No data subject rights framework identified in provided Kuwait regulatory sources.
+       coverage   : Not Covered
+       gap        : Kuwait regulatory chunks address operational resilience and data storage but do not establish data subject access, erasure, or portability rights obligations.
+       remediation: Identify applicable Kuwait data protection law; develop procedures for access, erasure, and portability requests aligned to local requirements.
+
+  GAP-002  [Medium]  (Bahrain)
+       source     : Personal Data Protection Law 30/2018 — Article (23) Right to request rectification, blocking and erasure of data
+       obligation : Bahrain law permits blocking of personal data; processing of blocked data requires data subject consent or evidentiary/third-party protection purposes.
+       coverage   : Partially Covered
+       gap        : Policy mentions 'Right to Restrict Processing' but does not distinguish Bahrain-specific 'blocking' mechanism or conditions for processing blocked data.
+       remediation: Add Bahrain-specific blocking procedure; document consent and exception conditions for processing blocked data per Article 23(3).
+
+  GAP-004  [Medium]  (India)
+       source     : Digital Personal Data Protection Act 2023 — CHAPTER III — RIGHTS AND DUTIES OF DATA PRINCIPAL
+       obligation : India DPDPA grants data principals right to obtain summary of personal data being processed and processing activities upon request.
+       coverage   : Partially Covered
+       gap        : Policy references 'Right of Access' generically but does not specify 'summary' format or 'processing activities' disclosure requirement distinct from full data copy.
+       remediation: Clarify India access requests must include processing activities summary; define summary format and distinguish from full data portability response.
+
+  GAP-005  [Medium]  (India)
+       source     : Digital Personal Data Protection Act 2023 — CHAPTER III — RIGHTS AND DUTIES OF DATA PRINCIPAL
+       obligation : India DPDPA requires data fiduciaries to provide readily available grievance redressal means; data principals must exhaust internal redressal before Board escalation.
+       coverage   : Partially Covered
+       gap        : Procedure documents grievance redressal requirement but does not specify 'readily available means' (e.g., dedicated channel) or Board escalation protocol.
+       remediation: Define 'readily available' grievance channel for India branch; document escalation criteria and Board notification procedure per DPDPA Section 13.
+
+================================================================================================
+  DEMO COMPLETE — total 267s
+================================================================================================

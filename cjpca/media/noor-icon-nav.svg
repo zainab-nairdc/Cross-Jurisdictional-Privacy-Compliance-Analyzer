@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+<title>CJPCA — BBK owl nav icon</title>
+
+<!-- Navy background box -->
+<rect width="64" height="64" rx="14" fill="#1B3A6B"/>
+
+<!-- Ear tuft tips -->
+<path d="M20 18 L16 8 L24 14Z" fill="#1B3A6B"/>
+<path d="M44 18 L48 8 L40 14Z" fill="#1B3A6B"/>
+<path d="M16 8 L18 13 L22 10Z" fill="#F5A800" opacity="0.9"/>
+<path d="M48 8 L46 13 L42 10Z" fill="#F5A800" opacity="0.9"/>
+
+<!-- Left eye — gold halo, white sclera, navy iris, dark pupil, catchlight -->
+<circle cx="22" cy="32" r="11" fill="#F5A800"/>
+<circle cx="22" cy="32" r="8" fill="#FAFCFF"/>
+<circle cx="22" cy="32" r="5.5" fill="#1B3A6B"/>
+<circle cx="22" cy="32" r="3" fill="#060E1C"/>
+<circle cx="19" cy="29" r="1.5" fill="#ffffff"/>
+
+<!-- Right eye -->
+<circle cx="42" cy="32" r="11" fill="#F5A800"/>
+<circle cx="42" cy="32" r="8" fill="#FAFCFF"/>
+<circle cx="42" cy="32" r="5.5" fill="#1B3A6B"/>
+<circle cx="42" cy="32" r="3" fill="#060E1C"/>
+<circle cx="39" cy="29" r="1.5" fill="#ffffff"/>
+
+<!-- Beak -->
+<path d="M28 41 L32 47 L36 41 Q34 38 32 38 Q30 38 28 41Z" fill="#F5A800"/>
+
+</svg>

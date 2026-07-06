@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Conflict Scanner — CJPCA{% endblock %}
+
+{% block content %}
+<div class="flex h-full bg-gray-50 overflow-hidden">
+
+ <div class="flex flex-col flex-1 min-w-0 overflow-hidden">
+
+ {# Top bar #}
+ <div class="bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between flex-shrink-0">
+ <div>
+ <h1 style="font-size:15px;font-weight:700;color:#002583;">Cross-jurisdiction conflict scanner</h1>
+ <p style="font-size:12px;color:#002583;margin-top:1px;">
+ Every obligation the comparison workflow flagged as a direct conflict between two jurisdictions.
+ </p>
+ </div>
+ <div style="display:flex;gap:14px;align-items:center;">
+ <div style="text-align:right;">
+ <p style="font-size:9px;color:#002583;text-transform:uppercase;letter-spacing:.07em;font-weight:700;">Total</p>
+ <p style="font-size:18px;font-weight:800;color:#002583;line-height:1;margin-top:2px;">{{ total }}</p>
+ </div>
+ <div style="text-align:right;">
+ <p style="font-size:9px;color:#002583;text-transform:uppercase;letter-spacing:.07em;font-weight:700;">Verified</p>
+ <p style="font-size:18px;font-weight:800;color:#002583;line-height:1;margin-top:2px;">{{ verified }}</p>
+ </div>
+ <div style="text-align:right;">
+ <p style="font-size:9px;color:#002583;text-transform:uppercase;letter-spacing:.07em;font-weight:700;">High AI risk</p>
+ <p style="font-size:18px;font-weight:800;color:#002583;line-height:1;margin-top:2px;">{{ high_risk }}</p>
+ </div>
+ </div>
+ </div>
+
+ {# Filters #}
+ <form method="get" class="bg-white border-b border-gray-100 px-6 py-3 flex-shrink-0 flex items-center gap-3 flex-wrap">
+ <select name="jur" style="padding:6px 10px;border:1px solid #E5E8EF;border-radius:8px;font-size:12px;background:#ffffff;">
+ {% for code, label in jur_options %}
+ <option value="{{ code }}" {% if jur_filter == code %}selected{% endif %}>{{ label }}</option>
+ {% endfor %}
+ </select>
+ <label style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#002583;">
+ <input type="checkbox" name="verified" value="1" {% if verified_only %}checked{% endif %}>
+ Only AI-verified citations
+ </label>
+ <button type="submit"
+ style="padding:6px 14px;border-radius:8px;background:#002583;color:#fff;font-size:12px;font-weight:500;border:none;cursor:pointer;">
+ Apply filters
+ </button>
+ {% if jur_filter or verified_only %}
+ <a href="{% url 'analytics-conflicts' %}" style="font-size:11px;color:#002583;text-decoration:underline;">clear</a>
+ {% endif %}
+ </form>
+
+ {# Results #}
+ <div class="flex-1 overflow-y-auto px-6 py-5">
+ {% if total == 0 %}
+ <div style="text-align:center;padding:60px 20px;color:#002583;">
+ <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.5" style="margin:0 auto 14px;">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+ </svg>
+ <p style="font-size:14px;font-weight:600;color:#002583;margin-bottom:6px;">No conflicts.</p>
+ <p style="font-size:12px;">Either no comparison runs have produced "Conflicting" rows yet, or the filters are too tight.</p>
+ </div>
+ {% else %}
+ <p style="font-size:11px;color:#002583;margin-bottom:14px;">
+ {{ total }} conflict{{ total|pluralize }} across <strong>{{ groups|length }}</strong> jurisdiction pair{{ groups|length|pluralize }}.
+ </p>
+
+ {% for pair_label, results in groups.items %}
+ <div style="margin-bottom:22px;">
+ <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+ <h2 style="font-size:11px;font-weight:800;color:#002583;text-transform:uppercase;letter-spacing:.07em;">
+ {{ pair_label }}
+ </h2>
+ <span style="font-size:10px;color:#002583;">{{ results|length }} conflict{{ results|length|pluralize }}</span>
+ <div style="flex:1;height:1px;background:#E5E8EF;"></div>
+ </div>
+
+ <div style="display:flex;flex-direction:column;gap:10px;">
+ {% for r in results %}
+ <div style="background:#fff;border:1px solid #E5E8EF;border-left:3px solid #002583;border-radius:9px;overflow:hidden;">
+ <div style="padding:10px 14px;background:#ffffff;border-bottom:1px solid #E5E8EF;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+ <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;min-width:0;">
+ <span style="padding:2px 8px;border-radius:5px;font-size:9px;font-weight:800;background:#ffffff;color:#002583;">CONFLICT</span>
+ {% if not r.citation_verified %}
+ <span style="padding:2px 7px;border-radius:5px;font-size:9px;font-weight:700;background:#ffffff;color:#002583;border:1px solid #002583;">⚠ Unverified</span>
+ {% endif %}
+ {% if r.hallucination_risk and r.hallucination_risk > 0.4 %}
+ <span style="padding:2px 7px;border-radius:5px;font-size:9px;font-weight:700;
+ {% if r.hallucination_risk > 0.7 %}background:#ffffff;color:#002583;border:1px solid #002583;
+ {% else %}background:#ffffff;color:#002583;border:1px solid #002583;{% endif %}">
+ AI risk {{ r.hallucination_risk|floatformat:2 }}
+ </span>
+ {% endif %}
+ <span style="font-size:10px;color:#002583;">conf {{ r.confidence_pct }}%</span>
+ <span style="font-size:10px;color:#002583;">sim {{ r.similarity_pct }}%</span>
+ </div>
+ <a href="{% url 'comparison-workspace' r.run.pk %}#result-{{ r.pk }}"
+ style="font-size:10px;color:#002583;text-decoration:none;font-weight:700;flex-shrink:0;">
+ View in run #{{ r.run.pk }} →
+ </a>
+ </div>
+
+ <div style="padding:10px 14px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+ <div style="border-left:2px solid #002583;padding-left:10px;">
+ <p style="font-size:9px;font-weight:800;color:#002583;text-transform:uppercase;letter-spacing:.07em;margin:0 0 3px;">{{ r.run.reg_a.jurisdiction|capfirst }} — {{ r.citation_a }}</p>
+ <p style="font-size:11px;color:#002583;line-height:1.55;margin:0;">{{ r.clause_text_a|default:r.preview_a|truncatechars:280 }}</p>
+ {% if r.evidence_a %}
+ <p style="font-size:10px;color:#002583;font-style:italic;line-height:1.5;margin:5px 0 0;">"{{ r.evidence_a|truncatechars:140 }}"</p>
+ {% endif %}
+ </div>
+ <div style="border-left:2px solid #002583;padding-left:10px;">
+ <p style="font-size:9px;font-weight:800;color:#002583;text-transform:uppercase;letter-spacing:.07em;margin:0 0 3px;">{{ r.run.reg_b.jurisdiction|capfirst }} — {{ r.citation_b|default:"No match" }}</p>
+ <p style="font-size:11px;color:#002583;line-height:1.55;margin:0;">{{ r.clause_text_b|default:r.preview_b|truncatechars:280 }}</p>
+ {% if r.evidence_b %}
+ <p style="font-size:10px;color:#002583;font-style:italic;line-height:1.5;margin:5px 0 0;">"{{ r.evidence_b|truncatechars:140 }}"</p>
+ {% endif %}
+ </div>
+ </div>
+
+ {% if r.key_difference %}
+ <div style="padding:8px 14px;border-top:1px solid #E5E8EF;background:#ffffff;">
+ <p style="font-size:9px;font-weight:800;color:#002583;text-transform:uppercase;letter-spacing:.07em;margin:0 0 3px;">Key difference</p>
+ <p style="font-size:11px;color:#002583;line-height:1.55;margin:0;">{{ r.key_difference }}</p>
+ </div>
+ {% endif %}
+ </div>
+ {% endfor %}
+ </div>
+ </div>
+ {% endfor %}
+ {% endif %}
+ </div>
+ </div>
+</div>
+{% endblock %}

@@ -1,0 +1,1243 @@
+﻿{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ analysis.policy_doc.name }} — Mapping — CJPCA{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+{% if chart_data %}<script>window.mappingChartData = {{ chart_data|safe }};</script>{% endif %}
+<style>
+ /* Status palette — covered/partial/review/none get distinct colors so
+    the legend, card borders, and badges actually look different. */
+ :root {
+   --st-covered-fg: #1E7E48;  --st-covered-bg: #E6F5EC;
+   --st-partial-fg: #B86E00;  --st-partial-bg: #FFF1D6;
+   --st-review-fg:  #002583;  --st-review-bg:  #EDF1FA;
+   --st-none-fg:    #B33;     --st-none-bg:    #FCE8E8;
+   --st-line:       #E5E8EF;
+   --st-text:       #1A2440;
+   --st-text-muted: #5A6685;
+   --st-bg-soft:    #F4F6FB;
+   --st-bg-tint:    #EDF1FA;
+ }
+ .stat-card {
+   background:#fff; border:1px solid var(--st-line); border-radius:12px;
+   padding:14px 16px; display:flex; flex-direction:column; gap:4px;
+   min-width:0;
+ }
+ .stat-card .lbl {
+   font-size:9px; font-weight:800; text-transform:uppercase;
+   letter-spacing:.08em; color:var(--st-text-muted);
+ }
+ .stat-card .num {
+   font-size:26px; font-weight:800; line-height:1;
+   font-variant-numeric:tabular-nums;
+ }
+ .stat-card .sub { font-size:10px; color:var(--st-text-muted); }
+
+ /* Score gauge — bigger, prominent */
+ .score-card {
+   background:#fff; border:1px solid var(--st-line); border-radius:12px;
+   padding:16px 20px;
+   display:flex; align-items:center; gap:18px;
+ }
+ .score-ring {
+   --pct: 0;
+   width:78px; height:78px; border-radius:50%;
+   background: conic-gradient(var(--ring-color) calc(var(--pct) * 1%), var(--st-bg-soft) 0);
+   display:flex; align-items:center; justify-content:center;
+   flex-shrink:0;
+ }
+ .score-ring::after {
+   content:""; width:64px; height:64px; border-radius:50%; background:#fff;
+   position:absolute;
+ }
+ .score-ring-wrap { position:relative; display:flex; align-items:center; justify-content:center; }
+ .score-ring-num {
+   position:relative; font-size:18px; font-weight:800; color:var(--st-text);
+   font-variant-numeric:tabular-nums;
+ }
+ .stack-bar { display:flex; height:8px; border-radius:4px; overflow:hidden; background:var(--st-bg-soft); }
+ .stack-bar > span { display:block; height:100%; }
+
+ /* Remediation editor — mode chips + textareas + AI suggestion box */
+ .rm-mode-chip {
+   padding: 5px 12px; border-radius: 999px;
+   font-size: 10.5px; font-weight: 700;
+   border: 1px solid var(--st-line); background: #fff;
+   color: var(--st-text-muted); cursor: pointer; font-family: inherit;
+   white-space: nowrap;
+   transition: background .12s, color .12s, border-color .12s;
+ }
+ .rm-mode-chip:hover:not(.is-active) {
+   background: var(--st-bg-soft); color: var(--st-text);
+ }
+ .rm-mode-chip.is-active {
+   background: var(--st-review-fg); border-color: var(--st-review-fg); color: #fff;
+ }
+ .rm-suggestion-card {
+   padding: 12px 14px; border-radius: 9px;
+   border: 1px solid var(--st-line);
+   background: var(--st-bg-tint);
+ }
+ .rm-empty-card {
+   padding: 14px 16px; border-radius: 9px;
+   border: 1.5px dashed var(--st-line); background: var(--st-bg-soft);
+ }
+ .rm-textarea {
+   width: 100%; padding: 11px 13px;
+   border-radius: 8px; border: 1.5px solid var(--st-line);
+   font-size: 12px; color: var(--st-text); line-height: 1.55;
+   resize: vertical; outline: none; box-sizing: border-box;
+   font-family: inherit; background: #fff;
+   transition: border-color .12s;
+ }
+ .rm-textarea:focus { border-color: var(--st-review-fg); }
+ .rm-btn-primary {
+   padding: 8px 18px; border-radius: 8px;
+   background: var(--st-review-fg); color: #fff;
+   font-size: 11.5px; font-weight: 700; border: none; cursor: pointer;
+   font-family: inherit; transition: background .12s, transform .12s;
+ }
+ .rm-btn-primary:hover { background: #011c66; }
+ .rm-btn-primary:active { transform: scale(.98); }
+ .rm-btn-ghost {
+   display: inline-flex; align-items: center; gap: 5px;
+   padding: 5px 11px; border-radius: 6px;
+   background: rgba(0,37,131,0.08); border: none; cursor: pointer;
+   font-size: 10px; font-weight: 700; color: var(--st-review-fg);
+   font-family: inherit; transition: background .12s;
+ }
+ .rm-btn-ghost:hover { background: rgba(0,37,131,0.15); }
+ .rm-spinner {
+   width: 16px; height: 16px;
+   border: 2px solid var(--st-line); border-top-color: var(--st-review-fg);
+   border-radius: 50%; animation: spin .6s linear infinite;
+   flex-shrink: 0;
+ }
+
+ /* ── Per-regulation sub-tab strip (inside Obligation/Gap tabs) ── */
+ .reg-subtab-bar {
+   display:flex; gap:2px; align-items:flex-end;
+   padding: 6px 24px 0;
+   background: var(--st-bg-soft);
+   border-bottom: 1px solid var(--st-line);
+   overflow-x: auto;
+ }
+ .reg-subtab {
+   padding: 8px 14px 8px;
+   border: 1px solid var(--st-line); border-bottom: none;
+   border-radius: 8px 8px 0 0;
+   background: transparent; color: var(--st-text-muted);
+   cursor: pointer; font-family: inherit;
+   font-size: 11px; font-weight: 600;
+   white-space: nowrap;
+   transition: background .12s, color .12s, border-color .12s;
+   display: inline-flex; align-items: center; gap: 6px;
+   margin-bottom: -1px;
+ }
+ .reg-subtab:hover:not(.is-active) { color: var(--st-text); background: rgba(255,255,255,0.5); }
+ .reg-subtab.is-active {
+   background: #fff; color: var(--st-text);
+   border-color: var(--st-line); border-bottom-color: #fff;
+   z-index: 2;
+ }
+ .reg-subtab .pill {
+   font-size: 9px; font-weight: 700; padding: 1px 7px; border-radius: 999px;
+   background: var(--st-bg-soft); color: var(--st-text-muted);
+ }
+ .reg-subtab.is-active .pill { background: var(--st-bg-tint, #EDF1FA); color: var(--st-review-fg); }
+
+ /* ── Carousel nav bar ─────────────────────────────────────────── */
+ .car-nav {
+   display: flex; align-items: center; gap: 12px;
+   padding: 12px 0 14px;
+ }
+ .car-nav .ctx { flex: 1; min-width: 0; }
+ .car-arrow {
+   width: 32px; height: 32px; border-radius: 50%;
+   border: 1px solid var(--st-line); background: #fff;
+   color: var(--st-text); cursor: pointer;
+   display: flex; align-items: center; justify-content: center;
+   transition: background .12s, color .12s, border-color .12s;
+ }
+ .car-arrow:hover:not(:disabled) { background: var(--st-bg-soft); border-color: var(--st-text-muted); }
+ .car-arrow:disabled { opacity: .35; cursor: not-allowed; }
+ .car-counter {
+   font-size: 11px; font-weight: 700; color: var(--st-text);
+   font-variant-numeric: tabular-nums;
+   white-space: nowrap;
+ }
+ .car-dots { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; max-width: 30%; }
+ .car-dot {
+   width: 7px; height: 7px; border-radius: 50%;
+   background: var(--st-line); cursor: pointer;
+   transition: background .12s, transform .12s;
+ }
+ .car-dot.is-active { background: var(--st-text); transform: scale(1.3); }
+ .car-dot:hover:not(.is-active) { background: var(--st-text-muted); }
+
+ /* ── Carousel card (the big one shown at a time) ──────────────── */
+ .car-card {
+   background: #fff; border: 1px solid var(--st-line);
+   border-radius: 14px; overflow: hidden;
+   box-shadow: 0 1px 4px rgba(0,37,131,0.04);
+ }
+ .car-card.is-covered { border-left: 4px solid var(--st-covered-fg); }
+ .car-card.is-partial { border-left: 4px solid var(--st-partial-fg); }
+ .car-card.is-review  { border-left: 4px solid var(--st-review-fg); }
+ .car-card.is-none    { border-left: 4px solid var(--st-none-fg); }
+
+ /* ── Visual link line between regulation and policy halves ────── */
+ .link-bridge {
+   position: relative; min-width: 64px; max-width: 88px;
+   display: flex; align-items: center; justify-content: center;
+ }
+ .link-bridge svg { width: 100%; height: 60px; }
+ .link-bridge .link-pill {
+   position: absolute; top: 50%; left: 50%;
+   transform: translate(-50%, -50%);
+   padding: 4px 10px; border-radius: 999px;
+   font-size: 9.5px; font-weight: 800; white-space: nowrap;
+   border: 2px solid #fff;
+ }
+
+ .compare-row {
+   display: grid;
+   grid-template-columns: 1fr auto 1fr;
+   gap: 12px; align-items: stretch;
+ }
+ .compare-side {
+   background: var(--st-bg-soft);
+   border-radius: 10px; padding: 14px 16px;
+   display: flex; flex-direction: column; gap: 8px;
+ }
+
+ @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="flex flex-col h-full overflow-hidden"
+ x-data="{activeTab: 'mapping', showSendModal: false}"
+ x-cloak>
+
+ {# ── Page header ──────────────────────────────────────────────────── #}
+ <div style="background:#fff;border-bottom:2px solid #E5E8EF;padding:14px 24px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+ <div style="display:flex;align-items:center;gap:12px;min-width:0;">
+ {% comment %}
+ Back-button destination is role-aware: reviewers/admins land here from the
+ review queue and want to go back there; analysts came from /mapping/ and
+ want to go back there. document.referrer check below covers the case where
+ someone direct-links the workspace and there's no useful history.
+ {% endcomment %}
+ <a href="{% if is_reviewer or is_admin %}{% url 'review' %}?source=mapping{% else %}{% url 'mapping' %}{% endif %}"
+ onclick="if (document.referrer && document.referrer !== window.location.href && (document.referrer.includes('/review/') || document.referrer.includes('/mapping/') || document.referrer.includes('/'))) { /* let browser follow href as fallback if referrer is empty */ }"
+ title="Back to {% if is_reviewer or is_admin %}Review &amp; Validate{% else %}Policy Mapping{% endif %}"
+ style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:7px;background:#F4F6FB;color:#002583;text-decoration:none;flex-shrink:0;border:1px solid #E5E8EF;transition:background .12s;"
+ onmouseover="this.style.background='#E5E8EF'" onmouseout="this.style.background='#F4F6FB'">
+ <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"/></svg>
+ </a>
+ <div style="min-width:0;">
+ <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;">
+ <div style="width:4px;height:20px;background:#002583;border-radius:2px;flex-shrink:0;"></div>
+ <p style="font-size:14px;font-weight:800;color:#002583;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.01em;">Compliance Analysis</p>
+ </div>
+ <p style="font-size:11px;color:#002583;margin:0 0 0 12px;">
+ {{ analysis.policy_doc.name|truncatechars:40 }} &rarr;
+ {% for reg in analysis.regulations.all %}{{ reg.jurisdiction|capfirst }}{% if not forloop.last %}, {% endif %}{% endfor %}
+ regulations
+ </p>
+ </div>
+ </div>
+ <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
+ <span style="font-size:11px;color:#002583;">{{ analysis.obligation_count }} obligation{{ analysis.obligation_count|pluralize }}</span>
+ <span style="width:1px;height:16px;background:#ffffff;"></span>
+ {# Status badge #}
+ {% if analysis.status == 'complete' %}
+ <span style="padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;background:#ffffff;color:#002583;">Complete</span>
+ {% elif analysis.status == 'review' %}
+ <span style="padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;background:#ffffff;color:#002583;">In Review</span>
+ {% elif analysis.status == 'approved' %}
+ <span style="padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;background:#ffffff;color:#002583;display:inline-flex;align-items:center;gap:5px;">
+ <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+ Validated
+ </span>
+ {% elif analysis.status == 'failed' %}
+ <span style="padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;background:#ffffff;color:#002583;">Failed</span>
+ {% else %}
+ <span style="padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;background:#ffffff;color:#002583;">{{ analysis.status|title }}</span>
+ {% endif %}
+
+ {# Action buttons — Review (analyst) + Validate (reviewer/admin) #}
+ {% if analysis.status == 'complete' and is_analyst %}
+ <button @click="showSendModal = true" type="button"
+  style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;background:#002583;color:#fff;font-size:11px;font-weight:700;border:none;cursor:pointer;box-shadow:0 2px 8px rgba(0,37,131,.22);">
+ <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.125A59.769 59.769 0 0121.485 12 59.768 59.768 0 013.27 20.875L5.999 12zm0 0h7.5"/></svg>
+ Send to reviewer
+ </button>
+ {% elif analysis.submitted_for_review_at %}
+ <span style="display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;background:#FFF6E0;color:#B07A00;font-size:10px;font-weight:700;">
+  <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+  Awaiting review · {{ analysis.submitted_for_review_at|date:"d M, H:i" }}
+ </span>
+ {% endif %}
+
+ {% if analysis.status in 'complete,review' or analysis.status == 'complete' or analysis.status == 'review' %}
+ {% if is_reviewer or is_admin %}
+ <div id="validate-btn-wrap">
+ <button hx-post="{% url 'mapping-validate' analysis.pk %}"
+ hx-target="#validate-btn-wrap"
+ hx-swap="innerHTML"
+ style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;background:#002583;color:#fff;font-size:11px;font-weight:700;border:none;cursor:pointer;">
+ <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+ Validate
+ </button>
+ </div>
+ {% endif %}
+ {% endif %}
+
+ {% if analysis.status == 'approved' %}
+ <span id="validate-btn-wrap"></span>
+ {% endif %}
+
+ {% if analysis.status == 'approved' %}
+ <div x-data="{ exportOpen: false }" style="position:relative;">
+  <button @click="exportOpen = !exportOpen" type="button"
+   style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;background:#fff;color:#002583;font-size:11px;font-weight:700;border:1px solid #E5E8EF;cursor:pointer;font-family:inherit;">
+   <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M12 3v13.5m0 0l-3.75-3.75M12 16.5l3.75-3.75"/></svg>
+   Download package
+   <svg width="9" height="9" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg>
+  </button>
+  <div x-show="exportOpen" x-cloak @click.outside="exportOpen = false"
+       style="position:absolute;right:0;top:calc(100% + 6px);min-width:280px;background:#fff;border:1px solid #E5E8EF;border-radius:10px;box-shadow:0 8px 24px rgba(0,37,131,.12);z-index:50;padding:6px;">
+   <a href="{% url 'mapping-export-pdf' analysis.pk %}"
+      style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:8px;text-decoration:none;color:inherit;"
+      onmouseover="this.style.background='#F7F9FC'" onmouseout="this.style.background=''">
+    <div style="width:30px;height:30px;border-radius:7px;background:#FCE8E8;color:#D93939;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+     <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
+    </div>
+    <div style="min-width:0;flex:1;">
+     <p style="font-size:12px;font-weight:700;color:#002583;margin:0;line-height:1.3;">Executive Summary (PDF)</p>
+     <p style="font-size:10px;color:#6B7280;margin:2px 0 0;line-height:1.4;">One-page board-pack summary with compliance score, top gaps, and audit hash.</p>
+    </div>
+   </a>
+   <a href="{% url 'mapping-export-xlsx' analysis.pk %}"
+      style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:8px;text-decoration:none;color:inherit;"
+      onmouseover="this.style.background='#F7F9FC'" onmouseout="this.style.background=''">
+    <div style="width:30px;height:30px;border-radius:7px;background:#E1F4E5;color:#1B7F3A;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+     <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5h1.5C5.496 19.5 6 18.996 6 18.375m-3.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125M3.375 5.25c0-.621.504-1.125 1.125-1.125h15c.621 0 1.125.504 1.125 1.125M3.375 5.25C3.375 4.629 3.879 4.125 4.5 4.125h15c.621 0 1.125.504 1.125 1.125m-17.25 0v1.5c0 .621.504 1.125 1.125 1.125m0 0h1.5m-1.5 0c-.621 0-1.125.504-1.125 1.125v9.75c0 .621.504 1.125 1.125 1.125h1.5"/></svg>
+    </div>
+    <div style="min-width:0;flex:1;">
+     <p style="font-size:12px;font-weight:700;color:#002583;margin:0;line-height:1.3;">Gap Register (Excel)</p>
+     <p style="font-size:10px;color:#6B7280;margin:2px 0 0;line-height:1.4;">Flat register with reg citation, gap, remediation, severity, computed due date. For your GRC tracker.</p>
+    </div>
+   </a>
+  </div>
+ </div>
+ {% endif %}
+ </div>
+ </div>
+
+ {# Analyst note panel — shown to reviewer (and to analyst after submission) #}
+ {% if analysis.analyst_note %}
+ <div style="background:#FFFBEB;border-bottom:1px solid #FFE9A8;padding:10px 24px;flex-shrink:0;">
+   <p style="font-size:9px;font-weight:800;color:#7A5500;text-transform:uppercase;letter-spacing:.07em;margin:0 0 3px;">Analyst note for reviewer</p>
+   <p style="font-size:12px;color:#3F2A00;line-height:1.55;margin:0;">{{ analysis.analyst_note }}</p>
+   {% if analysis.submitted_by %}<p style="font-size:10px;color:#7A5500;margin:4px 0 0;">— {{ analysis.submitted_by.username }}</p>{% endif %}
+ </div>
+ {% endif %}
+
+ {# Send-to-reviewer modal — same pattern as comparison workspace #}
+ <div x-show="showSendModal" x-cloak
+      style="position:fixed;inset:0;background:rgba(0,37,131,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;"
+      @click.self="showSendModal = false">
+   <form method="post" action="{% url 'mapping-send-to-review' analysis.pk %}"
+         style="background:#fff;border-radius:14px;padding:24px;width:520px;max-width:100%;box-shadow:0 12px 40px rgba(0,0,0,.25);">
+     {% csrf_token %}
+     <p style="font-size:14px;font-weight:800;color:#002583;margin:0 0 4px;">Send to reviewer</p>
+     <p style="font-size:11px;color:#7B8499;margin:0 0 14px;line-height:1.55;">
+       The reviewer will see all {{ analysis.obligation_count }} obligation{{ analysis.obligation_count|pluralize }} in this analysis, your note below, and can approve or reject each row individually.
+     </p>
+     <label style="display:block;font-size:10px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;">Note for reviewer (optional)</label>
+     <textarea name="analyst_note" rows="4" maxlength="2000"
+               placeholder="e.g. Check the data-residency gap on row 7 — Order 42 retrieval was thin, would appreciate a second look."
+               style="width:100%;padding:10px 12px;border:1px solid #E5E8EF;border-radius:8px;font-size:12px;font-family:inherit;color:#002583;resize:vertical;outline:none;box-sizing:border-box;"></textarea>
+     <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
+       <button type="button" @click="showSendModal = false"
+               style="padding:8px 18px;border-radius:50px;background:#fff;border:1.5px solid #E5E8EF;font-size:12px;font-weight:600;color:#002583;cursor:pointer;font-family:inherit;">
+         Cancel
+       </button>
+       <button type="submit"
+               style="padding:8px 22px;border-radius:50px;background:#002583;border:none;font-size:12px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit;box-shadow:0 2px 10px rgba(0,37,131,.22);">
+         Send to reviewer
+       </button>
+     </div>
+   </form>
+ </div>
+
+ {% if analysis.status == 'running' %}
+ {# ── Loading state ────────────────────────────────────────────────── #}
+ <div class="flex-1 overflow-y-auto">
+ <div id="mapping-poller"
+ hx-get="{% url 'mapping-workspace' analysis.pk %}"
+ hx-trigger="every 4s"
+ hx-target="this"
+ hx-swap="innerHTML">
+ {% include 'partials/_mapping_loading.html' %}
+ </div>
+ </div>
+
+ {% else %}
+ {% comment %}Score panels moved into the Charts tab so the three main tabs (Obligation Coverage / Gap Register / Charts) get the full vertical space. The Charts tab is the natural home for aggregate metrics anyway.{% endcomment %}
+
+ {# ── Tab bar ──────────────────────────────────────────────────────── #}
+ <style>
+ .mw-tab{border-radius:999px!important;padding:7px 16px!important;font-size:11px!important;border:none!important;cursor:pointer;white-space:nowrap;font-family:inherit;transition:background .15s,color .15s;display:inline-flex;align-items:center;gap:6px;}
+ .mw-chip{border-radius:999px!important;padding:4px 12px!important;font-size:10px!important;font-weight:700!important;border:none!important;cursor:pointer;white-space:nowrap;font-family:inherit;transition:background .15s,color .15s;}
+ </style>
+ <div style="background:#fff;border-bottom:1px solid #E5E8EF;padding:8px 20px;flex-shrink:0;display:flex;align-items:center;gap:6px;">
+
+ <button @click="activeTab='mapping'"
+ :style="activeTab==='mapping' ? 'background:#002583;color:#fff;font-weight:600;' : 'background:#ffffff;color:#002583;font-weight:500;'"
+ class="mw-tab" style="background:#ffffff;color:#002583;font-weight:500;">
+ <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+ Obligation Coverage
+ <span :style="activeTab==='mapping' ? 'background:rgba(255,255,255,.22);color:#fff;' : 'background:#ffffff;color:#002583;'"
+ style="padding:1px 7px;border-radius:999px;font-size:9px;font-weight:700;">{{ analysis.obligation_count }}</span>
+ </button>
+
+ <button @click="activeTab='gaps'"
+ :style="activeTab==='gaps' ? 'background:#002583;color:#fff;font-weight:600;' : 'background:#ffffff;color:#002583;font-weight:500;'"
+ class="mw-tab" style="background:#ffffff;color:#002583;font-weight:500;">
+ <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+ Gap Register
+ {% if gaps %}
+ <span :style="activeTab==='gaps' ? 'background:rgba(255,255,255,.22);color:#fff;' : 'background:#ffffff;color:#002583;'"
+ style="padding:1px 7px;border-radius:999px;font-size:9px;font-weight:700;">{{ gaps|length }}</span>
+ {% endif %}
+ </button>
+
+ {% if chart_data %}
+ <button @click="activeTab='charts'; $nextTick(() => setTimeout(initMappingCharts, 0))"
+ :style="activeTab==='charts' ? 'background:#002583;color:#fff;font-weight:600;' : 'background:#ffffff;color:#002583;font-weight:500;'"
+ class="mw-tab" style="background:#ffffff;color:#002583;font-weight:500;">
+ <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"/></svg>
+ Charts
+ <span :style="activeTab==='charts' ? 'background:rgba(255,255,255,.22);color:#fff;' : 'background:#ffffff;color:#002583;'"
+ style="padding:1px 7px;border-radius:999px;font-size:9px;font-weight:700;">{{ compliance_score }}%</span>
+ </button>
+ {% endif %}
+
+ </div>
+
+ {# ── Tab content ──────────────────────────────────────────────────── #}
+ <div class="flex-1 overflow-y-auto" style="background:#ffffff;">
+
+ {% comment %}TAB 1: Obligation Coverage — regulation sub-tabs + per-reg carousel. Keyboard nav (←/→) flips between cards in the active sub-tab; listener on .window so the user doesn't need to click in first; activeTab guard prevents fighting with the Gap Register listener.{% endcomment %}
+ <div x-show="activeTab==='mapping'"
+      x-data="{
+        active_reg: 0,
+        idx: {{ ob_counts_json|safe }}.map(() => 0),
+        counts: {{ ob_counts_json|safe }},
+        prev() { if (this.idx[this.active_reg] > 0) this.idx[this.active_reg]--; },
+        next() { if (this.idx[this.active_reg] < this.counts[this.active_reg]-1) this.idx[this.active_reg]++; },
+      }"
+      @keydown.left.window="if (activeTab==='mapping') prev()"
+      @keydown.right.window="if (activeTab==='mapping') next()"
+      x-transition:enter="transition ease-out duration-150"
+      x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100">
+
+ {# Regulation sub-tab strip — one tab per regulation that produced rows #}
+ <div class="reg-subtab-bar">
+   {% regroup mappings by regulation as reg_groups %}
+   {% for reg_group in reg_groups %}
+   <button class="reg-subtab" :class="active_reg === {{ forloop.counter0 }} ? 'is-active' : ''"
+           @click="active_reg = {{ forloop.counter0 }}" type="button">
+     {% if reg_group.grouper.jurisdiction %}
+     <span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--st-review-fg);"></span>
+     {% endif %}
+     <span>{{ reg_group.grouper.name|truncatechars:38 }}</span>
+     <span class="pill">{{ reg_group.list|length }}</span>
+   </button>
+   {% endfor %}
+ </div>
+
+ {# Per-regulation carousel panels — only the active one is visible #}
+ <div style="padding:18px 24px 24px;">
+ {% for reg_group in reg_groups %}
+ <div x-show="active_reg === {{ forloop.counter0 }}"
+      x-transition:enter="transition ease-out duration-200"
+      x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100">
+
+   {# ── Carousel nav bar ───────────────────────────────────────── #}
+   <div class="car-nav">
+     <div class="ctx">
+       <p style="font-size:13px;font-weight:800;color:var(--st-text);margin:0 0 2px;">{{ reg_group.grouper.name }}</p>
+       <p style="font-size:10.5px;color:var(--st-text-muted);margin:0;">
+         {{ reg_group.grouper.jurisdiction|capfirst }} · {{ reg_group.list|length }} obligation{{ reg_group.list|length|pluralize }}
+       </p>
+     </div>
+     <span class="car-counter">
+       <span x-text="idx[{{ forloop.counter0 }}]+1"></span> / {{ reg_group.list|length }}
+     </span>
+     <div class="car-dots">
+       {% for om in reg_group.list %}
+       <span class="car-dot" :class="idx[{{ forloop.parentloop.counter0 }}] === {{ forloop.counter0 }} ? 'is-active' : ''"
+             @click="idx[{{ forloop.parentloop.counter0 }}] = {{ forloop.counter0 }}"></span>
+       {% endfor %}
+     </div>
+     <button class="car-arrow" :disabled="idx[{{ forloop.counter0 }}] === 0" @click="prev()" type="button" aria-label="Previous obligation">
+       <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/></svg>
+     </button>
+     <button class="car-arrow" :disabled="idx[{{ forloop.counter0 }}] === {{ reg_group.list|length }}-1" @click="next()" type="button" aria-label="Next obligation">
+       <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+     </button>
+   </div>
+
+   {# ── The actual cards (only the active one is shown) ──────── #}
+   {% for om in reg_group.list %}
+   {% with c=om.coverage %}
+   <div x-show="idx[{{ forloop.parentloop.counter0 }}] === {{ forloop.counter0 }}"
+        class="car-card is-{{ c }}"
+        data-om-pk="{{ om.pk }}"
+        x-transition:enter="transition ease-out duration-150"
+        x-transition:enter-start="opacity-0 transform translate-y-2"
+        x-transition:enter-end="opacity-100 transform translate-y-0">
+
+     {# ── Card header: full obligation + verdict ── #}
+     <div style="padding:18px 22px 14px;display:flex;align-items:flex-start;justify-content:space-between;gap:18px;border-bottom:1px solid var(--st-line);">
+       <div style="flex:1;min-width:0;">
+         <p style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--st-text-muted);margin:0 0 4px;">Regulatory obligation</p>
+         <p style="font-size:13.5px;color:var(--st-text);line-height:1.55;margin:0 0 8px;">
+           {{ om.obligation_text|default:om.obligation_title }}
+         </p>
+         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+           <span style="font-size:10.5px;color:var(--st-text-muted);">Source: <strong style="color:var(--st-text);">{{ om.article_ref }}</strong></span>
+           {% if om.citation_verified %}
+           <span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:5px;font-size:9.5px;font-weight:700;background:var(--st-covered-bg);color:var(--st-covered-fg);"
+                 title="Citation passed all structural checks">
+             <svg width="9" height="9" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+             verified
+           </span>
+           {% else %}
+           <span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:5px;font-size:9.5px;font-weight:700;background:var(--st-none-bg);color:var(--st-none-fg);"
+                 title="Citation could not be matched to a real chunk">⚠ unverified</span>
+           {% endif %}
+           {% if om.hallucination_risk > 0.2 %}
+           <span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:5px;font-size:9.5px;font-weight:700;
+                {% if om.hallucination_risk > 0.5 %}background:var(--st-none-bg);color:var(--st-none-fg);{% else %}background:var(--st-partial-bg);color:var(--st-partial-fg);{% endif %}"
+                 title="NLI hallucination risk (0=entailed, 1=unsupported)">
+             AI risk {{ om.hallucination_risk|floatformat:2 }}
+           </span>
+           {% endif %}
+         </div>
+       </div>
+       <span style="flex-shrink:0;display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:800;
+         {% if c == 'covered' %}background:var(--st-covered-bg);color:var(--st-covered-fg);
+         {% elif c == 'partial' %}background:var(--st-partial-bg);color:var(--st-partial-fg);
+         {% elif c == 'review' %}background:var(--st-review-bg);color:var(--st-review-fg);
+         {% else %}background:var(--st-none-bg);color:var(--st-none-fg);{% endif %}">
+         {% if c == 'covered' %}✓ Covered
+         {% elif c == 'partial' %}◐ Partial
+         {% elif c == 'review' %}◇ Needs review
+         {% else %}✕ Not covered{% endif %}
+       </span>
+     </div>
+
+     {# ── Why this verdict band ── #}
+     <div style="padding:12px 22px;font-size:12px;line-height:1.55;border-bottom:1px solid var(--st-line);
+       {% if c == 'covered' %}background:var(--st-covered-bg);color:var(--st-covered-fg);
+       {% elif c == 'partial' %}background:var(--st-partial-bg);color:var(--st-partial-fg);
+       {% elif c == 'review' %}background:var(--st-review-bg);color:var(--st-review-fg);
+       {% else %}background:var(--st-none-bg);color:var(--st-none-fg);{% endif %}">
+       <strong style="font-size:9.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;display:block;margin-bottom:3px;">Why this verdict</strong>
+       {% if om.rationale %}{{ om.rationale }}
+       {% elif c == 'covered' %}The internal policy clause directly addresses the regulatory requirement. The two verbatim quotes below cover the same obligation in compatible terms.
+       {% elif c == 'partial' %}The policy touches on this obligation but the matched clause doesn't fully satisfy the regulation's requirements — see both quotes below to identify which elements are missing.
+       {% elif c == 'review' %}Match is uncertain — recommended for human review. Compare both quotes below before accepting or overriding.
+       {% else %}No matching internal policy clause was found for this regulatory obligation.{% endif %}
+     </div>
+
+     {% comment %}AI analysis confidence strip — same per-row signals the comparison workspace surfaces. Always visible. Verified citation contributes ~60%, low NLI risk contributes ~40%. Unverified rows cap at ~24% regardless of risk.{% endcomment %}
+     {% if om.citation_verified %}{% widthratio 1 1 60 as verif_w %}{% else %}{% widthratio 4 10 60 as verif_w %}{% endif %}
+     <div style="padding:12px 22px;background:var(--st-bg-soft);border-bottom:1px solid var(--st-line);">
+       <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:6px;">
+         <span style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--st-text-muted);">AI analysis confidence</span>
+         <span style="font-size:11px;color:var(--st-text-muted);">
+           {% if om.citation_verified and om.hallucination_risk < 0.2 %}<strong style="color:var(--st-covered-fg);">High</strong>
+           {% elif om.citation_verified and om.hallucination_risk < 0.5 %}<strong style="color:var(--st-partial-fg);">Mixed</strong>
+           {% else %}<strong style="color:var(--st-none-fg);">Low — review needed</strong>{% endif %}
+         </span>
+       </div>
+       <div style="display:grid;grid-template-columns:minmax(0,1fr) repeat(3, auto);gap:14px;align-items:center;">
+         {# Confidence bar — visual at-a-glance — #}
+         <div class="stack-bar" style="height:10px;border-radius:5px;">
+           {% if om.citation_verified %}
+           <span style="background:var(--st-covered-fg);width:{% if om.hallucination_risk < 0.2 %}90{% elif om.hallucination_risk < 0.5 %}60{% else %}40{% endif %}%;"></span>
+           {% else %}
+           <span style="background:var(--st-none-fg);width:25%;"></span>
+           {% endif %}
+         </div>
+         {# Citation verified — always shown, color-coded — #}
+         <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--st-text);"
+               title="Structural check: regulation citation label, chunk_id, and verbatim quote all matched a real retrieved chunk.">
+           {% if om.citation_verified %}
+           <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="var(--st-covered-fg)" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+           <strong style="color:var(--st-covered-fg);">Citation verified</strong>
+           {% else %}
+           <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="var(--st-none-fg)" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
+           <strong style="color:var(--st-none-fg);">Citation unverified</strong>
+           {% endif %}
+         </span>
+         {# Hallucination risk — always shown, color graded — #}
+         <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--st-text);"
+               title="NLI hallucination risk. 0 = the AI's verdict prose is fully entailed by the cited chunk. 1 = paraphrased beyond what the chunk supports. Watch closely above 0.5.">
+           AI risk
+           <strong style="font-variant-numeric:tabular-nums;color:{% if om.hallucination_risk > 0.5 %}var(--st-none-fg){% elif om.hallucination_risk > 0.2 %}var(--st-partial-fg){% else %}var(--st-covered-fg){% endif %};">
+             {{ om.hallucination_risk|floatformat:2 }}
+           </strong>
+         </span>
+         {% comment %}Source chunks — audit-trail traceability. Clickable when populated: pills open the same document viewer the panel-level "Open" buttons use, so the user can jump to the source.{% endcomment %}
+         <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--st-text-muted);">
+           <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244"/></svg>
+           Sources:
+           {% if om.regulation_chunk_id %}
+           <button type="button"
+                   onclick="(function(){var r=Alpine.$data(document.body);r.docViewerDoc='{{ om.actual_regulation_doc.pk|default:om.regulation.pk }}';r.docViewerArt='{{ om.regulation_evidence|truncatechars:80|escapejs }}';r.docViewerChunkId='{{ om.regulation_chunk_id|escapejs }}';r.docViewerOpen=true;})()"
+                   title="Open the regulation source and scroll to the cited chunk. Chunk ID: {{ om.regulation_chunk_id }}"
+                   style="background:#fff;border:1px solid var(--st-line);border-radius:5px;padding:2px 8px;font-family:ui-monospace,monospace;font-size:10px;color:var(--st-text);cursor:pointer;font-weight:600;transition:background .12s,border-color .12s;"
+                   onmouseover="this.style.background='var(--st-bg-tint)';this.style.borderColor='var(--st-review-fg)';"
+                   onmouseout="this.style.background='#fff';this.style.borderColor='var(--st-line)';">
+             reg ↗
+           </button>
+           {% else %}
+           <span title="No regulation chunk was retrieved for this row." style="font-family:ui-monospace,monospace;font-size:10px;color:var(--st-none-fg);">reg —</span>
+           {% endif %}
+           ·
+           {% if om.policy_chunk_id and om.analysis.policy_doc %}
+           <button type="button"
+                   onclick="(function(){var r=Alpine.$data(document.body);r.docViewerDoc='{{ om.actual_policy_doc.pk|default:om.analysis.policy_doc.pk }}';r.docViewerArt='{{ om.evidence_text|truncatechars:80|escapejs }}';r.docViewerChunkId='{{ om.policy_chunk_id|escapejs }}';r.docViewerOpen=true;})()"
+                   title="Open the policy source and scroll to the cited chunk. Chunk ID: {{ om.policy_chunk_id }}"
+                   style="background:#fff;border:1px solid var(--st-line);border-radius:5px;padding:2px 8px;font-family:ui-monospace,monospace;font-size:10px;color:var(--st-text);cursor:pointer;font-weight:600;transition:background .12s,border-color .12s;"
+                   onmouseover="this.style.background='var(--st-bg-tint)';this.style.borderColor='var(--st-review-fg)';"
+                   onmouseout="this.style.background='#fff';this.style.borderColor='var(--st-line)';">
+             policy ↗
+           </button>
+           {% else %}
+           <span title="No policy chunk was retrieved (typical for Not Covered rows)." style="font-family:ui-monospace,monospace;font-size:10px;color:var(--st-text-muted);">policy —</span>
+           {% endif %}
+         </span>
+       </div>
+     </div>
+
+     {# ── Side-by-side comparison + visual link line ── #}
+     <div style="padding:18px 22px;">
+       <div class="compare-row">
+
+         {# Regulation half #}
+         <div class="compare-side">
+           <div style="display:flex;align-items:center;justify-content:space-between;">
+             <p style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--st-text-muted);margin:0;">Regulation requirement</p>
+             <button onclick="(function(){var r=Alpine.$data(document.body);r.docViewerDoc='{{ om.actual_regulation_doc.pk|default:om.regulation.pk }}';r.docViewerArt='{{ om.regulation_evidence|truncatechars:80|default:om.article_ref|escapejs }}';r.docViewerChunkId='{{ om.regulation_chunk_id|escapejs }}';r.docViewerOpen=true;})()"
+                     title="Open the regulation document and scroll to the cited paragraph"
+                     style="padding:3px 9px;border-radius:5px;background:#fff;border:1px solid var(--st-line);font-size:9.5px;font-weight:700;color:var(--st-text);cursor:pointer;">↗ Open</button>
+           </div>
+           <p style="font-size:11px;font-weight:700;color:var(--st-text);margin:0;">{{ om.article_ref }}</p>
+           {% if om.regulation_evidence %}
+           <div style="background:#fff;border-radius:6px;padding:9px 11px;border-left:2px solid var(--st-review-fg);">
+             <p style="font-size:8.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--st-text-muted);margin:0 0 4px;">Verbatim quote</p>
+             <p style="font-size:11.5px;color:var(--st-text);line-height:1.6;font-style:italic;margin:0;">"{{ om.regulation_evidence }}"</p>
+           </div>
+           {% endif %}
+         </div>
+
+         {# Visual link bridge — color/style reflects coverage status #}
+         <div class="link-bridge">
+           <svg viewBox="0 0 80 60" preserveAspectRatio="none">
+             <path d="M 0 30 C 20 30, 60 30, 80 30"
+                   stroke="{% if c == 'covered' %}var(--st-covered-fg){% elif c == 'partial' %}var(--st-partial-fg){% elif c == 'review' %}var(--st-review-fg){% else %}var(--st-none-fg){% endif %}"
+                   stroke-width="2.5" fill="none"
+                   stroke-dasharray="{% if c == 'covered' %}0{% elif c == 'partial' %}6 4{% elif c == 'review' %}3 3{% else %}2 5{% endif %}"
+                   {% if c == 'partial' %}stroke-linecap="round"{% endif %} />
+           </svg>
+           <span class="link-pill"
+                 style="{% if c == 'covered' %}background:var(--st-covered-fg);color:#fff;
+                 {% elif c == 'partial' %}background:var(--st-partial-fg);color:#fff;
+                 {% elif c == 'review' %}background:var(--st-review-fg);color:#fff;
+                 {% else %}background:var(--st-none-fg);color:#fff;{% endif %}">
+             {% if c == 'covered' %}match
+             {% elif c == 'partial' %}partial
+             {% elif c == 'review' %}?
+             {% else %}gap{% endif %}
+           </span>
+         </div>
+
+         {% comment %}Policy half. Open button is gated on policy_chunk_id —
+            a row marked Covered/Partial with no chunk_id means the LLM
+            asserted a match without retrieving a real policy clause, so
+            opening the policy doc would land on nothing useful. We surface
+            that as an explicit "no real match found" note instead.{% endcomment %}
+         <div class="compare-side">
+           <div style="display:flex;align-items:center;justify-content:space-between;">
+             <p style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--st-text-muted);margin:0;">Policy response</p>
+             {% if c != 'none' and om.policy_chunk_id and om.analysis.policy_doc %}
+             <button onclick="(function(){var r=Alpine.$data(document.body);r.docViewerDoc='{{ om.actual_policy_doc.pk|default:om.analysis.policy_doc.pk }}';r.docViewerArt='{{ om.evidence_text|truncatechars:80|default:om.evidence_source|escapejs }}';r.docViewerChunkId='{{ om.policy_chunk_id|escapejs }}';r.docViewerOpen=true;})()"
+                     title="Open the policy document and scroll to the cited paragraph"
+                     style="padding:3px 9px;border-radius:5px;background:#fff;border:1px solid var(--st-line);font-size:9.5px;font-weight:700;color:var(--st-text);cursor:pointer;">↗ Open</button>
+             {% endif %}
+           </div>
+           {% if c == 'none' %}
+           <p style="font-size:11.5px;color:var(--st-none-fg);font-weight:700;margin:0;">No matching policy clause was identified.</p>
+           {% elif not om.policy_chunk_id %}
+           {# Verdict says "covered/partial" but no policy chunk was actually retrieved — flag it so the analyst doesn't trust the verdict blindly. #}
+           <div style="padding:10px 11px;border-radius:6px;background:var(--st-partial-bg);border:1px solid var(--st-partial-fg);">
+             <p style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--st-partial-fg);margin:0 0 4px;">⚠ Verdict without source chunk</p>
+             <p style="font-size:11px;color:var(--st-text);line-height:1.55;margin:0;">The AI returned this verdict but did not link to a specific policy clause. Treat the policy side as unverified; consider re-running this row or marking it for human review.</p>
+             {% if om.evidence_text %}
+             <p style="font-size:10.5px;color:var(--st-text-muted);font-style:italic;margin:8px 0 0;line-height:1.55;">AI commentary: "{{ om.evidence_text|truncatechars:200 }}"</p>
+             {% endif %}
+           </div>
+           {% else %}
+           {% if om.evidence_source and om.evidence_source != "None identified" %}
+           <p style="font-size:11px;font-weight:700;color:var(--st-text);margin:0;">{{ om.evidence_source }}</p>
+           {% endif %}
+           {% if om.evidence_text %}
+           <div style="background:#fff;border-radius:6px;padding:9px 11px;border-left:2px solid {% if c == 'covered' %}var(--st-covered-fg){% elif c == 'partial' %}var(--st-partial-fg){% else %}var(--st-review-fg){% endif %};">
+             <p style="font-size:8.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--st-text-muted);margin:0 0 4px;">Verbatim quote</p>
+             <p style="font-size:11.5px;color:var(--st-text);line-height:1.6;font-style:italic;margin:0;">"{{ om.evidence_text }}"</p>
+           </div>
+           {% endif %}
+           {% endif %}
+         </div>
+       </div>
+     </div>
+
+     {# ── Footer: action row ── #}
+     <div style="padding:12px 22px;border-top:1px solid var(--st-line);background:var(--st-bg-soft);display:flex;align-items:center;justify-content:space-between;gap:10px;">
+       {% if om.human_override %}
+       <span style="font-size:10px;color:var(--st-review-fg);font-weight:700;">★ Human override applied</span>
+       {% else %}
+       <span style="font-size:10px;color:var(--st-text-muted);">Use ←/→ keys to navigate · Click "Override" to change verdict</span>
+       {% endif %}
+       <button hx-post="{% url 'mapping-coverage-override' om.pk %}"
+               hx-target="closest div[data-om-pk]" hx-swap="outerHTML"
+               style="padding:6px 14px;border-radius:7px;background:#fff;border:1px solid var(--st-line);font-size:11px;font-weight:700;color:var(--st-text);cursor:pointer;transition:background .12s;"
+               onmouseover="this.style.background='var(--st-bg-tint)';"
+               onmouseout="this.style.background='#fff';">
+         Override verdict
+       </button>
+     </div>
+   </div>{# car-card #}
+   {% endwith %}
+   {% endfor %}{# for om #}
+
+ </div>{# x-show="active_reg === N" #}
+ {% endfor %}{# for reg_group #}
+ </div>{# padding wrapper #}
+ </div>{# x-show="activeTab==='mapping'" #}
+
+
+ {% comment %}TAB 2: Gap Register — same shape as Obligation Coverage: regulation sub-tabs + per-reg carousel of gap cards. Each gap card keeps its existing gapCard Alpine state for the AI/human/edited remediation modes.{% endcomment %}
+ <div x-show="activeTab==='gaps'"
+      x-data="{
+        gap_reg: 0,
+        gap_idx: {{ gap_counts_json|safe }}.map(() => 0),
+        gap_counts: {{ gap_counts_json|safe }},
+        prev() { if (this.gap_idx[this.gap_reg] > 0) this.gap_idx[this.gap_reg]--; },
+        next() { if (this.gap_idx[this.gap_reg] < this.gap_counts[this.gap_reg]-1) this.gap_idx[this.gap_reg]++; },
+      }"
+      @keydown.left.window="if (activeTab==='gaps') prev()"
+      @keydown.right.window="if (activeTab==='gaps') next()"
+      x-transition:enter="transition ease-out duration-150"
+      x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100">
+
+ {% if gaps %}
+
+ {# Regulation sub-tab strip — gaps grouped by their regulation #}
+ {% regroup gaps by obligation_mapping.regulation as gap_reg_groups %}
+ <div class="reg-subtab-bar">
+   {% for grp in gap_reg_groups %}
+   <button class="reg-subtab" :class="gap_reg === {{ forloop.counter0 }} ? 'is-active' : ''"
+           @click="gap_reg = {{ forloop.counter0 }}" type="button">
+     <span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--st-none-fg);"></span>
+     <span>{{ grp.grouper.name|truncatechars:38 }}</span>
+     <span class="pill">{{ grp.list|length }}</span>
+   </button>
+   {% endfor %}
+ </div>
+
+ <div style="padding:18px 24px 24px;">
+ {% for grp in gap_reg_groups %}
+ <div x-show="gap_reg === {{ forloop.counter0 }}"
+      x-transition:enter="transition ease-out duration-200"
+      x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100">
+
+   {# Carousel nav for this regulation's gaps #}
+   <div class="car-nav">
+     <div class="ctx">
+       <p style="font-size:13px;font-weight:800;color:var(--st-text);margin:0 0 2px;">{{ grp.grouper.name }}</p>
+       <p style="font-size:10.5px;color:var(--st-text-muted);margin:0;">
+         {{ grp.grouper.jurisdiction|capfirst }} · {{ grp.list|length }} gap{{ grp.list|length|pluralize }} flagged for remediation
+       </p>
+     </div>
+     <span class="car-counter"><span x-text="gap_idx[{{ forloop.counter0 }}]+1"></span> / {{ grp.list|length }}</span>
+     <div class="car-dots">
+       {% for gap in grp.list %}
+       <span class="car-dot" :class="gap_idx[{{ forloop.parentloop.counter0 }}] === {{ forloop.counter0 }} ? 'is-active' : ''"
+             @click="gap_idx[{{ forloop.parentloop.counter0 }}] = {{ forloop.counter0 }}"></span>
+       {% endfor %}
+     </div>
+     <button class="car-arrow" :disabled="gap_idx[{{ forloop.counter0 }}] === 0" @click="prev()" type="button">
+       <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/></svg>
+     </button>
+     <button class="car-arrow" :disabled="gap_idx[{{ forloop.counter0 }}] === {{ grp.list|length }}-1" @click="next()" type="button">
+       <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+     </button>
+   </div>
+
+   {# Each gap card — wrapped in x-show for carousel selection #}
+   {% for gap in grp.list %}
+   <div x-show="gap_idx[{{ forloop.parentloop.counter0 }}] === {{ forloop.counter0 }}"
+        x-transition:enter="transition ease-out duration-150"
+        x-transition:enter-start="opacity-0 transform translate-y-2"
+        x-transition:enter-end="opacity-100 transform translate-y-0">
+   {% with priority_color="var(--st-none-fg)" %}{% if gap.priority == 'medium' %}{% with priority_color="var(--st-partial-fg)" %}{% endwith %}{% endif %}
+   <div style="background:#fff;border-radius:14px;border:1px solid var(--st-line);overflow:hidden;box-shadow:0 1px 4px rgba(0,37,131,0.04);
+        border-left:4px solid {% if gap.priority == 'high' or gap.priority == 'critical' %}var(--st-none-fg){% elif gap.priority == 'medium' %}var(--st-partial-fg){% else %}var(--st-review-fg){% endif %};"
+        x-data="gapCard('{{ gap.remediation_text|escapejs }}', '{{ gap.remediation_source }}', {{ gap.pk }})">
+
+     {# Card header #}
+     <div style="padding:18px 22px 12px;display:flex;align-items:flex-start;justify-content:space-between;gap:14px;border-bottom:1px solid var(--st-line);">
+       <div style="min-width:0;flex:1;">
+         <p style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--st-text-muted);margin:0 0 4px;">Regulatory obligation with a gap</p>
+         <p style="font-size:13.5px;font-weight:700;color:var(--st-text);line-height:1.5;margin:0 0 8px;">{{ gap.obligation_mapping.obligation_text|default:gap.obligation_mapping.obligation_title }}</p>
+         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+           <span style="font-size:10.5px;color:var(--st-text-muted);">Source: <strong style="color:var(--st-text);">{{ gap.obligation_mapping.article_ref }}</strong></span>
+           {% if gap.priority == 'critical' %}
+           <span style="padding:2px 9px;border-radius:5px;font-size:9.5px;font-weight:800;background:var(--st-none-bg);color:var(--st-none-fg);">CRITICAL</span>
+           {% elif gap.priority == 'high' %}
+           <span style="padding:2px 9px;border-radius:5px;font-size:9.5px;font-weight:800;background:var(--st-none-bg);color:var(--st-none-fg);">HIGH</span>
+           {% elif gap.priority == 'medium' %}
+           <span style="padding:2px 9px;border-radius:5px;font-size:9.5px;font-weight:800;background:var(--st-partial-bg);color:var(--st-partial-fg);">MEDIUM</span>
+           {% else %}
+           <span style="padding:2px 9px;border-radius:5px;font-size:9.5px;font-weight:800;background:var(--st-review-bg);color:var(--st-review-fg);">LOW</span>
+           {% endif %}
+         </div>
+       </div>
+       <div id="gap-tag-{{ gap.pk }}" style="flex-shrink:0;">
+         {% include 'partials/_remediation_tag.html' with gap=gap %}
+       </div>
+     </div>
+   {% endwith %}
+
+     {% comment %}Remediation editor — proper color hierarchy. Mode chips use rm-mode-chip class (active = navy fill); textareas use rm-textarea (focus turns border navy); buttons use rm-btn-primary / rm-btn-ghost. Replaces the prior all-navy soup.{% endcomment %}
+     <div style="padding:16px 22px;">
+       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+         <span style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--st-text-muted);">Remediation plan</span>
+         <div style="display:flex;align-items:center;gap:6px;">
+           <button class="rm-mode-chip" :class="mode==='ai' ? 'is-active' : ''"
+                   @click="mode='ai'" type="button" title="View the AI's suggested remediation.">AI suggestion</button>
+           <button class="rm-mode-chip" :class="mode==='human' ? 'is-active' : ''"
+                   @click="mode='human'; editText=''" type="button" title="Write your own remediation from scratch.">Write own</button>
+           <button class="rm-mode-chip" :class="mode==='edited' ? 'is-active' : ''"
+                   @click="mode='edited'; editText=aiText" type="button" title="Start from the AI suggestion and edit it.">Edit suggestion</button>
+         </div>
+       </div>
+
+       {# AI suggestion view #}
+       <div x-show="mode==='ai'">
+         <template x-if="aiText">
+           <div class="rm-suggestion-card">
+             <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+               <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="var(--st-review-fg)" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg>
+               <span style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--st-review-fg);">AI-generated suggestion</span>
+             </div>
+             <p style="font-size:12px;color:var(--st-text);line-height:1.65;margin:0 0 10px;" x-text="aiText"></p>
+             <div style="display:flex;justify-content:flex-end;">
+               <button class="rm-btn-ghost"
+                       @click="aiText='';generateSuggestion()" x-show="!generating" type="button">↺ Regenerate</button>
+               <div x-show="generating" class="rm-spinner" style="width:14px;height:14px;"></div>
+             </div>
+           </div>
+         </template>
+         <template x-if="!aiText">
+           <div class="rm-empty-card" style="display:flex;flex-direction:column;gap:10px;">
+             <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;">
+               <p style="font-size:12px;color:var(--st-text-muted);margin:0;" x-show="!generating">No AI suggestion yet — generate one or write your own.</p>
+               <p style="font-size:12px;color:var(--st-text);margin:0;font-weight:600;" x-show="generating">Generating suggestion…</p>
+               <button class="rm-btn-primary"
+                       @click="generateSuggestion()" x-show="!generating" type="button"
+                       style="font-size:11px;padding:6px 14px;flex-shrink:0;">Generate</button>
+               <div x-show="generating" class="rm-spinner"></div>
+             </div>
+             <p x-show="aiError" x-text="aiError" style="font-size:10.5px;color:var(--st-none-fg);margin:0;font-style:italic;"></p>
+           </div>
+         </template>
+       </div>
+
+       {# Write own #}
+       <div x-show="mode==='human'">
+         <textarea x-model="editText" rows="4"
+                   class="rm-textarea"
+                   placeholder="Write a remediation plan: what should the policy say, which clause to add, who owns it, by when…"></textarea>
+       </div>
+
+       {# Edit suggestion (pre-filled with AI text) #}
+       <div x-show="mode==='edited'">
+         <textarea x-model="editText" rows="4" class="rm-textarea"></textarea>
+       </div>
+
+       {# Save bar — only shown when there's something to save #}
+       <div x-show="mode !== 'ai'" style="margin-top:10px;display:flex;justify-content:flex-end;align-items:center;gap:10px;">
+         <span x-show="editText.length > 0" style="font-size:10.5px;color:var(--st-text-muted);" x-text="editText.length + ' chars'"></span>
+         <button class="rm-btn-primary" @click="saveRemediation()" :disabled="!editText.trim()" type="button"
+                 :style="!editText.trim() ? 'opacity:.4;cursor:not-allowed;' : ''">
+           Save remediation
+         </button>
+       </div>
+     </div>
+
+     </div>{# gapCard outer div #}
+   </div>{# x-show="gap_idx[...] === N" — closes the per-card carousel wrapper #}
+   {% endfor %}{# for gap in grp.list #}
+
+ </div>{# x-show="gap_reg === N" — closes the per-regulation panel #}
+ {% endfor %}{# for grp in gap_reg_groups #}
+ </div>{# padding wrapper #}
+
+ {% else %}
+ <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 24px;text-align:center;">
+   <div style="width:52px;height:52px;border-radius:14px;background:var(--st-covered-bg);display:flex;align-items:center;justify-content:center;margin-bottom:14px;">
+     <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="var(--st-covered-fg)" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+   </div>
+   <p style="font-size:14px;font-weight:700;color:var(--st-text);margin-bottom:5px;">No gaps found</p>
+   <p style="font-size:12px;color:var(--st-text-muted);line-height:1.6;">All obligations are fully covered by the policy.</p>
+ </div>
+ {% endif %}
+ </div>{# x-show="activeTab==='gaps'" #}
+
+ {% comment %}TAB 3: Charts — also hosts the dual score hero panel (Compliance + AI Quality) so the other two tabs get the full vertical space.{% endcomment %}
+ {% if chart_data %}
+ <div x-show="activeTab==='charts'"
+ x-transition:enter="transition ease-out duration-150"
+ x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+ style="padding:20px 24px;display:flex;flex-direction:column;gap:16px;">
+
+ {% if mappings %}
+ {% comment %}Dual score hero — Compliance | AI Quality. Mirrors the comparison workspace's per-pair confidence display, but at the analysis level.{% endcomment %}
+ <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch;">
+
+   {# ═════ LEFT: Compliance ═════ #}
+   <div class="score-card" style="align-items:flex-start;">
+     <div class="score-ring-wrap"
+          style="{% if compliance_score >= 80 %}--ring-color:var(--st-covered-fg);
+                 {% elif compliance_score >= 50 %}--ring-color:var(--st-partial-fg);
+                 {% else %}--ring-color:var(--st-none-fg);{% endif %}">
+       <div class="score-ring" style="--pct:{{ compliance_score }};
+                {% if compliance_score >= 80 %}--ring-color:var(--st-covered-fg);
+                {% elif compliance_score >= 50 %}--ring-color:var(--st-partial-fg);
+                {% else %}--ring-color:var(--st-none-fg);{% endif %}"></div>
+       <span class="score-ring-num">{{ compliance_score }}%</span>
+     </div>
+     <div style="flex:1;min-width:0;">
+       <p style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--st-text-muted);margin:0 0 2px;">Compliance score</p>
+       <p style="font-size:13px;font-weight:700;color:var(--st-text);margin:0 0 6px;line-height:1.3;">
+         {% if compliance_score >= 80 %}Strong coverage
+         {% elif compliance_score >= 50 %}Partial coverage — gaps to address
+         {% else %}Significant gaps — remediation needed{% endif %}
+       </p>
+       <div class="stack-bar">
+         {% if counts.covered %}<span style="background:var(--st-covered-fg);width:{% widthratio counts.covered analysis.obligation_count 100 %}%;"></span>{% endif %}
+         {% if counts.partial %}<span style="background:var(--st-partial-fg);width:{% widthratio counts.partial analysis.obligation_count 100 %}%;"></span>{% endif %}
+         {% if counts.review %}<span style="background:var(--st-review-fg);width:{% widthratio counts.review analysis.obligation_count 100 %}%;"></span>{% endif %}
+         {% if counts.none %}<span style="background:var(--st-none-fg);width:{% widthratio counts.none analysis.obligation_count 100 %}%;"></span>{% endif %}
+       </div>
+       <div style="display:flex;gap:14px;margin-top:8px;flex-wrap:wrap;">
+         <span style="font-size:10.5px;color:var(--st-text);"><strong style="color:var(--st-covered-fg);">{{ counts.covered }}</strong> covered</span>
+         <span style="font-size:10.5px;color:var(--st-text);"><strong style="color:var(--st-partial-fg);">{{ counts.partial }}</strong> partial</span>
+         <span style="font-size:10.5px;color:var(--st-text);"><strong style="color:var(--st-review-fg);">{{ counts.review }}</strong> review</span>
+         <span style="font-size:10.5px;color:var(--st-text);"><strong style="color:var(--st-none-fg);">{{ counts.none }}</strong> not covered</span>
+       </div>
+     </div>
+   </div>
+
+   {# ═════ RIGHT: AI Quality ═════ #}
+   <div class="score-card" style="align-items:flex-start;">
+     <div class="score-ring-wrap"
+          style="{% if ai_quality_score >= 85 %}--ring-color:var(--st-covered-fg);
+                 {% elif ai_quality_score >= 65 %}--ring-color:var(--st-partial-fg);
+                 {% else %}--ring-color:var(--st-none-fg);{% endif %}">
+       <div class="score-ring" style="--pct:{{ ai_quality_score }};
+                {% if ai_quality_score >= 85 %}--ring-color:var(--st-covered-fg);
+                {% elif ai_quality_score >= 65 %}--ring-color:var(--st-partial-fg);
+                {% else %}--ring-color:var(--st-none-fg);{% endif %}"></div>
+       <span class="score-ring-num">{{ ai_quality_score }}%</span>
+     </div>
+     <div style="flex:1;min-width:0;">
+       <p style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--st-text-muted);margin:0 0 2px;">AI quality score</p>
+       <p style="font-size:13px;font-weight:700;color:var(--st-text);margin:0 0 6px;line-height:1.3;">
+         {% if ai_quality_score >= 85 %}High confidence — citations grounded
+         {% elif ai_quality_score >= 65 %}Mixed confidence — review the flagged rows
+         {% else %}Low confidence — many rows need manual verification{% endif %}
+       </p>
+       <div class="stack-bar">
+         <span style="background:var(--st-covered-fg);width:{{ verified_pct }}%;"></span>
+         <span style="background:var(--st-none-fg);width:{{ unverified_pct }}%;"></span>
+       </div>
+       <div style="display:flex;gap:14px;margin-top:8px;flex-wrap:wrap;">
+         <span style="font-size:10.5px;color:var(--st-text);" title="Citation passed all structural checks (label + chunk_id + verbatim evidence all matched).">
+           <strong style="color:var(--st-covered-fg);">{{ verified_count }}/{{ total_obligations }}</strong> citations verified
+         </span>
+         <span style="font-size:10.5px;color:var(--st-text);" title="NLI hallucination risk averaged across all rows. 0 = perfectly entailed, 1 = paraphrased beyond what the chunk says.">
+           <strong style="color:{% if avg_hall_pct < 20 %}var(--st-covered-fg){% elif avg_hall_pct < 50 %}var(--st-partial-fg){% else %}var(--st-none-fg){% endif %};">{{ avg_hall }}</strong> avg risk
+         </span>
+         <span style="font-size:10.5px;color:var(--st-text);" title="Rows where the AI's verdict prose drifts >0.5 from what the cited chunk actually says.">
+           <strong style="color:{% if high_risk_count == 0 %}var(--st-covered-fg){% else %}var(--st-none-fg){% endif %};">{{ high_risk_count }}</strong> flagged
+         </span>
+       </div>
+     </div>
+   </div>
+
+ </div>
+ {% endif %}
+
+ {# ── Compliance score banner ── #}
+ <div class="an-card" style="background:#fff;border-radius:14px;border:1px solid #E5E8EF;padding:16px 20px;display:flex;align-items:center;gap:20px;box-shadow:0 1px 3px rgba(27,48,104,0.06);">
+ <div style="position:relative;width:78px;height:78px;flex-shrink:0;">
+ <canvas id="mw-chart-score" width="78" height="78"></canvas>
+ <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
+ <span style="font-size:17px;font-weight:800;font-family:'Satoshi',sans-serif;color:{% if compliance_score >= 70 %}#1B7F3A{% elif compliance_score >= 40 %}#B07A00{% else %}#D93939{% endif %};">{{ compliance_score }}%</span>
+ </div>
+ </div>
+ <div style="flex:1;min-width:0;">
+ <p style="font-size:10px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:.07em;margin:0 0 4px;">Compliance Score</p>
+ <p style="font-size:11px;color:#6B7280;margin:0 0 10px;">Weighted: Covered = 100%, Partial = 50%, others = 0%</p>
+ <div style="display:flex;gap:14px;flex-wrap:wrap;">
+ <span style="font-size:11px;font-weight:600;color:#1B7F3A;display:inline-flex;align-items:center;gap:5px;"><span style="width:8px;height:8px;border-radius:2px;background:#1B7F3A;"></span>{{ counts.covered }} covered</span>
+ <span style="font-size:11px;font-weight:600;color:#B07A00;display:inline-flex;align-items:center;gap:5px;"><span style="width:8px;height:8px;border-radius:2px;background:#FFB800;"></span>{{ counts.partial }} partial</span>
+ <span style="font-size:11px;font-weight:600;color:#002583;display:inline-flex;align-items:center;gap:5px;"><span style="width:8px;height:8px;border-radius:2px;background:#002583;"></span>{{ counts.review }} review</span>
+ <span style="font-size:11px;font-weight:600;color:#D93939;display:inline-flex;align-items:center;gap:5px;"><span style="width:8px;height:8px;border-radius:2px;background:#D93939;"></span>{{ counts.none }} not covered</span>
+ </div>
+ </div>
+ </div>
+
+ {# ── Coverage donut + By regulation ── #}
+ <div style="display:grid;grid-template-columns:1fr 2fr;gap:14px;">
+
+ <div style="background:#fff;border-radius:14px;border:1px solid #E5E8EF;padding:18px 20px;box-shadow:0 1px 3px rgba(27,48,104,0.06);">
+ <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#002583;margin-bottom:4px;">Coverage breakdown</p>
+ <p style="font-size:11px;color:#6B7280;margin-bottom:14px;">All {{ analysis.obligation_count }} obligations</p>
+ <div style="height:180px;position:relative;"><canvas id="mw-chart-donut"></canvas></div>
+ <div style="display:flex;flex-direction:column;gap:7px;margin-top:14px;">
+ <div style="display:flex;align-items:center;gap:7px;"><div style="width:10px;height:10px;border-radius:3px;background:#1B7F3A;flex-shrink:0;"></div><span style="font-size:11px;color:#1F2937;flex:1;">Covered</span><span style="font-size:11px;font-weight:700;font-family:'Satoshi',sans-serif;color:#1B7F3A;">{{ counts.covered }}</span></div>
+ <div style="display:flex;align-items:center;gap:7px;"><div style="width:10px;height:10px;border-radius:3px;background:#FFB800;flex-shrink:0;"></div><span style="font-size:11px;color:#1F2937;flex:1;">Partial</span><span style="font-size:11px;font-weight:700;font-family:'Satoshi',sans-serif;color:#B07A00;">{{ counts.partial }}</span></div>
+ <div style="display:flex;align-items:center;gap:7px;"><div style="width:10px;height:10px;border-radius:3px;background:#002583;flex-shrink:0;"></div><span style="font-size:11px;color:#1F2937;flex:1;">Needs review</span><span style="font-size:11px;font-weight:700;font-family:'Satoshi',sans-serif;color:#002583;">{{ counts.review }}</span></div>
+ <div style="display:flex;align-items:center;gap:7px;"><div style="width:10px;height:10px;border-radius:3px;background:#D93939;flex-shrink:0;"></div><span style="font-size:11px;color:#1F2937;flex:1;">Not covered</span><span style="font-size:11px;font-weight:700;font-family:'Satoshi',sans-serif;color:#D93939;">{{ counts.none }}</span></div>
+ </div>
+ </div>
+
+ <div style="background:#fff;border-radius:14px;border:1px solid #E5E8EF;padding:18px 20px;box-shadow:0 1px 3px rgba(27,48,104,0.06);">
+ <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#002583;margin-bottom:4px;">Coverage by regulation</p>
+ <p style="font-size:11px;color:#6B7280;margin-bottom:14px;">Stacked breakdown per regulation</p>
+ <div style="height:200px;position:relative;"><canvas id="mw-chart-by-reg"></canvas></div>
+ </div>
+
+ </div>
+
+ {# ── Gap priority ── #}
+ {% if gaps %}
+ <div style="background:#fff;border-radius:14px;border:1px solid #E5E8EF;padding:18px 20px;box-shadow:0 1px 3px rgba(27,48,104,0.06);">
+ <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#002583;margin-bottom:4px;">Gap priority distribution</p>
+ <p style="font-size:11px;color:#6B7280;margin-bottom:14px;">{{ gaps|length }} gap{{ gaps|length|pluralize }} by severity</p>
+ <div style="height:140px;"><canvas id="mw-chart-priority"></canvas></div>
+ </div>
+ {% endif %}
+
+ </div>
+ {% endif %}
+
+ </div>
+ {% endif %}{# end status check #}
+
+</div>
+
+<style>
+ @keyframes spin { to { transform: rotate(360deg); } }
+ [x-cloak] { display: none !important; }
+</style>
+
+{% if chart_data %}
+<script>
+(function() {
+ var _chartsInited = false;
+
+ window.initMappingCharts = function() {
+ if (_chartsInited || typeof Chart === 'undefined' || !window.mappingChartData) return;
+ _chartsInited = true;
+ var d = window.mappingChartData;
+ // Match the home + analytics chart defaults so the visual language is
+ // consistent across the three pages.
+ Chart.defaults.font.family = "'Satoshi', sans-serif";
+ Chart.defaults.font.size   = 11;
+ Chart.defaults.color       = '#1F2937';
+ var shared = { responsive: true, maintainAspectRatio: false };
+ var tooltip = {
+ backgroundColor: '#fff', titleColor: '#002583', bodyColor: '#1F2937',
+ borderColor: '#E5E8EF', borderWidth: 1, padding: 10, cornerRadius: 8,
+ titleFont: { weight: 700 },
+ };
+
+ // ── Coverage donut ────────────────────────────────────────────────────
+ var donutEl = document.getElementById('mw-chart-donut');
+ if (donutEl) {
+ new Chart(donutEl, {
+ type: 'doughnut',
+ data: {
+ labels: d.coverage.labels,
+ datasets: [{ data: d.coverage.values, backgroundColor: d.coverage.colors, borderWidth: 2, borderColor: '#fff', hoverOffset: 6 }],
+ },
+ options: {
+ ...shared,
+ cutout: '68%',
+ plugins: { legend: { display: false }, tooltip: { ...tooltip, callbacks: { label: i => ` ${i.label}: ${i.raw}` } } },
+ },
+ });
+ }
+
+ // ── Compliance score mini donut ───────────────────────────────────────
+ var scoreEl = document.getElementById('mw-chart-score');
+ if (scoreEl) {
+ var score = d.complianceScore;
+ // Semantic colour: green at 70+, amber at 40-69, red below.
+ var scoreColor = score >= 70 ? '#1B7F3A' : score >= 40 ? '#FFB800' : '#D93939';
+ new Chart(scoreEl, {
+ type: 'doughnut',
+ data: {
+ datasets: [{
+ data: [score, 100 - score],
+ backgroundColor: [scoreColor, '#EEF1F6'],
+ borderWidth: 0,
+ }],
+ },
+ options: { ...shared, cutout: '74%', plugins: { legend: { display: false }, tooltip: { enabled: false } } },
+ });
+ }
+
+ // ── Coverage by regulation — stacked bar ─────────────────────────────
+ // Palette aligned with the analytics page and the legend chips above:
+ //   Covered = #1B7F3A, Partial = #FFB800, Review = #002583, None = #D93939
+ var regEl = document.getElementById('mw-chart-by-reg');
+ if (regEl) {
+ new Chart(regEl, {
+ type: 'bar',
+ data: {
+ labels: d.byRegulation.labels,
+ datasets: [
+ { label: 'Covered',      data: d.byRegulation.covered, backgroundColor: '#1B7F3A', borderRadius: 4, borderSkipped: false },
+ { label: 'Partial',      data: d.byRegulation.partial, backgroundColor: '#FFB800', borderRadius: 0, borderSkipped: false },
+ { label: 'Needs Review', data: d.byRegulation.review,  backgroundColor: '#002583', borderRadius: 0, borderSkipped: false },
+ { label: 'Not Covered',  data: d.byRegulation.none,    backgroundColor: '#D93939', borderRadius: 0, borderSkipped: false },
+ ],
+ },
+ options: {
+ ...shared,
+ scales: {
+ x: { stacked: true, grid: { display: false }, ticks: { font: { size: 10, family: "'Satoshi',sans-serif" }, color: '#6B7280' }, border: { color: '#E5E8EF' } },
+ y: { stacked: true, grid: { color: '#EEF1F6' }, ticks: { stepSize: 1, font: { size: 10, family: "'Satoshi',sans-serif" }, color: '#6B7280' }, border: { display: false } },
+ },
+ plugins: {
+ legend: { position: 'bottom', labels: { font: { size: 10, family: "'Satoshi',sans-serif" }, color: '#1F2937', boxWidth: 10, padding: 12 } },
+ tooltip: { ...tooltip, mode: 'index', callbacks: { label: i => ` ${i.dataset.label}: ${i.raw}` } },
+ },
+ },
+ });
+ }
+
+ // ── Gap priority bar ──────────────────────────────────────────────────
+ // Palette: Critical = #D93939, High = #E07A1F, Medium = #FFB800, Low = #5A6685
+ var priEl = document.getElementById('mw-chart-priority');
+ if (priEl) {
+ new Chart(priEl, {
+ type: 'bar',
+ data: {
+ labels: d.gapPriority.labels,
+ datasets: [{
+ data: d.gapPriority.values,
+ backgroundColor: ['#D93939', '#E07A1F', '#FFB800', '#5A6685'],
+ borderRadius: 6,
+ borderSkipped: false,
+ }],
+ },
+ options: {
+ ...shared,
+ plugins: { legend: { display: false }, tooltip: { ...tooltip, callbacks: { label: i => ` ${i.raw} gap${i.raw !== 1 ? 's' : ''}` } } },
+ scales: {
+ x: { grid: { display: false }, ticks: { font: { size: 10, family: "'Satoshi',sans-serif" }, color: '#6B7280' }, border: { color: '#E5E8EF' } },
+ y: { grid: { color: '#EEF1F6' }, ticks: { stepSize: 1, font: { size: 10, family: "'Satoshi',sans-serif" }, color: '#6B7280' }, border: { display: false } },
+ },
+ },
+ });
+ }
+
+ // After all charts are created, force a resize so any that initialised
+ // at 0×0 (due to display:none layout timing) fill their containers.
+ Object.values(Chart.instances).forEach(c => { try { c.resize(); } catch(e) {} });
+ };
+})();
+</script>
+{% endif %}
+
+<script>
+function gapCard(aiText, source, gapPk) {
+ return {
+ mode: 'ai',
+ aiText: aiText,
+ aiError: '',
+ editText: aiText,
+ generating: false,
+ gapPk: gapPk,
+
+ async generateSuggestion() {
+ this.generating = true;
+ this.aiError = '';
+ try {
+ const resp = await fetch(`/mapping/gap/${this.gapPk}/suggest/`, {
+ method: 'POST',
+ headers: {
+ 'X-CSRFToken': document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '',
+ },
+ });
+ const data = await resp.json();
+ if (data.suggestion) {
+ this.aiText = data.suggestion;
+ } else if (data.error === 'API key not configured') {
+ this.aiError = 'Add your OPENROUTER_API_KEY to the .env file to enable AI suggestions.';
+ } else if (data.error) {
+ this.aiError = 'AI call failed: ' + data.error;
+ }
+ } catch (e) {
+ this.aiError = 'Network error — check server logs.';
+ console.error('AI suggest failed', e);
+ }
+ this.generating = false;
+ },
+
+ async saveRemediation() {
+ const source = this.mode === 'edited' ? 'ai_draft_edited' : 'human_written';
+ const body = `remediation_text=${encodeURIComponent(this.editText)}&remediation_source=${source}`;
+ const resp = await fetch(`/mapping/gap/${this.gapPk}/save/`, {
+ method: 'POST',
+ headers: {
+ 'X-CSRFToken': document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '',
+ 'Content-Type': 'application/x-www-form-urlencoded',
+ },
+ body,
+ });
+ const html = await resp.text();
+ document.getElementById(`gap-tag-${this.gapPk}`).innerHTML = html;
+ },
+ };
+}
+</script>
+{% endblock %}

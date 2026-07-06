@@ -1,0 +1,25 @@
+{% comment %}Inner content of the HTMX polling div while MappingAnalysis.status == 'running'.
+The outer div (in mapping_workspace.html) owns hx-get/hx-trigger — this partial is only the inner.{% endcomment %}
+<div class="flex flex-col items-center justify-center py-24 px-6 text-center">
+ <div style="display:flex;align-items:center;gap:6px;margin-bottom:20px;">
+ <span style="width:10px;height:10px;border-radius:50%;background:#002583;display:inline-block;animation:dot-bounce 1.2s ease-in-out infinite;"></span>
+ <span style="width:10px;height:10px;border-radius:50%;background:#002583;display:inline-block;animation:dot-bounce 1.2s ease-in-out 0.2s infinite;"></span>
+ <span style="width:10px;height:10px;border-radius:50%;background:#002583;display:inline-block;animation:dot-bounce 1.2s ease-in-out 0.4s infinite;"></span>
+ </div>
+ <p style="font-size:14px;font-weight:600;color:#002583;margin-bottom:6px;">Analyzing obligations…</p>
+ <p style="font-size:12px;color:#002583;max-width:320px;line-height:1.6;">
+ The AI is mapping <strong style="color:#002583;">{{ analysis.policy_doc.name }}</strong> against
+ {% with regs=analysis.regulations.all %}
+ {% for r in regs %}{{ r.name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+ {% endwith %}
+ on <strong style="color:#002583;">{{ analysis.topic }}</strong>. This may take a minute.
+ </p>
+ <p style="font-size:11px;color:#ffffff;margin-top:16px;">Auto-refreshing every 4 seconds</p>
+</div>
+
+<style>
+@keyframes dot-bounce {
+ 0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+ 40% { transform: translateY(-6px); opacity: 1; }
+}
+</style>

@@ -1,0 +1,340 @@
+/*
+ Tailwind CSS v4 entry point — Interdimensional palette.
+
+ Compile + watch (run from cjpca/ directory):
+ node_modules\.bin\tailwindcss -i static/css/tailwind.css -o static/css/output.css --watch
+
+ Reference static/css/output.css in base.html (not this file).
+*/
+
+@import "tailwindcss";
+
+@source "../../templates/**/*.html";
+@source "../../apps/**/*.py";
+
+/* ── Interdimensional palette ─────────────────────────────────────────────
+ 01 Interdimensional Blue #002583 primary brand, links, interactive
+ 02 Himawari Yellow #E5E8EF accent, attention, highlight
+ 03 Black #002583 primary text, deepest chrome, alarms
+ 04 Daisy Field #E5E8EF page canvas (warm, editorial)
+
+ Plus:
+ • White #FFFFFF elevated content surfaces (cards/modals)
+ • Daisy Border #E5E8EF structural hairline (derived from Daisy)
+
+ Design intent: editorial/modern. The cream Daisy Field is the page
+ canvas; cards FLOAT in white above it. Yellow is a deliberate pop and
+ reserved for the "attention required" semantic role. Black is the
+ alarm / highest-priority signal. Blue is primary action.
+ ───────────────────────────────────────────────────────────────────────── */
+@theme {
+ /* Core palette */
+ --color-noor-blue: #002583;
+ --color-noor-yellow: #E5E8EF;
+ --color-noor-black: #002583;
+ --color-noor-cream: #E5E8EF;
+ --color-noor-surface: #FFFFFF;
+ --color-noor-border: #E5E8EF;
+
+ /* Override Tailwind's defaults so utility classes resolve to our palette */
+ --color-black: #002583;
+ --color-white: #FFFFFF;
+
+ /* Gray scale collapsed onto the palette — light grays read as cream
+ surface or border; dark grays read as black; warm muted greys
+ (derived from Daisy + Black) bridge the body-text range so text
+ hierarchy survives on long-form regulatory pages. */
+ --color-gray-50: #E5E8EF;
+ --color-gray-100: #E5E8EF;
+ --color-gray-200: #E5E8EF;
+ --color-gray-300: #E5E8EF;
+ --color-gray-400: #D1D5E0;
+ --color-gray-500: #D1D5E0;
+ --color-gray-600: #002583;
+ --color-gray-700: #002583;
+ --color-gray-800: #002583;
+ --color-gray-900: #002583;
+
+ /* Slate scale — same treatment for templates that used slate-* utilities */
+ --color-slate-50: #E5E8EF;
+ --color-slate-100: #E5E8EF;
+ --color-slate-200: #E5E8EF;
+ --color-slate-300: #E5E8EF;
+ --color-slate-400: #D1D5E0;
+ --color-slate-500: #D1D5E0;
+ --color-slate-600: #002583;
+ --color-slate-700: #002583;
+ --color-slate-800: #002583;
+ --color-slate-900: #002583;
+
+ /* Blue scale — collapsed onto Interdimensional Blue */
+ --color-blue-50: #E5E8EF;
+ --color-blue-100: #E5E8EF;
+ --color-blue-200: color-mix(in srgb, #002583 20%, #FFFFFF);
+ --color-blue-300: color-mix(in srgb, #002583 35%, #FFFFFF);
+ --color-blue-400: color-mix(in srgb, #002583 55%, #FFFFFF);
+ --color-blue-500: #002583;
+ --color-blue-600: #002583;
+ --color-blue-700: #002583;
+ --color-blue-800: #002583;
+ --color-blue-900: #002583;
+
+ /* Yellow / amber — collapsed onto Himawari Yellow */
+ --color-yellow-50: color-mix(in srgb, #E5E8EF 12%, #FFFFFF);
+ --color-yellow-100: color-mix(in srgb, #E5E8EF 22%, #FFFFFF);
+ --color-yellow-200: color-mix(in srgb, #E5E8EF 40%, #FFFFFF);
+ --color-yellow-300: color-mix(in srgb, #E5E8EF 60%, #FFFFFF);
+ --color-yellow-400: #E5E8EF;
+ --color-yellow-500: #E5E8EF;
+ --color-yellow-600: #E5E8EF;
+ --color-yellow-700: #002583;
+ --color-yellow-800: #002583;
+
+ --color-amber-50: color-mix(in srgb, #E5E8EF 12%, #FFFFFF);
+ --color-amber-100: color-mix(in srgb, #E5E8EF 22%, #FFFFFF);
+ --color-amber-200: color-mix(in srgb, #E5E8EF 40%, #FFFFFF);
+ --color-amber-400: #E5E8EF;
+ --color-amber-500: #E5E8EF;
+ --color-amber-600: #E5E8EF;
+ --color-amber-700: #002583;
+
+ /* Greens / reds collapsed onto semantic palette tones */
+ --color-green-50: color-mix(in srgb, #002583 6%, #FFFFFF);
+ --color-green-100: color-mix(in srgb, #002583 14%, #FFFFFF);
+ --color-green-500: #002583;
+ --color-green-600: #002583;
+ --color-green-700: #002583;
+
+ --color-red-50: color-mix(in srgb, #002583 4%, #FFFFFF);
+ --color-red-100: color-mix(in srgb, #002583 8%, #FFFFFF);
+ --color-red-200: #E5E8EF;
+ --color-red-500: #002583;
+ --color-red-600: #002583;
+ --color-red-700: #002583;
+
+ /* Legacy / semantic aliases — keep so older utility classes resolve */
+ --color-noor-rich: #002583;
+ --color-noor-navy: #002583;
+ --color-noor-accent: #002583;
+ --color-noor-sage: #E5E8EF;
+ --color-noor-mist: #E5E8EF;
+ --color-noor-light: #FFFFFF;
+ --color-noor-steel: #002583;
+
+ /* Coverage status — semantic, not chromatic */
+ --color-cov-green: #002583; /* "covered / done" — confident blue */
+ --color-cov-amber: #E5E8EF; /* "partial / attention" — yellow pop */
+ --color-cov-blue: #002583; /* "review / informational" */
+ --color-cov-red: #002583; /* "missing / conflict" — alarm black */
+
+ /* Page accents — collapsed to brand */
+ --color-accent-blue: #002583;
+ --color-accent-green: #002583;
+ --color-accent-coral: #E5E8EF;
+ --color-accent-purple: #002583;
+
+ --font-sans: 'DM Sans', sans-serif;
+ --font-mono: 'DM Mono', monospace;
+}
+
+/* ── Base styles ──────────────────────────────────────────────────────────
+ The page canvas is Daisy Field cream — softer on the eyes for long
+ regulatory reading and gives white cards somewhere to float above.
+ ───────────────────────────────────────────────────────────────────────── */
+@layer base {
+ html, body {
+ font-family: var(--font-sans);
+ font-size: 14px;
+ color: #002583;
+ background-color: #E5E8EF;
+ }
+
+ /* Headings — tight tracking, editorial feel */
+ h1, h2, h3, h4 {
+ color: #002583;
+ letter-spacing: -0.015em;
+ font-feature-settings: 'ss01', 'cv11';
+ }
+
+ /* Links — brand blue with a yellow underline-on-hover (the editorial pop) */
+ a {
+ color: #002583;
+ text-decoration: none;
+ transition: color 120ms ease;
+ }
+ a:hover {
+ color: #002583;
+ box-shadow: inset 0 -2px 0 0 #E5E8EF;
+ }
+
+ /* Selection — yellow pop, the only place yellow beats blue for legibility */
+ ::selection {
+ background: #E5E8EF;
+ color: #002583;
+ }
+
+ /* Custom scrollbar — restrained, palette-only */
+ ::-webkit-scrollbar { width: 10px; height: 10px; }
+ ::-webkit-scrollbar-track { background: #E5E8EF; }
+ ::-webkit-scrollbar-thumb { background: #E5E8EF; border-radius: 8px; border: 2px solid #E5E8EF; }
+ ::-webkit-scrollbar-thumb:hover { background: #002583; }
+
+ /* Focus rings — strong brand blue, slight outline-offset for breathing room */
+ input:focus-visible,
+ select:focus-visible,
+ textarea:focus-visible,
+ button:focus-visible,
+ [role="button"]:focus-visible {
+ outline: 2px solid #002583;
+ outline-offset: 2px;
+ }
+
+ /* HR — subtle hairline */
+ hr { border: 0; border-top: 1px solid #E5E8EF; }
+}
+
+/* ── HTMX loading indicator ──────────────────────────────────────────────── */
+.htmx-indicator { display: none; }
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator { display: block; }
+
+/* ── Component classes ────────────────────────────────────────────────────
+ Reusable patterns that handle hierarchy + interaction.
+ ───────────────────────────────────────────────────────────────────────── */
+@layer components {
+
+ /* ─ Citation chip ─────────────────────────────────────────────────────
+ Subtle blue-tinted pill that opens the Document Viewer. */
+ .cite-chip {
+ @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium cursor-pointer transition-all;
+ background-color: color-mix(in srgb, #002583 8%, transparent);
+ color: #002583;
+ border: 1px solid color-mix(in srgb, #002583 18%, transparent);
+ }
+ .cite-chip:hover {
+ background-color: #002583;
+ color: #FFFFFF;
+ border-color: #002583;
+ }
+
+ /* ─ Coverage badges ───────────────────────────────────────────────────
+ Semantic differentiation:
+ covered = blue tint (confident — compliant)
+ partial = SOLID yellow (attention — needs review)
+ review = cream pill (neutral information)
+ none = black w/ white text (alarm — uncovered) */
+ .badge-covered {
+ @apply px-2 py-0.5 rounded-full text-[11px] font-medium;
+ background-color: color-mix(in srgb, #002583 14%, transparent);
+ color: #002583;
+ }
+ .badge-partial {
+ @apply px-2 py-0.5 rounded-full text-[11px] font-bold;
+ background-color: #E5E8EF;
+ color: #002583;
+ }
+ .badge-review {
+ @apply px-2 py-0.5 rounded-full text-[11px] font-medium;
+ background-color: #E5E8EF;
+ color: #002583;
+ }
+ .badge-none {
+ @apply px-2 py-0.5 rounded-full text-[11px] font-bold;
+ background-color: #002583;
+ color: #FFFFFF;
+ }
+
+ /* ─ Card surface ──────────────────────────────────────────────────────
+ White card floating above cream canvas. The shadow is what gives
+ the "lift" — never use a heavy border. */
+ .noor-card {
+ background-color: #FFFFFF;
+ border: 1px solid #E5E8EF;
+ border-radius: 12px;
+ box-shadow: 0 1px 0 color-mix(in srgb, #002583 3%, transparent),
+ 0 1px 3px color-mix(in srgb, #002583 4%, transparent);
+ transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+ }
+ .noor-card:hover {
+ border-color: color-mix(in srgb, #002583 35%, transparent);
+ box-shadow: 0 2px 0 color-mix(in srgb, #002583 4%, transparent),
+ 0 8px 24px color-mix(in srgb, #002583 12%, transparent);
+ transform: translateY(-1px);
+ }
+ .noor-card.is-active {
+ border-color: #002583;
+ box-shadow: 0 0 0 3px color-mix(in srgb, #002583 18%, transparent);
+ }
+
+ /* ─ Primary button ────────────────────────────────────────────────────
+ Solid Interdimensional Blue. Hover lifts to black for a strong
+ editorial contrast. */
+ .btn-primary {
+ @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all;
+ background-color: #002583;
+ color: #FFFFFF;
+ border: 1px solid #002583;
+ }
+ .btn-primary:hover {
+ background-color: #002583;
+ border-color: #002583;
+ }
+ .btn-primary:active {
+ transform: translateY(1px);
+ }
+
+ /* ─ Secondary button ──────────────────────────────────────────────────
+ Outlined, sits on cream or white. Hover swaps to yellow for the pop. */
+ .btn-secondary {
+ @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all;
+ background-color: #FFFFFF;
+ color: #002583;
+ border: 1px solid #E5E8EF;
+ }
+ .btn-secondary:hover {
+ background-color: #E5E8EF;
+ border-color: #E5E8EF;
+ color: #002583;
+ }
+
+ /* ─ Tertiary / ghost button ──────────────────────────────────────────── */
+ .btn-ghost {
+ @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all;
+ background: transparent;
+ color: #002583;
+ border: 1px solid transparent;
+ }
+ .btn-ghost:hover {
+ background-color: color-mix(in srgb, #002583 8%, transparent);
+ color: #002583;
+ }
+
+ /* ─ Pill nav / tab ───────────────────────────────────────────────────── */
+ .pill {
+ @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium transition-all cursor-pointer;
+ background-color: #FFFFFF;
+ color: #002583;
+ border: 1px solid #E5E8EF;
+ }
+ .pill:hover { border-color: #002583; color: #002583; }
+ .pill.is-active {
+ background-color: #002583;
+ color: #FFFFFF;
+ border-color: #002583;
+ }
+
+ /* ─ Divider — branded hairline ───────────────────────────────────────── */
+ .noor-divider {
+ height: 1px;
+ background: #E5E8EF;
+ }
+
+ /* ─ Highlight callout — yellow attention block ──────────────────────── */
+ .noor-callout {
+ background-color: color-mix(in srgb, #E5E8EF 18%, #FFFFFF);
+ border-left: 3px solid #E5E8EF;
+ border-radius: 6px;
+ padding: 10px 12px;
+ color: #002583;
+ }
+}

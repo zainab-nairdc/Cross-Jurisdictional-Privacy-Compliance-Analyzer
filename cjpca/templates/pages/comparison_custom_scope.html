@@ -1,0 +1,517 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Comparison — CJPCA{% endblock %}
+
+{% block extra_head %}
+<style>
+ [x-cloak] { display:none!important; }
+
+ /* ── Reg picker trigger ── */
+ .rpick-trig {
+ width:100%;display:flex;align-items:center;gap:9px;padding:10px 12px;
+ background:#ffffff;border:1.5px solid #E5E8EF;border-radius:10px;
+ cursor:pointer;font-family:inherit;text-align:left;
+ transition:border-color .12s,box-shadow .12s,background .12s;
+ }
+ .rpick-trig:hover:not(.a-sel):not(.b-sel) { background:#ffffff;border-color:#E5E8EF; }
+ .rpick-trig.a-sel { border-color:#002583;background:#ffffff; }
+ .rpick-trig.b-sel { border-color:#002583;background:#ffffff; }
+ .rpick-trig.a-open { border-color:#002583;box-shadow:0 0 0 3px rgba(27,48,104,.09);background:#fff; }
+ .rpick-trig.b-open { border-color:#002583;box-shadow:0 0 0 3px rgba(250,166,51,.12);background:#fff; }
+
+ /* ── Dropdown ── */
+ .rpick-drop {
+ position:absolute;top:calc(100% + 5px);left:0;right:0;
+ background:#fff;border:1px solid #E5E8EF;border-radius:12px;
+ z-index:400;overflow:hidden;
+ box-shadow:0 12px 36px rgba(0,0,0,.13);
+ }
+ .rpick-drop-list { max-height:200px;overflow-y:auto; }
+ .rpick-drop-list::-webkit-scrollbar { width:4px; }
+ .rpick-drop-list::-webkit-scrollbar-thumb { background:#ffffff;border-radius:2px; }
+ .rpick-jur {
+ padding:5px 13px;font-size:9px;font-weight:800;text-transform:uppercase;
+ letter-spacing:.1em;color:#002583;background:#ffffff;
+ border-bottom:1px solid #E5E8EF;display:flex;align-items:center;gap:6px;
+ position:sticky;top:0;z-index:1;
+ }
+ .rpick-item {
+ padding:8px 13px;display:flex;align-items:center;gap:9px;
+ cursor:pointer;transition:background .07s;border-bottom:1px solid #E5E8EF;
+ }
+ .rpick-item:last-child { border-bottom:none; }
+ .rpick-item:hover { background:#ffffff; }
+ .rpick-item.rpick-sel { background:#ffffff; }
+ .drop-srch {
+ width:100%;padding:9px 13px;background:#ffffff;border:none;
+ font-size:11px;font-family:inherit;color:#002583;outline:none;box-sizing:border-box;
+ }
+ .drop-srch:focus { background:#ffffff; }
+
+ /* ── Scope toggle buttons ── */
+ .scope-btn {
+ flex:1;display:flex;align-items:center;justify-content:center;gap:5px;
+ padding:8px 10px;border-radius:9px;border:1.5px solid #E5E8EF;
+ background:#ffffff;font-size:11px;font-weight:600;color:#002583;
+ cursor:pointer;font-family:inherit;transition:all .12s;
+ }
+ .scope-btn:hover { border-color:#E5E8EF;color:#002583;background:#ffffff; }
+ .scope-btn.s-on { border-color:#002583;background:#002583;color:#fff; }
+
+ /* ── Topic tiles ── */
+ .topic-tile {
+ border:1.5px solid #E5E8EF;border-radius:10px;background:#fff;
+ padding:10px;cursor:pointer;
+ transition:border-color .13s,background .13s;user-select:none;
+ }
+ .topic-tile:hover:not(.sel) { background:#ffffff;border-color:#E5E8EF; }
+ .topic-tile.sel { border-color:#002583;background:#ffffff; }
+ .cbox {
+ width:14px;height:14px;border-radius:4px;border:1.5px solid #E5E8EF;
+ display:flex;align-items:center;justify-content:center;
+ flex-shrink:0;transition:background .1s,border-color .1s;
+ }
+ .cbox.sel { background:#002583;border-color:#002583; }
+
+ /* ── Tag input ── */
+ .tag-wrap {
+ display:flex;flex-wrap:wrap;gap:4px;align-items:center;
+ min-height:32px;padding:4px 8px;
+ border:1.5px solid #E5E8EF;border-radius:8px;background:#ffffff;cursor:text;
+ transition:border-color .12s,box-shadow .12s,background .12s;
+ }
+ .tag-wrap.a-f { border-color:#002583;background:#fff;box-shadow:0 0 0 2px rgba(27,48,104,.07); }
+ .tag-wrap.b-f { border-color:#002583;background:#fff;box-shadow:0 0 0 2px rgba(250,166,51,.10); }
+ .tag-chip {
+ display:inline-flex;align-items:center;gap:3px;
+ padding:2px 7px;border-radius:20px;font-size:10px;font-weight:600;white-space:nowrap;
+ }
+ .tag-chip.a { background:#ffffff;color:#002583; }
+ .tag-chip.b { background:#ffffff;color:#002583; }
+ .tag-chip button { background:none;border:none;cursor:pointer;color:inherit;padding:0;line-height:1;font-size:12px;opacity:.5; }
+ .tag-chip button:hover { opacity:1; }
+ .tag-field { font-size:10px;border:none;outline:none;background:transparent;font-family:inherit;color:#002583;min-width:60px;flex:1; }
+ .tag-field::placeholder { color:#002583; }
+
+ @keyframes pulsedot { 0%,100%{opacity:1} 50%{opacity:.35} }
+ .divider { height:1px;background:#E5E8EF;margin:14px 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="flex flex-col h-full overflow-hidden" style="background:#ffffff;"
+ x-data="customScope()" x-init="init()">
+
+ {# ── Header — title left, Run-comparison bubble pinned top-right. ── #}
+ <div style="background:#fff;border-bottom:1px solid #E5E8EF;padding:12px 24px;flex-shrink:0;display:flex;align-items:center;gap:12px;">
+ <div style="flex:1;">
+ <p style="font-size:14px;font-weight:800;color:#002583;margin:0;letter-spacing:-.02em;">Comparison</p>
+ <p style="font-size:11px;color:#002583;margin:0;">Pick any two regulations, then run the AI workflow to see every obligation with verbatim evidence and risk score.</p>
+ </div>
+ <button type="submit" form="scope-form" :disabled="!canRun"
+         @click="if (canRun) showLoading = true"
+         :style="canRun ? { opacity: '1', cursor: 'pointer' } : { opacity: '0.45', cursor: 'not-allowed' }"
+         style="display:inline-flex;align-items:center;gap:7px;padding:8px 18px;border-radius:50px;border:none;font-family:inherit;font-size:12px;font-weight:700;color:#fff;background:#002583;box-shadow:0 2px 10px rgba(0,37,131,.22);transition:opacity .15s;">
+   <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.125A59.769 59.769 0 0121.485 12 59.768 59.768 0 013.27 20.875L5.999 12zm0 0h7.5"/></svg>
+   Run comparison
+ </button>
+ </div>
+
+ {% if same_jurisdiction %}
+ <div style="margin:12px 24px 0;padding:10px 14px;background:#FFFBEB;border:1px solid #FFE9A8;border-radius:10px;display:flex;align-items:flex-start;gap:10px;">
+  <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#7A5500" stroke-width="2" style="flex-shrink:0;margin-top:1px;"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+  <div>
+   <p style="font-size:11.5px;font-weight:700;color:#7A5500;margin:0 0 2px;">Same-jurisdiction comparison</p>
+   <p style="font-size:11px;color:#7A5500;margin:0;line-height:1.5;">Both regulations are from <strong>{{ reg_a.get_jurisdiction_display }}</strong>. This tool is designed for cross-jurisdictional analysis — same-jurisdiction comparisons may produce low-quality results because the regulations often cover different domains within the same regime. Consider picking one regulation from a different country.</p>
+  </div>
+ </div>
+ {% endif %}
+
+ {# ── Single card layout ── #}
+ <form id="scope-form" method="post" action="{% url 'comparison-run' %}"
+ style="flex:1;min-height:0;display:flex;align-items:stretch;justify-content:center;padding:16px 24px 76px;">
+ {% csrf_token %}
+ <input type="hidden" name="pair_key" value="custom">
+ <input type="hidden" name="scope_mode" :value="scopeMode">
+ <input type="hidden" name="include_orphans" :value="includeOrphans ? '1' : '0'">
+ <input type="hidden" name="reg_a_pk" value="{{ reg_a_pk }}">
+ <input type="hidden" name="reg_b_pk" value="{{ reg_b_pk }}">
+
+ {# The card #}
+ <div style="display:flex;width:100%;max-width:900px;background:#fff;border-radius:18px;border:1px solid #E5E8EF;box-shadow:0 2px 16px rgba(27,48,104,.07);overflow:hidden;">
+
+ {# ── LEFT PANEL ── #}
+ <div style="width:272px;flex-shrink:0;border-right:1px solid #E5E8EF;display:flex;flex-direction:column;overflow-y:auto;padding:20px;">
+
+ {# Reg A #}
+ <p style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#002583;margin:0 0 10px;">Select Regulations</p>
+
+ <div style="display:flex;align-items:center;gap:5px;margin-bottom:6px;">
+ <div style="width:8px;height:8px;border-radius:50%;background:#002583;flex-shrink:0;"></div>
+ <span style="font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#002583;">Regulation A</span>
+ </div>
+ <div style="position:relative;margin-bottom:10px;" id="wrap-a">
+ <button type="button" id="trig-a" class="rpick-trig{% if reg_a %} a-sel{% endif %}" onclick="toggleDrop('a')">
+ {% if reg_a %}
+ {% if flag_a %}<img src="https://flagcdn.com/w40/{{ flag_a }}.png" style="width:20px;height:14px;border-radius:2px;object-fit:cover;flex-shrink:0;border:1px solid #E5E8EF;">{% endif %}
+ <div style="flex:1;min-width:0;">
+ <p style="font-size:11px;font-weight:700;color:#002583;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.3;">{{ reg_a.name }}</p>
+ <p style="font-size:9px;color:#002583;margin:1px 0 0;">{{ reg_a.chunk_count }} sections</p>
+ </div>
+ <span onclick="event.stopPropagation();clearReg('a')" style="color:#002583;cursor:pointer;font-size:17px;line-height:1;flex-shrink:0;" title="Clear">&times;</span>
+ {% else %}
+ <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="2" style="flex-shrink:0;"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+ <span style="flex:1;font-size:11px;color:#002583;">Search regulations…</span>
+ <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="#ffffff" stroke-width="2.5" style="flex-shrink:0;"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg>
+ {% endif %}
+ </button>
+ <div id="drop-a" class="rpick-drop" style="display:none;">
+ <input id="search-a" type="text" class="drop-srch" placeholder="Search regulations…" autocomplete="off" oninput="filterDrop('a')">
+ <div id="drop-list-a" class="rpick-drop-list"></div>
+ </div>
+ </div>
+
+ {# VS #}
+ <div style="display:flex;align-items:center;gap:8px;margin:2px 0 10px;">
+ <div style="flex:1;height:1px;background:#E5E8EF;"></div>
+ <span style="font-size:9px;font-weight:900;color:#ffffff;letter-spacing:.04em;">vs</span>
+ <div style="flex:1;height:1px;background:#E5E8EF;"></div>
+ </div>
+
+ {# Reg B #}
+ <div style="display:flex;align-items:center;gap:5px;margin-bottom:6px;">
+ <div style="width:8px;height:8px;border-radius:50%;background:#002583;flex-shrink:0;"></div>
+ <span style="font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#002583;">Regulation B</span>
+ </div>
+ <div style="position:relative;" id="wrap-b">
+ <button type="button" id="trig-b" class="rpick-trig{% if reg_b %} b-sel{% endif %}" onclick="toggleDrop('b')">
+ {% if reg_b %}
+ {% if flag_b %}<img src="https://flagcdn.com/w40/{{ flag_b }}.png" style="width:20px;height:14px;border-radius:2px;object-fit:cover;flex-shrink:0;border:1px solid #E5E8EF;">{% endif %}
+ <div style="flex:1;min-width:0;">
+ <p style="font-size:11px;font-weight:700;color:#002583;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.3;">{{ reg_b.name }}</p>
+ <p style="font-size:9px;color:#002583;margin:1px 0 0;">{{ reg_b.chunk_count }} sections</p>
+ </div>
+ <span onclick="event.stopPropagation();clearReg('b')" style="color:#002583;cursor:pointer;font-size:17px;line-height:1;flex-shrink:0;" title="Clear">&times;</span>
+ {% else %}
+ <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="2" style="flex-shrink:0;"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+ <span style="flex:1;font-size:11px;color:#002583;">Search regulations…</span>
+ <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="#ffffff" stroke-width="2.5" style="flex-shrink:0;"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg>
+ {% endif %}
+ </button>
+ <div id="drop-b" class="rpick-drop" style="display:none;">
+ <input id="search-b" type="text" class="drop-srch" placeholder="Search regulations…" autocomplete="off" oninput="filterDrop('b')">
+ <div id="drop-list-b" class="rpick-drop-list"></div>
+ </div>
+ </div>
+
+ {% if has_regs %}
+ <div class="divider"></div>
+
+ {# Scope toggle #}
+ <p style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#002583;margin:0 0 8px;">Scope</p>
+ <div style="display:flex;gap:6px;margin-bottom:14px;">
+ <button type="button" class="scope-btn" :class="scopeMode==='full'?'s-on':''" @click="scopeMode='full'">
+ <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+ Full
+ </button>
+ <button type="button" class="scope-btn" :class="scopeMode==='topics'?'s-on':''" @click="scopeMode='topics'">
+ <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12"/></svg>
+ Topics
+ </button>
+ </div>
+
+ {% endif %}
+
+ </div>
+
+ {# ── RIGHT PANEL ── #}
+ <div style="flex:1;min-width:0;overflow:hidden;position:relative;">
+
+ {# Empty state — distinguishes 0-selected from 1-selected. #}
+ {% if not has_regs %}
+ <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:40px;">
+ <div style="width:52px;height:52px;border-radius:50%;background:#ffffff;display:flex;align-items:center;justify-content:center;">
+ <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/></svg>
+ </div>
+ <div style="text-align:center;">
+ {% if reg_a and not reg_b %}
+ <p style="font-size:14px;font-weight:700;color:#002583;margin:0 0 5px;">Reg A selected — now pick Reg B</p>
+ <p style="font-size:11px;color:#002583;margin:0;max-width:280px;line-height:1.6;"><strong>{{ reg_a.name|truncatechars:60 }}</strong> is set as Regulation A. Open the Regulation B picker on the left to continue.</p>
+ {% elif reg_b and not reg_a %}
+ <p style="font-size:14px;font-weight:700;color:#002583;margin:0 0 5px;">Reg B selected — now pick Reg A</p>
+ <p style="font-size:11px;color:#002583;margin:0;max-width:280px;line-height:1.6;"><strong>{{ reg_b.name|truncatechars:60 }}</strong> is set as Regulation B. Open the Regulation A picker on the left to continue.</p>
+ {% else %}
+ <p style="font-size:14px;font-weight:700;color:#002583;margin:0 0 5px;">Select two regulations</p>
+ <p style="font-size:11px;color:#002583;margin:0;max-width:220px;line-height:1.6;">Use the search pickers on the left to choose Regulation A and Regulation B.</p>
+ {% endif %}
+ </div>
+ </div>
+
+ {% else %}
+
+ {# Full mode #}
+ <div x-show="scopeMode==='full'" x-cloak style="position:absolute;inset:0;">
+ <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:40px;">
+ <div style="display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;">
+ <div style="width:54px;height:54px;border-radius:50%;background:#ffffff;display:flex;align-items:center;justify-content:center;">
+ <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+ </div>
+ <p style="font-size:16px;font-weight:800;color:#002583;margin:0;letter-spacing:-.02em;">Full Comparison</p>
+ <p style="font-size:12px;color:#002583;margin:0;line-height:1.6;max-width:240px;">Every clause across all privacy principles</p>
+ </div>
+ </div>
+ </div>
+
+ {# Topics mode #}
+ <div x-show="scopeMode==='topics'" x-cloak style="position:absolute;inset:0;">
+ <div style="width:100%;height:100%;display:flex;flex-direction:column;overflow:hidden;">
+ {% if scan.both_covered %}
+ <div style="padding:18px 20px 10px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+ <p style="font-size:11px;font-weight:700;color:#002583;margin:0;">Choose topics</p>
+ <div style="display:flex;gap:5px;">
+ <button type="button" @click="selectAll()" style="font-size:10px;font-weight:700;color:#002583;background:#ffffff;border:none;cursor:pointer;padding:4px 10px;border-radius:6px;font-family:inherit;">All</button>
+ <button type="button" @click="clearAll()" style="font-size:10px;font-weight:700;color:#002583;background:#ffffff;border:none;cursor:pointer;padding:4px 10px;border-radius:6px;font-family:inherit;">None</button>
+ </div>
+ </div>
+ <div style="flex:1;min-height:0;overflow-y:auto;padding:0 20px 16px;">
+ <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:12px;">
+ {% for topic in scan.both_covered %}
+ <div class="topic-tile" data-tile id="tile-{{ topic.principle_id }}"
+ onclick="toggleTile(this,'{{ topic.principle_id }}')">
+ <input type="checkbox" name="topics" value="{{ topic.principle_id }}"
+ data-pairs="{{ topic.estimated_pairs }}"
+ id="cb-{{ topic.principle_id }}"
+ @change="onTopicToggle()"
+ style="display:none;">
+ <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:5px;margin-bottom:7px;">
+ <div style="display:flex;align-items:center;gap:6px;">
+ <div class="cbox" id="chkbox-{{ topic.principle_id }}"></div>
+ <span style="font-size:10px;font-weight:700;color:#002583;line-height:1.3;">{{ topic.label }}</span>
+ </div>
+ {# Low-coverage badge: when one side has < 3 chunks the LLM is likely to manufacture parallels. #}
+ {% if topic.articles_a < 3 or topic.articles_b < 3 %}
+ <span style="font-size:8px;font-weight:800;padding:2px 5px;border-radius:4px;background:#FFF7E0;color:#7A5500;border:1px solid #FFE9A8;white-space:nowrap;flex-shrink:0;" title="Low coverage on one side ({{ topic.articles_a }}A / {{ topic.articles_b }}B chunks). The LLM may struggle to find genuine parallels.">⚠ low</span>
+ {% else %}
+ <span style="font-size:8px;font-weight:700;padding:2px 5px;border-radius:4px;background:#ffffff;color:#002583;white-space:nowrap;flex-shrink:0;">~{{ topic.estimated_pairs }}p</span>
+ {% endif %}
+ </div>
+ <div style="display:flex;flex-direction:column;gap:3px;">
+ <div style="display:flex;align-items:center;gap:5px;">
+ <span style="font-size:8px;font-weight:800;color:#002583;width:7px;flex-shrink:0;">A</span>
+ <div style="flex:1;height:3px;background:#ffffff;border-radius:2px;overflow:hidden;"><div style="height:100%;width:{{ topic.bar_width_a }}%;background:#002583;border-radius:2px;"></div></div>
+ <span style="font-size:8px;color:#002583;width:14px;text-align:right;flex-shrink:0;">{{ topic.articles_a }}</span>
+ </div>
+ <div style="display:flex;align-items:center;gap:5px;">
+ <span style="font-size:8px;font-weight:800;color:#002583;width:7px;flex-shrink:0;">B</span>
+ <div style="flex:1;height:3px;background:#ffffff;border-radius:2px;overflow:hidden;"><div style="height:100%;width:{{ topic.bar_width_b }}%;background:#002583;border-radius:2px;"></div></div>
+ <span style="font-size:8px;color:#002583;width:14px;text-align:right;flex-shrink:0;">{{ topic.articles_b }}</span>
+ </div>
+ </div>
+ </div>
+ {% endfor %}
+ </div>
+
+ {% if scan.only_in_a or scan.only_in_b %}
+ <div style="border-top:1px solid #E5E8EF;padding-top:12px;">
+ <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+ <p style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:#002583;margin:0;">Only in one regulation</p>
+ <label style="display:flex;align-items:center;gap:5px;cursor:pointer;">
+ <input type="checkbox" x-model="includeOrphans" style="accent-color:#002583;width:12px;height:12px;">
+ <span style="font-size:10px;color:#002583;font-weight:600;">Include in analysis</span>
+ </label>
+ </div>
+ <div style="display:flex;flex-wrap:wrap;gap:5px;">
+ {% for t in scan.only_in_a %}
+ <div style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;background:#002583;">
+ <span style="font-size:10px;font-weight:600;color:#fff;">{{ t.label }}</span>
+ <span style="font-size:9px;color:rgba(255,255,255,.5);">A</span>
+ </div>
+ {% endfor %}
+ {% for t in scan.only_in_b %}
+ <div style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;background:#002583;">
+ <span style="font-size:10px;font-weight:600;color:#fff;">{{ t.label }}</span>
+ <span style="font-size:9px;color:rgba(255,255,255,.55);">B</span>
+ </div>
+ {% endfor %}
+ </div>
+ </div>
+ {% endif %}
+ </div>
+ {% else %}
+ <div style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;padding:40px;text-align:center;color:#002583;">
+ <p style="font-size:12px;font-weight:600;margin:0;">No shared topics detected</p>
+ <p style="font-size:11px;margin:0;">Switch to Full comparison.</p>
+ </div>
+ {% endif %}
+ </div>{# /inner flex wrapper #}
+ </div>
+
+ {% endif %}
+ </div>
+
+ </div>
+ </form>
+
+ {# Loading overlay with live elapsed-time counter (synchronous run). #}
+ <div x-show="showLoading" x-cloak
+      style="position:fixed;inset:0;background:rgba(0,37,131,.75);backdrop-filter:blur(4px);z-index:9999;display:flex;align-items:center;justify-content:center;">
+   <div style="background:#fff;border-radius:18px;padding:32px 40px;text-align:center;min-width:340px;box-shadow:0 12px 40px rgba(0,0,0,.25);">
+     <div style="width:48px;height:48px;border:4px solid #E5E8EF;border-top-color:#002583;border-radius:50%;margin:0 auto 18px;animation:spin 0.9s linear infinite;"></div>
+     <p style="font-size:14px;font-weight:700;color:#002583;margin:0 0 4px;">Running comparison</p>
+     <p style="font-size:11px;color:#002583;margin:0 0 16px;line-height:1.55;">
+       Typical run takes 1–3 minutes. Don't close this tab.
+     </p>
+     <p style="font-size:26px;font-weight:800;color:#002583;margin:0;letter-spacing:.02em;font-variant-numeric:tabular-nums;" x-text="elapsedDisplay"></p>
+     <p style="font-size:9px;font-weight:700;color:#7B8499;text-transform:uppercase;letter-spacing:.09em;margin:3px 0 0;">elapsed</p>
+   </div>
+ </div>
+ <style>@keyframes spin { to { transform:rotate(360deg); } }</style>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const ALL_REGS = [
+ {% for r in all_regs %}
+ { id:"{{ r.pk }}", name:"{{ r.name|escapejs }}", jur:"{{ r.get_jurisdiction_display|escapejs }}", jurCode:"{{ r.jurisdiction }}", chunks:{{ r.chunk_count }} }{% if not forloop.last %},{% endif %}
+ {% endfor %}
+];
+const FLAG_CDN = { bahrain:'bh', india:'in', kuwait:'kw', saudi:'sa', uae:'ae', eu:'eu', bbk:'bh' };
+const CUR_A = "{{ reg_a_pk }}";
+const CUR_B = "{{ reg_b_pk }}";
+let dropOpen = { a:false, b:false };
+
+function flagTag(jurCode) {
+ const code = FLAG_CDN[jurCode];
+ if (!code) return '';
+ return `<img src="https://flagcdn.com/w40/${code}.png" style="width:17px;height:11px;border-radius:2px;object-fit:cover;flex-shrink:0;border:1px solid #E5E8EF;" onerror="this.style.display='none'">`;
+}
+function buildDropList(side) {
+ const q = (document.getElementById(`search-${side}`)?.value || '').toLowerCase().trim();
+ const exclude = side === 'a' ? CUR_B : CUR_A;
+ const cur = side === 'a' ? CUR_A : CUR_B;
+ const filtered = ALL_REGS.filter(r => r.id !== exclude && (r.name.toLowerCase().includes(q) || r.jur.toLowerCase().includes(q)));
+ if (!filtered.length) return '<p style="padding:14px;font-size:11px;color:#002583;text-align:center;">No regulations found</p>';
+ const jurMap = {};
+ filtered.forEach(r => { (jurMap[r.jurCode] = jurMap[r.jurCode] || []).push(r); });
+ let html = '';
+ Object.entries(jurMap).forEach(([jc, regs]) => {
+ html += `<div class="rpick-jur">${flagTag(jc)}<span>${regs[0].jur}</span></div>`;
+ regs.forEach(r => {
+ const isSel = r.id === cur;
+ const nm = r.name.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+ html += `<div class="rpick-item${isSel?' rpick-sel':''}" onclick="selectReg('${side}','${r.id}')">
+ ${flagTag(jc)}
+ <div style="flex:1;min-width:0;"><p style="font-size:11px;font-weight:600;color:#002583;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${nm}</p><p style="font-size:9px;color:#002583;margin:0;">${r.chunks} sections · ${r.jur}</p></div>
+ ${isSel ? '<svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>' : ''}
+ </div>`;
+ });
+ });
+ return html;
+}
+function toggleDrop(side) { dropOpen[side] ? closeDrop(side) : openDrop(side); }
+function openDrop(side) {
+ const other = side === 'a' ? 'b' : 'a';
+ if (dropOpen[other]) closeDrop(other);
+ dropOpen[side] = true;
+ const drop = document.getElementById(`drop-${side}`);
+ const trig = document.getElementById(`trig-${side}`);
+ const list = document.getElementById(`drop-list-${side}`);
+ const srch = document.getElementById(`search-${side}`);
+ if (list) list.innerHTML = buildDropList(side);
+ if (drop) drop.style.display = 'block';
+ if (trig) trig.classList.add(side === 'a' ? 'a-open' : 'b-open');
+ if (srch) setTimeout(() => srch.focus(), 40);
+}
+function filterDrop(side) {
+ const list = document.getElementById(`drop-list-${side}`);
+ if (list) list.innerHTML = buildDropList(side);
+}
+function closeDrop(side) {
+ dropOpen[side] = false;
+ const drop = document.getElementById(`drop-${side}`);
+ const trig = document.getElementById(`trig-${side}`);
+ if (drop) drop.style.display = 'none';
+ if (trig) trig.classList.remove('a-open','b-open');
+}
+function selectReg(side, pk) {
+ const a = side === 'a' ? pk : CUR_A, b = side === 'b' ? pk : CUR_B;
+ const params = [];
+ if (a) params.push('reg_a_pk=' + a);
+ if (b) params.push('reg_b_pk=' + b);
+ window.location.href = '{% url "comparison" %}' + (params.length ? '?' + params.join('&') : '');
+}
+function clearReg(side) {
+ const other = side === 'a' ? CUR_B : CUR_A;
+ const key = side === 'a' ? 'reg_b_pk' : 'reg_a_pk';
+ window.location.href = '{% url "comparison" %}' + (other ? `?${key}=${other}` : '');
+}
+document.addEventListener('click', e => {
+ if (dropOpen.a && !e.target.closest('#wrap-a')) closeDrop('a');
+ if (dropOpen.b && !e.target.closest('#wrap-b')) closeDrop('b');
+}, true);
+
+function toggleTile(tile, id) {
+ const cb = document.getElementById('cb-'+id), box = document.getElementById('chkbox-'+id);
+ if (!cb) return;
+ cb.checked = !cb.checked; tile.classList.toggle('sel',cb.checked);
+ if (box) box.classList.toggle('sel',cb.checked);
+ cb.dispatchEvent(new Event('change',{bubbles:true}));
+}
+
+function customScope() {
+ return {
+ scopeMode:'full', includeOrphans:false,
+ // Reactive counter — selected topics. canRun depends on this so Alpine
+ // re-evaluates the disabled state the instant a topic is ticked. Previous
+ // version queried the DOM inside canRun, which Alpine doesn't track —
+ // that was the "have to toggle Full→Topics to enable Run" bug.
+ selectedTopicCount: 0,
+ showLoading: false,
+ elapsedDisplay: '0s',
+ _timerId: null,
+ _started: 0,
+ get canRun() {
+ if (!{{ has_regs|yesno:"true,false" }}) return false;
+ if (this.scopeMode==='full') return true;
+ return this.selectedTopicCount > 0;
+ },
+ init() {
+ this.onTopicToggle();
+ // When the user actually submits, start the elapsed timer.
+ const form = document.getElementById('scope-form');
+ if (form) {
+ form.addEventListener('submit', () => {
+ if (!this.canRun) return;
+ this.showLoading = true;
+ this._started = Date.now();
+ this._timerId = setInterval(() => {
+ const s = Math.floor((Date.now() - this._started) / 1000);
+ this.elapsedDisplay = s < 60 ? `${s}s` : `${Math.floor(s/60)}m ${s%60}s`;
+ }, 250);
+ });
+ }
+ },
+ onTopicToggle() {
+ this.selectedTopicCount =
+ document.querySelectorAll('input[name="topics"]:checked').length;
+ },
+ selectAll() {
+ this.scopeMode='topics';
+ document.querySelectorAll('[data-tile]').forEach(tile=>{
+ const id=tile.id.replace('tile-',''); const cb=document.getElementById('cb-'+id), box=document.getElementById('chkbox-'+id);
+ if(cb&&!cb.checked){cb.checked=true;tile.classList.add('sel');if(box)box.classList.add('sel');}
+ }); this.onTopicToggle();
+ },
+ clearAll() {
+ document.querySelectorAll('[data-tile]').forEach(tile=>{
+ const id=tile.id.replace('tile-',''); const cb=document.getElementById('cb-'+id), box=document.getElementById('chkbox-'+id);
+ if(cb){cb.checked=false;tile.classList.remove('sel');if(box)box.classList.remove('sel');}
+ }); this.onTopicToggle();
+ },
+ };
+}
+</script>
+{% endblock %}

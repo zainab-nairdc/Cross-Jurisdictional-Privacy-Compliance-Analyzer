@@ -1,0 +1,135 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Analyst Comparison — CJPCA{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="{% static 'js/d3.v7.min.js' %}"></script>
+<script src="{% static 'js/equivalency_arc.js' %}"></script>
+{% endblock %}
+
+{% block content %}
+<div class="flex h-full bg-gray-50 overflow-hidden">
+
+ <div class="flex flex-col flex-1 min-w-0 overflow-hidden">
+
+ {# Top bar #}
+ <div class="bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between flex-shrink-0">
+ <div>
+ <h1 style="font-size:15px;font-weight:700;color:#002583;">Analyst comparison</h1>
+ <p style="font-size:12px;color:#002583;margin-top:1px;">
+ Pick two regulations and a topic, run the AI workflow inline, see every obligation it produces with verbatim evidence + AI risk score.
+ </p>
+ </div>
+ <a href="{% url 'comparison' %}" style="font-size:11px;color:#002583;text-decoration:underline;">
+ ← Back to comparison index
+ </a>
+ </div>
+
+ {% comment %}
+ Form submits via HTMX so the user gets an immediate spinner instead of
+ a 3-minute blank-page hang. hx-target swaps in the rendered results into
+ #analyst-results below. hx-disabled-elt disables the submit button while
+ the request is in flight to prevent double-submits.
+ {% endcomment %}
+ <form method="post"
+ hx-post="{% url 'comparison-analyst' %}"
+ hx-target="#analyst-results"
+ hx-swap="innerHTML"
+ hx-indicator="#analyst-spinner"
+ hx-disabled-elt="find button"
+ class="bg-white border-b border-gray-100 px-6 py-4 flex-shrink-0 flex items-end gap-3 flex-wrap">
+ {% csrf_token %}
+ <div style="flex:1;min-width:240px;">
+ <label style="display:block;font-size:10px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">Regulation A</label>
+ <select name="reg_a_pk" required
+ style="width:100%;padding:8px 10px;border:1px solid #E5E8EF;border-radius:8px;font-size:12px;background:#ffffff;">
+ <option value="">— Select —</option>
+ {% for r in regulations %}
+ <option value="{{ r.pk }}" {% if reg_a_pk|stringformat:"s" == r.pk|stringformat:"s" %}selected{% endif %}>
+ [{{ r.jurisdiction|capfirst|slice:":3" }}] {{ r.name|truncatechars:55 }}
+ </option>
+ {% endfor %}
+ </select>
+ </div>
+
+ <div style="display:flex;align-items:center;justify-content:center;padding-bottom:8px;">
+ <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#002583" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/></svg>
+ </div>
+
+ <div style="flex:1;min-width:240px;">
+ <label style="display:block;font-size:10px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">Regulation B</label>
+ <select name="reg_b_pk" required
+ style="width:100%;padding:8px 10px;border:1px solid #E5E8EF;border-radius:8px;font-size:12px;background:#ffffff;">
+ <option value="">— Select —</option>
+ {% for r in regulations %}
+ <option value="{{ r.pk }}" {% if reg_b_pk|stringformat:"s" == r.pk|stringformat:"s" %}selected{% endif %}>
+ [{{ r.jurisdiction|capfirst|slice:":3" }}] {{ r.name|truncatechars:55 }}
+ </option>
+ {% endfor %}
+ </select>
+ </div>
+
+ {# Topic + subcategory cascade — picking a topic populates the subcategory list client-side from taxonomy_map_json. #}
+ <div style="min-width:180px;" x-data="{ topic: '{{ topic|escapejs }}', subcategory: '{{ subcategory|escapejs }}', subs: {{ taxonomy_map_json|safe }} }">
+ <label style="display:block;font-size:10px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">Topic</label>
+ <select name="topic" x-model="topic"
+ @change="subcategory = ''"
+ style="width:100%;padding:8px 10px;border:1px solid #E5E8EF;border-radius:8px;font-size:12px;background:#ffffff;">
+ <option value="">— Any —</option>
+ {% for code, label in topic_choices %}
+ <option value="{{ code }}">{{ label }}</option>
+ {% endfor %}
+ </select>
+
+ <label style="display:block;font-size:10px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:.05em;margin:8px 0 4px;">Subcategory</label>
+ {% comment %}
+ Render every (topic, subcategory) option server-side and let Alpine x-show
+ filter by current topic. <template x-for> inside <select> isn't reliable —
+ the HTML5 parser hoists <template> out of <select> before Alpine boots.
+ {% endcomment %}
+ <select name="subcategory" x-model="subcategory" :disabled="!topic"
+ style="width:100%;padding:8px 10px;border:1px solid #E5E8EF;border-radius:8px;font-size:12px;background:#ffffff;">
+ <option value="">— Any —</option>
+ {% for t_code, s_code, s_label in taxonomy_subs_flat %}
+ <option value="{{ s_code }}" x-show="topic === '{{ t_code }}'">{{ s_label }}</option>
+ {% endfor %}
+ </select>
+ </div>
+
+ <button type="submit"
+ style="padding:9px 18px;border-radius:8px;background:#002583;color:#fff;font-size:13px;font-weight:600;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+ <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 010 1.972l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z"/></svg>
+ Run comparison
+ </button>
+ </form>
+
+ {# HTMX-driven loading state — visible only during the in-flight request #}
+ <div id="analyst-spinner" class="htmx-indicator" style="flex-shrink:0;">
+ <div style="background:#ffffff;border-bottom:1px solid #E5E8EF;padding:14px 20px;display:flex;align-items:center;gap:14px;">
+ <div style="width:28px;height:28px;border:3px solid #002583;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;flex-shrink:0;"></div>
+ <div style="flex:1;min-width:0;">
+ <p style="font-size:12px;font-weight:700;color:#002583;margin:0 0 2px;">Running comparison through the AI workflow…</p>
+ <p style="font-size:10px;color:#002583;margin:0;line-height:1.4;">
+ Retrieving chunks → Claude Haiku 4.5 via OpenRouter → NLI verification → grounding score per row.
+ Typical run takes <strong>1–3 minutes</strong>. Don't refresh — your browser is waiting on the result.
+ </p>
+ </div>
+ </div>
+ </div>
+
+ <style>
+ @keyframes spin { to { transform: rotate(360deg); } }
+ .htmx-indicator { display: none; }
+ .htmx-request .htmx-indicator { display: block; }
+ .htmx-request.htmx-indicator { display: block; }
+ </style>
+
+ <div id="analyst-results" class="flex-1 overflow-y-auto px-6 py-5">
+ {% include 'partials/_analyst_comparison_results.html' %}
+ </div>
+
+ </div>
+</div>
+{% endblock %}

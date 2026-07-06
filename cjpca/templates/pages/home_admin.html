@@ -1,0 +1,357 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Home — Admin{% endblock %}
+
+{% block extra_head %}
+<style>
+ .an-card{background:#fff;border:1px solid #E5E8EF;border-radius:14px;overflow:hidden;
+  box-shadow:0 1px 3px rgba(27,48,104,0.06),0 1px 2px rgba(0,0,0,0.03);}
+ .an-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;
+  color:#002583;display:block;}
+ .an-track{height:4px;border-radius:2px;background:#F0F3F8;overflow:hidden;margin-top:10px;}
+ .an-fill{height:100%;border-radius:2px;transition:width .6s cubic-bezier(.4,0,.2,1);}
+ @keyframes kpi-in{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+ .kpi-card{animation:kpi-in .35s ease both;}
+ .kpi-card:nth-child(2){animation-delay:.07s;}
+ .kpi-card:nth-child(3){animation-delay:.14s;}
+ .kpi-card:nth-child(4){animation-delay:.21s;}
+ .qa-row{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #EEF1F6;
+  text-decoration:none;color:inherit;transition:background .12s;}
+ .qa-row:last-child{border-bottom:none;}
+ .qa-row:hover{background:#F7F9FC;}
+ .pill{padding:2px 8px;border-radius:5px;font-size:9px;font-weight:700;white-space:nowrap;}
+ .rpill{padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700;white-space:nowrap;}
+ .role-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;
+  font-size:9px;font-weight:700;background:#E5E8EF;color:#002583;text-transform:uppercase;
+  letter-spacing:.06em;}
+ .ev-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:6px;}
+ .role-bar{height:6px;border-radius:3px;background:#E5E8EF;overflow:hidden;}
+ .role-bar > div{height:100%;background:#002583;}
+ @keyframes pulsedot{0%,100%{opacity:1}50%{opacity:.35}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="flex flex-col h-full overflow-hidden" style="background:#F7F9FC;">
+
+ <div style="background:#fff;border-bottom:1px solid #E5E8EF;padding:14px 24px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:space-between;">
+  <div>
+   <h1 style="font-size:16px;font-weight:800;color:#002583;margin:0;letter-spacing:-.025em;
+    display:flex;align-items:center;gap:8px;">
+    {{ greeting }}{% if request.user.is_authenticated %}, {{ request.user.first_name|default:request.user.username }}{% endif %}
+    <span class="role-chip">Admin</span>
+   </h1>
+   <p style="font-size:11px;color:#6B7280;margin:2px 0 0;">System health, ingestion, and access control</p>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;">
+   <a href="{% url 'history' %}"
+    style="display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;
+     background:#fff;color:#002583;font-size:11px;font-weight:600;text-decoration:none;
+     border:1px solid #E5E8EF;">
+    <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25"/></svg>
+    Audit log
+   </a>
+   <a href="{% url 'library-regulations' %}"
+    style="display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;
+     background:#002583;color:#fff;font-size:11px;font-weight:700;text-decoration:none;
+     box-shadow:0 2px 6px rgba(27,48,104,0.28);">
+    <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
+    Upload document
+   </a>
+  </div>
+ </div>
+
+ <div style="flex:1;overflow:hidden;padding:14px 20px 10px;display:flex;flex-direction:column;
+  gap:10px;min-height:0;">
+
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;flex-shrink:0;">
+
+   <a href="{% url 'library-regulations' %}" class="an-card kpi-card" style="text-decoration:none;
+    padding:14px 16px;border-left:4px solid #002583;display:block;">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+     <span class="an-label">Documents</span>
+     <div style="width:30px;height:30px;border-radius:8px;background:#E5E8EF;display:flex;
+      align-items:center;justify-content:center;">
+      <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
+     </div>
+    </div>
+    <div style="display:flex;align-items:baseline;gap:5px;margin-top:6px;">
+     <span data-countup="{{ docs_total }}" style="font-size:28px;font-weight:800;line-height:1;
+      color:#002583;letter-spacing:-.03em;">{{ docs_total }}</span>
+     <span style="font-size:11px;color:#6B7280;">total</span>
+    </div>
+    <p style="font-size:10px;color:#6B7280;margin-top:6px;margin-bottom:0;">
+     {{ docs_indexed }} indexed · {{ docs_processing }} processing
+     {% if docs_failed %}· <span style="color:#D93939;font-weight:700;">{{ docs_failed }} failed</span>{% endif %}
+    </p>
+   </a>
+
+   <a href="{% url 'system-monitoring' %}" class="an-card kpi-card" style="text-decoration:none;
+    padding:14px 16px;border-left:4px solid {% if jobs_active_count %}#FFB800{% else %}#002583{% endif %};display:block;">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+     <span class="an-label" style="display:flex;align-items:center;gap:5px;">
+      Active ingestion
+      {% if jobs_active_count %}<span style="display:inline-block;width:5px;height:5px;border-radius:50%;
+       background:#FFB800;animation:pulsedot 1.4s ease-in-out infinite;"></span>{% endif %}
+     </span>
+     <div style="width:30px;height:30px;border-radius:8px;background:{% if jobs_active_count %}#FFF6E0{% else %}#E5E8EF{% endif %};
+      display:flex;align-items:center;justify-content:center;">
+      <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="{% if jobs_active_count %}#B07A00{% else %}#002583{% endif %}" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
+     </div>
+    </div>
+    <div style="display:flex;align-items:baseline;gap:5px;margin-top:6px;">
+     <span data-countup="{{ jobs_active_count }}" style="font-size:28px;font-weight:800;line-height:1;
+      color:{% if jobs_active_count %}#B07A00{% else %}#002583{% endif %};letter-spacing:-.03em;">{{ jobs_active_count }}</span>
+     <span style="font-size:11px;color:#6B7280;">job{{ jobs_active_count|pluralize }}</span>
+    </div>
+    <p style="font-size:10px;color:#6B7280;margin-top:6px;margin-bottom:0;">
+     {% if jobs_failed_24h %}<span style="color:#D93939;font-weight:700;">{{ jobs_failed_24h }} failed</span> in last 24h{% else %}no failures in last 24h{% endif %}
+    </p>
+   </a>
+
+   <a href="{% url 'quarantine-queue' %}" class="an-card kpi-card" style="text-decoration:none;
+    padding:14px 16px;border-left:4px solid {% if quarantine_pending %}#D93939{% else %}#1B7F3A{% endif %};display:block;">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+     <span class="an-label">Quarantine</span>
+     <div style="width:30px;height:30px;border-radius:8px;background:{% if quarantine_pending %}#FCE8E8{% else %}#E1F4E5{% endif %};
+      display:flex;align-items:center;justify-content:center;">
+      <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="{% if quarantine_pending %}#D93939{% else %}#1B7F3A{% endif %}" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
+     </div>
+    </div>
+    <div style="display:flex;align-items:baseline;gap:5px;margin-top:6px;">
+     <span data-countup="{{ quarantine_pending }}" style="font-size:28px;font-weight:800;line-height:1;
+      color:{% if quarantine_pending %}#D93939{% else %}#1B7F3A{% endif %};letter-spacing:-.03em;">{{ quarantine_pending }}</span>
+     <span style="font-size:11px;color:#6B7280;">flagged</span>
+    </div>
+    <p style="font-size:10px;color:#6B7280;margin-top:6px;margin-bottom:0;">
+     {% if quarantine_pending %}prompt-injection candidates awaiting decision{% else %}no pending decisions{% endif %}
+    </p>
+   </a>
+
+   <a href="{% url 'user-management' %}" class="an-card kpi-card" style="text-decoration:none;
+    padding:14px 16px;border-left:4px solid #002583;display:block;">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+     <span class="an-label">Active users</span>
+     <div style="width:30px;height:30px;border-radius:8px;background:#E5E8EF;display:flex;
+      align-items:center;justify-content:center;">
+      <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"/></svg>
+     </div>
+    </div>
+    <div style="display:flex;align-items:baseline;gap:5px;margin-top:6px;">
+     <span data-countup="{{ users_total }}" style="font-size:28px;font-weight:800;line-height:1;
+      color:#002583;letter-spacing:-.03em;">{{ users_total }}</span>
+     <span style="font-size:11px;color:#6B7280;">user{{ users_total|pluralize }}</span>
+    </div>
+    <p style="font-size:10px;color:#6B7280;margin-top:6px;margin-bottom:0;">
+     {{ users_by_role.admin }} admin · {{ users_by_role.reviewer }} reviewer · {{ users_by_role.analyst }} analyst
+    </p>
+   </a>
+
+  </div>
+
+  <div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 1.3fr 1fr;
+   grid-template-rows:auto 1fr;gap:10px;">
+
+   <div class="an-card" style="display:flex;flex-direction:column;overflow:hidden;align-self:start;">
+    <div style="padding:10px 14px 8px;border-bottom:1px solid #EEF1F6;flex-shrink:0;">
+     <span class="an-label">Quick Actions</span>
+    </div>
+    <div>
+     <a href="{% url 'library-regulations' %}" class="qa-row">
+      <div style="width:26px;height:26px;border-radius:7px;background:#002583;display:flex;
+       align-items:center;justify-content:center;flex-shrink:0;">
+       <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
+      </div>
+      <div style="flex:1;min-width:0;">
+       <p style="font-size:12px;font-weight:600;color:#002583;margin:0;line-height:1.3;">Upload regulation</p>
+       <p style="font-size:10px;color:#6B7280;margin:0;">Add a new jurisdiction document</p>
+      </div>
+      <svg width="8" height="8" fill="none" viewBox="0 0 24 24" stroke="#9CA3AF" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+     </a>
+     <a href="{% url 'library-policies' %}" class="qa-row">
+      <div style="width:26px;height:26px;border-radius:7px;background:#002583;display:flex;
+       align-items:center;justify-content:center;flex-shrink:0;">
+       <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5"/></svg>
+      </div>
+      <div style="flex:1;min-width:0;">
+       <p style="font-size:12px;font-weight:600;color:#002583;margin:0;line-height:1.3;">Upload BBK policy</p>
+       <p style="font-size:10px;color:#6B7280;margin:0;">Add an internal policy doc</p>
+      </div>
+      <svg width="8" height="8" fill="none" viewBox="0 0 24 24" stroke="#9CA3AF" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+     </a>
+     <a href="{% url 'user-management' %}" class="qa-row">
+      <div style="width:26px;height:26px;border-radius:7px;background:#002583;display:flex;
+       align-items:center;justify-content:center;flex-shrink:0;">
+       <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"/></svg>
+      </div>
+      <div style="flex:1;min-width:0;">
+       <p style="font-size:12px;font-weight:600;color:#002583;margin:0;line-height:1.3;">Manage users</p>
+       <p style="font-size:10px;color:#6B7280;margin:0;">Invite, reset, disable accounts</p>
+      </div>
+      <svg width="8" height="8" fill="none" viewBox="0 0 24 24" stroke="#9CA3AF" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+     </a>
+     <a href="{% url 'quarantine-queue' %}" class="qa-row">
+      <div style="width:26px;height:26px;border-radius:7px;background:{% if quarantine_pending %}#D93939{% else %}#002583{% endif %};
+       display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+       <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M9 18.75c0 1.243-1.007 2.25-2.25 2.25S4.5 19.993 4.5 18.75s1.007-2.25 2.25-2.25S9 17.507 9 18.75z"/></svg>
+      </div>
+      <div style="flex:1;min-width:0;">
+       <p style="font-size:12px;font-weight:600;color:#002583;margin:0;line-height:1.3;">Quarantine queue</p>
+       <p style="font-size:10px;color:#6B7280;margin:0;">Review flagged chunks</p>
+      </div>
+      {% if quarantine_pending %}<span style="font-size:9px;font-weight:700;background:#FCE8E8;color:#D93939;padding:2px 7px;border-radius:20px;flex-shrink:0;">{{ quarantine_pending }}</span>{% endif %}
+      <svg width="8" height="8" fill="none" viewBox="0 0 24 24" stroke="#9CA3AF" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+     </a>
+     <a href="{% url 'system-monitoring' %}" class="qa-row">
+      <div style="width:26px;height:26px;border-radius:7px;background:#002583;display:flex;
+       align-items:center;justify-content:center;flex-shrink:0;">
+       <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"/></svg>
+      </div>
+      <div style="flex:1;min-width:0;">
+       <p style="font-size:12px;font-weight:600;color:#002583;margin:0;line-height:1.3;">System monitoring</p>
+       <p style="font-size:10px;color:#6B7280;margin:0;">Pipeline + reasoning health</p>
+      </div>
+      <svg width="8" height="8" fill="none" viewBox="0 0 24 24" stroke="#9CA3AF" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+     </a>
+    </div>
+   </div>
+
+   <div class="an-card" style="display:flex;flex-direction:column;overflow:hidden;grid-row:span 2;">
+    <div style="padding:10px 14px 8px;border-bottom:1px solid #EEF1F6;flex-shrink:0;
+     display:flex;align-items:center;justify-content:space-between;">
+     <span class="an-label">Recent system events</span>
+     <a href="{% url 'history' %}" style="font-size:10px;color:#002583;text-decoration:none;font-weight:700;">Full log →</a>
+    </div>
+    {% if recent_events %}
+     <div style="flex:1;min-height:0;overflow-y:auto;padding:6px 0;">
+      {% for ev in recent_events %}
+       <a href="{% url 'history' %}#al_{{ ev.pk }}"
+        style="display:flex;gap:10px;padding:9px 14px;border-bottom:1px solid #F4F6FA;
+         text-decoration:none;color:inherit;transition:background .12s;"
+        onmouseover="this.style.background='#F7F9FC'" onmouseout="this.style.background=''">
+        {% if 'failed' in ev.event_type or 'rejected' in ev.event_type or 'login_failed' in ev.event_type %}
+         <span class="ev-dot" style="background:#D93939;"></span>
+        {% elif 'complete' in ev.event_type or 'approved' in ev.event_type %}
+         <span class="ev-dot" style="background:#1B7F3A;"></span>
+        {% elif 'quarantine.flagged' == ev.event_type or 'reasoning.validation_error' == ev.event_type %}
+         <span class="ev-dot" style="background:#FFB800;"></span>
+        {% else %}
+         <span class="ev-dot" style="background:#002583;"></span>
+        {% endif %}
+        <div style="flex:1;min-width:0;">
+         <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
+          <span class="pill" style="background:#E5E8EF;color:#002583;">{{ ev.event_type }}</span>
+          {% if ev.ip_address %}<span style="font-size:9px;color:#9CA3AF;font-family:monospace;">{{ ev.ip_address }}</span>{% endif %}
+         </div>
+         <p style="font-size:11px;color:#1F2937;margin:0;line-height:1.35;
+          display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">
+          {{ ev.description }}
+         </p>
+         <p style="font-size:9px;color:#9CA3AF;margin:2px 0 0;">
+          {% if ev.user %}{{ ev.user.get_full_name|default:ev.user.username }}{% else %}system{% endif %}
+          · {{ ev.timestamp|date:"d M, H:i" }}
+         </p>
+        </div>
+       </a>
+      {% endfor %}
+     </div>
+    {% else %}
+     <div style="flex:1;display:flex;align-items:center;justify-content:center;">
+      <p style="font-size:11px;color:#6B7280;">No system events yet.</p>
+     </div>
+    {% endif %}
+   </div>
+
+   <div class="an-card" style="display:flex;flex-direction:column;overflow:hidden;">
+    <div style="padding:10px 14px 8px;border-bottom:1px solid #EEF1F6;flex-shrink:0;">
+     <span class="an-label">Active ingestion jobs</span>
+    </div>
+    {% if jobs_active %}
+     <div style="flex:1;min-height:0;overflow-y:auto;">
+      {% for job in jobs_active %}
+       <a href="{% url 'system-monitoring' %}"
+        style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid #F4F6FA;
+         text-decoration:none;color:inherit;transition:background .12s;"
+        onmouseover="this.style.background='#F7F9FC'" onmouseout="this.style.background=''">
+        {% if job.status == 'running' %}
+         <span style="width:6px;height:6px;border-radius:50%;background:#FFB800;
+          animation:pulsedot 1.4s ease-in-out infinite;flex-shrink:0;"></span>
+        {% else %}
+         <span style="width:6px;height:6px;border-radius:50%;background:#9CA3AF;flex-shrink:0;"></span>
+        {% endif %}
+        <div style="flex:1;min-width:0;">
+         <p style="font-size:11px;font-weight:600;color:#1F2937;margin:0;line-height:1.3;
+          white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ job.document.name }}</p>
+         <p style="font-size:9px;color:#9CA3AF;margin:1px 0 0;">{{ job.status|title }}</p>
+        </div>
+       </a>
+      {% endfor %}
+     </div>
+    {% else %}
+     <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:18px;">
+      <p style="font-size:11px;color:#6B7280;text-align:center;">No jobs running.</p>
+     </div>
+    {% endif %}
+   </div>
+
+   <a href="{% url 'user-management' %}" class="an-card" style="padding:14px 16px;display:flex;flex-direction:column;gap:10px;text-decoration:none;color:inherit;transition:background .12s;"
+    onmouseover="this.style.background='#FBFCFD'" onmouseout="this.style.background='#fff'">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+     <span class="an-label">User distribution</span>
+     <span style="font-size:10px;color:#002583;font-weight:700;">Manage →</span>
+    </div>
+    {% with total=users_total %}
+    <div style="display:flex;flex-direction:column;gap:10px;">
+     <div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
+       <span style="font-size:10px;font-weight:700;color:#002583;">Analysts</span>
+       <span style="font-size:11px;color:#1F2937;font-weight:700;">{{ users_by_role.analyst }}</span>
+      </div>
+      <div class="role-bar"><div style="width:{% if total %}{% widthratio users_by_role.analyst total 100 %}{% else %}0{% endif %}%;background:#002583;"></div></div>
+     </div>
+     <div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
+       <span style="font-size:10px;font-weight:700;color:#002583;">Reviewers</span>
+       <span style="font-size:11px;color:#1F2937;font-weight:700;">{{ users_by_role.reviewer }}</span>
+      </div>
+      <div class="role-bar"><div style="width:{% if total %}{% widthratio users_by_role.reviewer total 100 %}{% else %}0{% endif %}%;background:#FFB800;"></div></div>
+     </div>
+     <div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
+       <span style="font-size:10px;font-weight:700;color:#002583;">Admins</span>
+       <span style="font-size:11px;color:#1F2937;font-weight:700;">{{ users_by_role.admin }}</span>
+      </div>
+      <div class="role-bar"><div style="width:{% if total %}{% widthratio users_by_role.admin total 100 %}{% else %}0{% endif %}%;background:#1B7F3A;"></div></div>
+     </div>
+    </div>
+    {% endwith %}
+   </a>
+
+  </div>
+
+  <div id="ingestion-widget" hx-get="{% url 'ingestion-widget' %}" hx-trigger="every 5s" hx-swap="innerHTML" style="flex-shrink:0;">
+   {% include 'partials/_ingestion_widget.html' %}
+  </div>
+
+ </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+ document.querySelectorAll('[data-countup]').forEach(function(el){
+  var target=parseFloat(el.dataset.countup);
+  var suffix=el.dataset.suffix||'';
+  if(isNaN(target))return;
+  var start=performance.now();var duration=900;
+  (function update(now){
+   var t=Math.min((now-start)/duration,1);
+   var ease=1-Math.pow(1-t,3);
+   el.textContent=Math.round(target*ease)+suffix;
+   if(t<1)requestAnimationFrame(update);
+  })(performance.now());
+ });
+</script>
+{% endblock %}

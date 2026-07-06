@@ -1,0 +1,183 @@
+{% comment %}
+  HTMX fragment — inline evidence panel for one ObligationMapping row.
+  Layout (top to bottom):
+    1. Verdict header — full obligation + verdict explanation
+    2. Side-by-side comparison — regulation requirement vs policy response
+    3. Gap & remediation strip — only when the verdict isn't fully Covered
+    4. Audit trail row — citation grounding + AI risk + override action
+  Uses the --st-* tokens defined in mapping_workspace.html so colors
+  stay consistent with the hero panel and the row badges.
+{% endcomment %}
+
+{% with c=mapping.coverage gap=mapping.gaps.first %}
+<div style="padding:14px 18px 16px;background:var(--st-bg-soft);border-top:1px solid var(--st-line);">
+
+  {# ── 1. Verdict header ─────────────────────────────────────────── #}
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:14px;">
+    <div style="flex:1;min-width:0;">
+      <p style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--st-text-muted);margin:0 0 4px;">
+        Obligation
+      </p>
+      <p style="font-size:13px;color:var(--st-text);line-height:1.55;margin:0 0 6px;">
+        {{ mapping.obligation_text|default:mapping.obligation_title }}
+      </p>
+      <p style="font-size:10.5px;color:var(--st-text-muted);margin:0;">
+        Source: <strong style="color:var(--st-text);">{{ mapping.article_ref }}</strong>
+      </p>
+    </div>
+    <div style="flex-shrink:0;">
+      <span style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:7px;font-size:11px;font-weight:800;
+        {% if c == 'covered' %}background:var(--st-covered-bg);color:var(--st-covered-fg);
+        {% elif c == 'partial' %}background:var(--st-partial-bg);color:var(--st-partial-fg);
+        {% elif c == 'review' %}background:var(--st-review-bg);color:var(--st-review-fg);
+        {% else %}background:var(--st-none-bg);color:var(--st-none-fg);{% endif %}">
+        {% if c == 'covered' %}✓ Covered
+        {% elif c == 'partial' %}◐ Partial
+        {% elif c == 'review' %}◇ Needs review
+        {% else %}✕ Not covered{% endif %}
+      </span>
+    </div>
+  </div>
+
+  {# ── 2. Verdict explanation strip ──────────────────────────────── #}
+  {% comment %}
+  Always visible. For Covered, a green band saying both clauses align.
+  For Partial / Not covered, the LLM's gap_description (rationale).
+  For Review, a neutral note. This is the answer to "why this verdict?"
+  {% endcomment %}
+  <div style="padding:10px 14px;border-radius:8px;margin-bottom:14px;font-size:11.5px;line-height:1.55;
+    {% if c == 'covered' %}background:var(--st-covered-bg);color:var(--st-covered-fg);border-left:3px solid var(--st-covered-fg);
+    {% elif c == 'partial' %}background:var(--st-partial-bg);color:var(--st-partial-fg);border-left:3px solid var(--st-partial-fg);
+    {% elif c == 'review' %}background:var(--st-review-bg);color:var(--st-review-fg);border-left:3px solid var(--st-review-fg);
+    {% else %}background:var(--st-none-bg);color:var(--st-none-fg);border-left:3px solid var(--st-none-fg);{% endif %}">
+    <strong style="font-size:9.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;display:block;margin-bottom:3px;">
+      Why this verdict
+    </strong>
+    {% if mapping.rationale %}
+      {{ mapping.rationale }}
+    {% elif c == 'covered' %}
+      The internal policy clause directly addresses the regulatory requirement. Both quotes below cover the same obligation in compatible terms — read them side-by-side to confirm the match.
+    {% elif c == 'review' %}
+      The match is uncertain — recommended for human review. Compare the regulation requirement and the policy excerpt below before accepting or overriding.
+    {% else %}
+      No matching internal policy clause was found for this regulatory obligation.
+    {% endif %}
+  </div>
+
+  {# ── 3. Side-by-side comparison ────────────────────────────────── #}
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+
+    {# Regulation side — the requirement #}
+    <div style="background:#fff;border:1px solid var(--st-line);border-radius:9px;padding:12px 14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <p style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--st-text-muted);margin:0;">
+          What the regulation requires
+        </p>
+        <button onclick="(function(){var r=Alpine.$data(document.body);r.docViewerDoc='{{ mapping.regulation.pk }}';r.docViewerArt='{{ mapping.article_ref|escapejs }}';r.docViewerOpen=true;})()"
+                style="display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:5px;background:var(--st-bg-soft);border:none;cursor:pointer;font-size:9.5px;font-weight:700;color:var(--st-text);">
+          <svg width="9" height="9" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><circle cx="12" cy="12" r="3"/></svg>
+          Open source
+        </button>
+      </div>
+      {% if mapping.regulation_evidence %}
+      <div style="padding:9px 11px;border-left:2px solid var(--st-review-fg);background:var(--st-bg-soft);border-radius:4px;">
+        <p style="font-size:8.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--st-text-muted);margin:0 0 4px;">Verbatim quote</p>
+        <p style="font-size:11.5px;color:var(--st-text);line-height:1.6;font-style:italic;margin:0;">"{{ mapping.regulation_evidence }}"</p>
+      </div>
+      {% else %}
+      <p style="font-size:11px;color:var(--st-text-muted);font-style:italic;margin:0;">No verbatim quote captured.</p>
+      {% endif %}
+    </div>
+
+    {# Policy side — the response #}
+    <div style="background:#fff;border:1px solid var(--st-line);border-radius:9px;padding:12px 14px;
+      {% if c == 'covered' %}border-left:3px solid var(--st-covered-fg);
+      {% elif c == 'partial' %}border-left:3px solid var(--st-partial-fg);
+      {% elif c == 'review' %}border-left:3px solid var(--st-review-fg);
+      {% else %}border-left:3px solid var(--st-none-fg);{% endif %}">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <p style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--st-text-muted);margin:0;">
+          What your policy says
+        </p>
+        {% if c != 'none' and mapping.analysis.policy_doc %}
+        <button onclick="(function(){var r=Alpine.$data(document.body);r.docViewerDoc='{{ mapping.analysis.policy_doc.pk }}';r.docViewerArt='{{ mapping.evidence_source|escapejs }}';r.docViewerOpen=true;})()"
+                style="display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:5px;background:var(--st-bg-soft);border:none;cursor:pointer;font-size:9.5px;font-weight:700;color:var(--st-text);">
+          <svg width="9" height="9" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><circle cx="12" cy="12" r="3"/></svg>
+          Open source
+        </button>
+        {% endif %}
+      </div>
+      {% if c == 'none' %}
+        <p style="font-size:11.5px;color:var(--st-none-fg);line-height:1.55;margin:0;font-weight:600;">
+          No matching policy clause was identified.
+        </p>
+      {% else %}
+        {% if mapping.evidence_source and mapping.evidence_source != 'None identified' %}
+        <p style="font-size:10.5px;font-weight:700;color:var(--st-text);margin:0 0 6px;">{{ mapping.evidence_source }}</p>
+        {% endif %}
+        {% if mapping.evidence_text %}
+        <div style="padding:9px 11px;border-left:2px solid {% if c == 'covered' %}var(--st-covered-fg){% elif c == 'partial' %}var(--st-partial-fg){% else %}var(--st-review-fg){% endif %};background:var(--st-bg-soft);border-radius:4px;">
+          <p style="font-size:8.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--st-text-muted);margin:0 0 4px;">Verbatim quote</p>
+          <p style="font-size:11.5px;color:var(--st-text);line-height:1.6;font-style:italic;margin:0;">"{{ mapping.evidence_text }}"</p>
+        </div>
+        {% else %}
+        <p style="font-size:11px;color:var(--st-text-muted);font-style:italic;margin:0;">No specific clause excerpted.</p>
+        {% endif %}
+      {% endif %}
+    </div>
+  </div>
+
+  {# ── 4. Remediation strip — only when there's a gap to fix ─────── #}
+  {% if c != 'covered' and gap and gap.remediation_text %}
+  <div style="background:#fff;border:1px solid var(--st-partial-fg);border-radius:9px;padding:11px 14px;margin-bottom:14px;">
+    <p style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--st-partial-fg);margin:0 0 5px;">
+      Recommended remediation
+    </p>
+    <p style="font-size:11.5px;color:var(--st-text);line-height:1.6;margin:0;">{{ gap.remediation_text }}</p>
+  </div>
+  {% endif %}
+
+  {# ── 5. Audit trail row ────────────────────────────────────────── #}
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:10px;border-top:1px solid var(--st-line);">
+    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;">
+      {# Citation verification #}
+      {% if mapping.citation_verified %}
+      <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--st-covered-fg);"
+            title="The regulatory citation passed all structural checks: label, chunk_id, and verbatim evidence were all matched to a real retrieved chunk.">
+        <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+        <strong>Citation verified</strong>
+      </span>
+      {% else %}
+      <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--st-none-fg);"
+            title="Citation could not be verified against retrieved chunks. Manual review required.">
+        ⚠ <strong>Citation unverified</strong>
+      </span>
+      {% endif %}
+
+      {# Hallucination risk #}
+      <span style="font-size:10px;color:var(--st-text-muted);"
+            title="NLI hallucination risk (0 = AI's verdict fully entailed by the cited chunk, 1 = paraphrased beyond what the chunk supports).">
+        AI risk
+        <strong style="color:{% if mapping.hallucination_risk > 0.5 %}var(--st-none-fg){% elif mapping.hallucination_risk > 0.2 %}var(--st-partial-fg){% else %}var(--st-covered-fg){% endif %};">
+          {{ mapping.hallucination_risk|floatformat:2 }}
+        </strong>
+      </span>
+
+      {% if mapping.human_override %}
+      <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--st-review-fg);font-weight:700;">★ Human override applied</span>
+      {% endif %}
+    </div>
+
+    <button
+      hx-post="{% url 'mapping-coverage-override' mapping.pk %}"
+      hx-target="closest div[data-om-pk]"
+      hx-swap="outerHTML"
+      style="padding:5px 12px;border-radius:6px;background:#fff;border:1px solid var(--st-line);font-size:10px;font-weight:700;color:var(--st-text);cursor:pointer;transition:background .12s;"
+      onmouseover="this.style.background='var(--st-bg-soft)';"
+      onmouseout="this.style.background='#fff';">
+      Override verdict
+    </button>
+  </div>
+
+</div>
+{% endwith %}

@@ -1,0 +1,63 @@
+D:\Cross-Jurisdictional Privacy Compliance Analyzer\.venv\Lib\site-packages\langchain_core\_api\deprecation.py:25: UserWarning: Core Pydantic V1 functionality isn't compatible with Python 3.14 or greater.
+  from pydantic.v1.fields import FieldInfo as FieldInfoV1
+==============================================================================
+  REASONING EVAL (langgraph pipeline over 8 hand-picked queries)
+==============================================================================
+
+  resolving expected chunk_ids -> node_ids...
+
+  running eval queries:
+
+  [1/8] How long must banking companies retain KYC and transaction r...
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3410.30it/s]
+[1mBertModel LOAD REPORT[0m from: BAAI/bge-small-en-v1.5
+Key                     | Status     |  | 
+------------------------+------------+--+-
+embeddings.position_ids | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+Loading weights:   0%|          | 0/105 [00:00<?, ?it/s]Loading weights: 100%|██████████| 105/105 [00:00<00:00, 9222.50it/s]
+[1mBertForSequenceClassification LOAD REPORT[0m from: cross-encoder/ms-marco-MiniLM-L-6-v2
+Key                          | Status     |  | 
+-----------------------------+------------+--+-
+bert.embeddings.position_ids | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 8923.38it/s]
+[1mBertModel LOAD REPORT[0m from: BAAI/bge-small-en-v1.5
+Key                     | Status     |  | 
+------------------------+------------+--+-
+embeddings.position_ids | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+D:\Cross-Jurisdictional Privacy Compliance Analyzer\reasoning\generator.py:180: UserWarning: WARNING! response_format is not default parameter.
+                response_format was transferred to model_kwargs.
+                Please confirm that response_format is what you intended.
+  llm        = _get_llm(),
+Loading weights:   0%|          | 0/202 [00:00<?, ?it/s]Loading weights: 100%|██████████| 202/202 [00:00<00:00, 7899.98it/s]
+[1mDebertaV2ForSequenceClassification LOAD REPORT[0m from: cross-encoder/nli-deberta-v3-base
+Key                             | Status     |  | 
+--------------------------------+------------+--+-
+deberta.embeddings.position_ids | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+      [OK            ] route=compliance  conf=0.67 hall=0.26 cites=1 (64.9s)
+
+  [2/8] What is the breach notification timeline to the Bahrain Pers...
+      [OK            ] route=general     conf=0.72 hall=0.20 cites=1 (51.1s)
+
+  [3/8] Under what conditions can sensitive personal data be process...
+      [ERR           ] route=?           conf=0.00 hall=0.00 cites=0 (642.4s)
+
+  [4/8] How does a controller obtain prior authorization to transfer...
+      [OK            ] route=comparative conf=0.00 hall=0.00 cites=3 (369.2s)
+
+  [5/8] Where must Indian payment system data be stored?...
+      [OK            ] route=compliance  conf=0.67 hall=0.26 cites=3 (51.1s)
+
+  [6/8] What does Kuwait DPPR require for data classification?...

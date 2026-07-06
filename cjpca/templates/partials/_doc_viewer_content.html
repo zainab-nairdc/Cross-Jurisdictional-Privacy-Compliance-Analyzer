@@ -1,0 +1,54 @@
+﻿{% if sections %}
+<div class="px-4 py-3 space-y-1" id="dv-sections">
+ {% for section in sections %}
+ <div id="dv-art-{{ section.article_ref|slugify }}"
+ class="rounded-md px-3 py-2.5 mb-1
+ {% if section.article_ref == article_id %}dv-primary{% else %}dv-section{% endif %}">
+ {% if section.article_ref %}
+ <p class="text-xs font-semibold mb-1.5"
+ style="color:{% if section.article_ref == article_id %}#002583{% else %}#002583{% endif %};">
+ {{ section.article_ref }}
+ </p>
+ {% endif %}
+ {% for part in section.parts %}
+ <p class="text-xs leading-relaxed {% if not forloop.first %}mt-2{% endif %}"
+ style="color:{% if section.article_ref == article_id %}#002583{% else %}#002583{% endif %};">
+ {{ part }}
+ </p>
+ {% endfor %}
+ </div>
+ {% endfor %}
+</div>
+
+<style>
+ .dv-primary {
+ background: #ffffff;
+ border-left: 3px solid #002583;
+ border-bottom: 2px solid #002583;
+ }
+ .dv-section {
+ border-left: 2px solid #E5E8EF;
+ }
+ .dv-section:hover {
+ background: #ffffff;
+ }
+</style>
+
+<script>
+ (function () {
+ {% if article_id %}
+ const target = document.getElementById('dv-art-{{ article_id|slugify }}');
+ if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+ {% endif %}
+ })();
+</script>
+
+{% else %}
+<div class="px-4 py-10 text-center">
+ <svg class="mx-auto mb-3" width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="#ffffff" stroke-width="1.5">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
+ </svg>
+ <p class="text-xs font-medium text-gray-500">No content available</p>
+ <p class="text-xs text-gray-400 mt-1">Upload and index this document to view its text here.</p>
+</div>
+{% endif %}

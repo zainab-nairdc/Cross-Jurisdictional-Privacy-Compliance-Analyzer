@@ -1,0 +1,275 @@
+{% comment %}
+Context: run, topics, avg_divergence, most_aligned_label
+Each topic: principle_id, label, color_dot, color_light, pair_count,
+ divergence_score, divergence_pct, a_count, b_count, bar_width_a, bar_width_b,
+ avg_confidence, dominant_color, dominant_label,
+ rel_breakdown (list: rel, count, pct, color, label),
+ top_citations_a, top_citations_b
+{% endcomment %}
+<style>
+.tm-card { background:#fff; border:1px solid #E5E8EF; border-radius:14px; padding:18px; display:flex; flex-direction:column; gap:14px; transition:box-shadow .15s,border-color .15s; }
+.tm-card:hover { box-shadow:0 6px 22px rgba(0,0,0,0.07); border-color:#E5E8EF; }
+.tm-stat { background:#fff; border:1px solid #E5E8EF; border-radius:10px; padding:11px 16px; display:flex; flex-direction:column; gap:2px; min-width:110px; }
+.tm-label { font-size:8px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:#002583; margin:0; }
+.tm-value { font-size:18px; font-weight:800; color:#002583; margin:0; line-height:1.1; font-family:'Fredoka',sans-serif; }
+.tm-sub { font-size:9px; color:#002583; margin:0; }
+.tm-cite-pill { font-size:8px; font-weight:600; color:#002583; background:#ffffff; border:1px solid #E5E8EF; border-radius:4px; padding:2px 6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:140px; }
+</style>
+
+{% if topics %}
+<div style="max-width:900px;margin:0 auto;">
+
+ {# ── Page title ── #}
+ <div style="margin-bottom:18px;">
+ <p style="font-size:14px;font-weight:700;color:#002583;margin:0 0 3px;">Topic Coverage Map</p>
+ <p style="font-size:11px;color:#002583;margin:0;">Clause coverage and divergence across privacy principles — {{ run.reg_a.name }} vs {{ run.reg_b.name }}</p>
+ </div>
+
+ {# ── Summary stats row ── #}
+ <div style="display:flex;gap:10px;margin-bottom:22px;flex-wrap:wrap;">
+ <div class="tm-stat">
+ <p class="tm-label">Topics Mapped</p>
+ <p class="tm-value">{{ topics|length }}</p>
+ <p class="tm-sub">privacy principles</p>
+ </div>
+ <div class="tm-stat">
+ <p class="tm-label">Avg Divergence</p>
+ <p class="tm-value" style="color:{% if avg_divergence > 60 %}#002583{% elif avg_divergence > 35 %}#002583{% else %}#002583{% endif %};">{{ avg_divergence }}%</p>
+ <p class="tm-sub">across all topics</p>
+ </div>
+ <div class="tm-stat">
+ <p class="tm-label">Most Divergent</p>
+ <p style="font-size:13px;font-weight:700;color:#002583;margin:0;line-height:1.2;">{{ topics.0.label }}</p>
+ <p class="tm-sub">{{ topics.0.divergence_pct }}% divergence</p>
+ </div>
+ <div class="tm-stat">
+ <p class="tm-label">Most Aligned</p>
+ <p style="font-size:13px;font-weight:700;color:#002583;margin:0;line-height:1.2;">{{ most_aligned_label }}</p>
+ <p class="tm-sub">lowest divergence</p>
+ </div>
+ </div>
+
+ {# ── Global relationship legend ── #}
+ <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:18px;padding:10px 14px;background:#ffffff;border:1px solid #E5E8EF;border-radius:10px;">
+ <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#002583;flex-shrink:0;">Relationships</span>
+ <div style="display:flex;align-items:center;gap:5px;"><div style="width:8px;height:8px;border-radius:2px;background:#002583;"></div><span style="font-size:9px;color:#002583;">Equivalent</span></div>
+ <div style="display:flex;align-items:center;gap:5px;"><div style="width:8px;height:8px;border-radius:2px;background:#002583;"></div><span style="font-size:9px;color:#002583;">One Side Stricter</span></div>
+ <div style="display:flex;align-items:center;gap:5px;"><div style="width:8px;height:8px;border-radius:2px;background:#002583;"></div><span style="font-size:9px;color:#002583;">Additional Clause</span></div>
+ <div style="display:flex;align-items:center;gap:5px;"><div style="width:8px;height:8px;border-radius:2px;background:#002583;"></div><span style="font-size:9px;color:#002583;">Conflicting</span></div>
+ </div>
+
+ {# ── Topic cards — 2 column grid ── #}
+ <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;">
+ {% for topic in topics %}
+ <div class="tm-card">
+
+ {# ── Card header ── #}
+ <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
+ <div style="display:flex;align-items:center;gap:8px;min-width:0;">
+ <div style="width:11px;height:11px;border-radius:50%;background:{{ topic.color_dot }};flex-shrink:0;box-shadow:0 0 0 3px {{ topic.color_light }};"></div>
+ <div style="min-width:0;">
+ <p style="font-size:12px;font-weight:700;color:#002583;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ topic.label }}</p>
+ <div style="display:flex;align-items:center;gap:6px;margin-top:3px;">
+ <span style="font-size:8px;font-weight:600;padding:1px 6px;border-radius:20px;background:#ffffff;color:#002583;">{{ topic.pair_count }} pair{{ topic.pair_count|pluralize }}</span>
+ <span style="font-size:8px;font-weight:700;padding:1px 6px;border-radius:20px;background:{{ topic.dominant_color }}18;color:{{ topic.dominant_color }};">{{ topic.dominant_label }}</span>
+ </div>
+ </div>
+ </div>
+ {# Divergence score badge #}
+ <div style="flex-shrink:0;text-align:right;background:{% if topic.divergence_pct > 60 %}#ffffff{% elif topic.divergence_pct > 35 %}#ffffff{% else %}#ffffff{% endif %};border-radius:8px;padding:6px 10px;">
+ <p style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin:0;color:{% if topic.divergence_pct > 60 %}#002583{% elif topic.divergence_pct > 35 %}#002583{% else %}#002583{% endif %};">Divergence</p>
+ <p style="font-size:20px;font-weight:800;margin:0;line-height:1;font-family:'Fredoka',sans-serif;color:{% if topic.divergence_pct > 60 %}#002583{% elif topic.divergence_pct > 35 %}#002583{% else %}#002583{% endif %};">{{ topic.divergence_pct }}%</p>
+ </div>
+ </div>
+
+ {# ── Relationship breakdown stacked bar ── #}
+ <div>
+ <p class="tm-label" style="margin-bottom:6px;">Relationship Breakdown</p>
+ <div style="display:flex;height:10px;border-radius:6px;overflow:hidden;gap:1px;background:#ffffff;">
+ {% for seg in topic.rel_breakdown %}{% if seg.pct > 0 %}<div style="width:{{ seg.pct }}%;background:{{ seg.color }};flex-shrink:0;" title="{{ seg.label }}: {{ seg.count }}"></div>{% endif %}{% endfor %}
+ </div>
+ <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
+ {% for seg in topic.rel_breakdown %}{% if seg.count > 0 %}
+ <div style="display:flex;align-items:center;gap:3px;">
+ <div style="width:6px;height:6px;border-radius:50%;background:{{ seg.color }};flex-shrink:0;"></div>
+ <span style="font-size:8px;color:#002583;white-space:nowrap;">{{ seg.label }} <span style="color:#002583;">({{ seg.count }})</span></span>
+ </div>
+ {% endif %}{% endfor %}
+ </div>
+ </div>
+
+ {# ── Coverage bars ── #}
+ <div>
+ <p class="tm-label" style="margin-bottom:7px;">Clause Coverage</p>
+ <div style="display:flex;flex-direction:column;gap:5px;">
+ <div style="display:flex;align-items:center;gap:8px;">
+ <span style="font-size:9px;font-weight:800;color:#002583;width:12px;flex-shrink:0;">A</span>
+ <div style="flex:1;height:8px;background:#ffffff;border-radius:4px;overflow:hidden;">
+ <div style="height:100%;width:{{ topic.bar_width_a }}%;background:#002583;border-radius:4px;"></div>
+ </div>
+ <span style="font-size:9px;font-weight:700;color:#002583;width:24px;text-align:right;flex-shrink:0;">{{ topic.a_count }}</span>
+ </div>
+ <div style="display:flex;align-items:center;gap:8px;">
+ <span style="font-size:9px;font-weight:800;color:#002583;width:12px;flex-shrink:0;">B</span>
+ <div style="flex:1;height:8px;background:#ffffff;border-radius:4px;overflow:hidden;">
+ <div style="height:100%;width:{{ topic.bar_width_b }}%;background:#002583;border-radius:4px;"></div>
+ </div>
+ <span style="font-size:9px;font-weight:700;color:#002583;width:24px;text-align:right;flex-shrink:0;">{{ topic.b_count }}</span>
+ </div>
+ </div>
+ </div>
+
+ {# ── Footer: confidence + top articles ── #}
+ <div style="border-top:1px solid #E5E8EF;padding-top:12px;">
+
+ {# Avg confidence row #}
+ <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+ <p class="tm-label" style="flex-shrink:0;">Avg Confidence</p>
+ <div style="flex:1;height:5px;background:#ffffff;border-radius:3px;overflow:hidden;">
+ <div style="height:100%;width:{{ topic.avg_confidence }}%;background:{% if topic.avg_confidence >= 80 %}#002583{% elif topic.avg_confidence >= 60 %}#002583{% else %}#002583{% endif %};border-radius:3px;"></div>
+ </div>
+ <span style="font-size:9px;font-weight:700;color:#002583;flex-shrink:0;">{{ topic.avg_confidence }}%</span>
+ </div>
+
+ {# Articles side-by-side #}
+ <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+
+ {# Top cited articles A #}
+ <div>
+ <div style="display:flex;align-items:center;gap:5px;margin-bottom:5px;">
+ <div style="width:7px;height:7px;border-radius:50%;background:#002583;flex-shrink:0;"></div>
+ <p class="tm-label" style="color:#002583;">A — Articles</p>
+ </div>
+ {% if topic.top_citations_a %}
+ <div style="display:flex;flex-direction:column;gap:3px;">
+ {% for cit in topic.top_citations_a %}
+ <button onclick="tmShowArticle(this)"
+ data-art-label="{{ cit.full|escapejs }}"
+ data-art-short="{{ cit.short|escapejs }}"
+ data-art-text="{{ cit.text|escapejs }}"
+ data-art-side="a"
+ style="text-align:left;cursor:pointer;font-size:9px;font-weight:600;color:#002583;background:#ffffff;border:1px solid #E5E8EF;border-radius:5px;padding:4px 8px;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:inherit;transition:background .1s;"
+ onmouseover="this.style.background='#ffffff'" onmouseout="this.style.background='#ffffff'">
+ {{ cit.short|truncatechars:28 }}
+ </button>
+ {% endfor %}
+ </div>
+ {% else %}
+ <p style="font-size:9px;color:#ffffff;margin:0;font-style:italic;">No articles</p>
+ {% endif %}
+ </div>
+
+ {# Top cited articles B #}
+ <div>
+ <div style="display:flex;align-items:center;gap:5px;margin-bottom:5px;">
+ <div style="width:7px;height:7px;border-radius:50%;background:#002583;flex-shrink:0;"></div>
+ <p class="tm-label" style="color:#002583;">B — Articles</p>
+ </div>
+ {% if topic.top_citations_b %}
+ <div style="display:flex;flex-direction:column;gap:3px;">
+ {% for cit in topic.top_citations_b %}
+ <button onclick="tmShowArticle(this)"
+ data-art-label="{{ cit.full|escapejs }}"
+ data-art-short="{{ cit.short|escapejs }}"
+ data-art-text="{{ cit.text|escapejs }}"
+ data-art-side="b"
+ style="text-align:left;cursor:pointer;font-size:9px;font-weight:600;color:#002583;background:#ffffff;border:1px solid #E5E8EF;border-radius:5px;padding:4px 8px;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:inherit;transition:background .1s;"
+ onmouseover="this.style.background='#ffffff'" onmouseout="this.style.background='#ffffff'">
+ {{ cit.short|truncatechars:28 }}
+ </button>
+ {% endfor %}
+ </div>
+ {% else %}
+ <p style="font-size:9px;color:#ffffff;margin:0;font-style:italic;">No articles</p>
+ {% endif %}
+ </div>
+
+ </div>{# end articles grid #}
+
+ </div>
+
+ </div>
+ {% endfor %}
+ </div>
+
+</div>
+
+{# ── Article viewer modal ── #}
+<div id="tm-modal"
+ onclick="if(event.target===this)tmCloseModal()"
+ style="display:none;position:fixed;inset:0;background:rgba(17,24,39,0.45);z-index:9000;align-items:center;justify-content:center;padding:24px;">
+ <div style="background:#fff;border-radius:16px;width:100%;max-width:580px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,0.18);">
+
+ {# Modal header #}
+ <div style="display:flex;align-items:flex-start;justify-content:space-between;padding:18px 20px 14px;border-bottom:1px solid #E5E8EF;flex-shrink:0;">
+ <div style="min-width:0;">
+ <div id="tm-modal-side-badge" style="display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:20px;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;"></div>
+ <p id="tm-modal-short" style="font-size:15px;font-weight:700;color:#002583;margin:0 0 2px;"></p>
+ <p id="tm-modal-full" style="font-size:10px;color:#002583;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:460px;"></p>
+ </div>
+ <button onclick="tmCloseModal()"
+ style="flex-shrink:0;margin-left:12px;width:28px;height:28px;border-radius:8px;background:#ffffff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#002583;font-size:14px;"
+ onmouseover="this.style.background='#ffffff'" onmouseout="this.style.background='#ffffff'">✕</button>
+ </div>
+
+ {# Modal body — clause text #}
+ <div style="flex:1;overflow-y:auto;padding:18px 20px;">
+ <p id="tm-modal-no-text" style="font-size:11px;color:#002583;font-style:italic;margin:0;display:none;">No clause text available for this article.</p>
+ <p id="tm-modal-text" style="font-size:12px;color:#002583;line-height:1.75;margin:0;white-space:pre-wrap;"></p>
+ </div>
+
+ </div>
+</div>
+
+<script>
+function tmShowArticle(btn) {
+ const side = btn.dataset.artSide;
+ const short = btn.dataset.artShort;
+ const full = btn.dataset.artLabel;
+ const text = btn.dataset.artText || '';
+
+ const badge = document.getElementById('tm-modal-side-badge');
+ badge.textContent = side === 'a' ? 'Regulation A' : 'Regulation B';
+ badge.style.background = side === 'a' ? '#ffffff' : '#ffffff';
+ badge.style.color = side === 'a' ? '#002583' : '#002583';
+
+ document.getElementById('tm-modal-short').textContent = short;
+ document.getElementById('tm-modal-full').textContent = full;
+
+ const textEl = document.getElementById('tm-modal-text');
+ const noTextEl = document.getElementById('tm-modal-no-text');
+ if (text.trim()) {
+ textEl.textContent = text.trim();
+ textEl.style.display = 'block';
+ noTextEl.style.display = 'none';
+ } else {
+ textEl.style.display = 'none';
+ noTextEl.style.display = 'block';
+ }
+
+ document.getElementById('tm-modal').style.display = 'flex';
+}
+
+function tmCloseModal() {
+ document.getElementById('tm-modal').style.display = 'none';
+}
+
+document.addEventListener('keydown', function(e) {
+ if (e.key === 'Escape') tmCloseModal();
+});
+</script>
+
+{% else %}
+<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px;gap:14px;text-align:center;">
+ <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
+ <circle cx="28" cy="28" r="27" stroke="#ffffff" stroke-width="1.5"/>
+ <rect x="14" y="20" width="28" height="4" rx="2" fill="#ffffff"/>
+ <rect x="14" y="28" width="20" height="4" rx="2" fill="#ffffff"/>
+ <rect x="14" y="36" width="24" height="4" rx="2" fill="#ffffff"/>
+ </svg>
+ <div>
+ <p style="font-size:13px;font-weight:600;color:#002583;margin:0 0 4px;">No topic data available</p>
+ <p style="font-size:11px;color:#002583;margin:0;">Run the comparison to see the topic map.</p>
+ </div>
+</div>
+{% endif %}

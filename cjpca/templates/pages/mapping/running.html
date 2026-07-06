@@ -1,0 +1,151 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Mapping {% if failed %}failed{% else %}in progress{% endif %} — CJPCA{% endblock %}
+
+{% block content %}
+<div class="flex flex-col h-full overflow-hidden" style="background:#fafbfd;">
+
+ <div style="background:#fff;border-bottom:1px solid #E5E8EF;padding:18px 32px;flex-shrink:0;">
+  <h1 style="font-size:15px;font-weight:700;color:#002583;margin:0 0 3px;">
+   {% if failed %}Mapping failed{% else %}Mapping in progress{% endif %}
+  </h1>
+  <p style="font-size:11px;color:#7B8499;margin:0;">
+   {{ analysis.policy_doc.name }}{% if analysis.regulations.all %} — {{ analysis.reg_names }}{% endif %}
+  </p>
+ </div>
+
+ <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:48px 32px;">
+
+  {% if failed %}
+  <div style="max-width:520px;text-align:center;">
+   <div style="width:60px;height:60px;border-radius:50%;background:#FCE5E5;border:1px solid #D93939;display:flex;align-items:center;justify-content:center;margin:0 auto 18px;">
+    <svg width="26" height="26" fill="none" viewBox="0 0 24 24" stroke="#A33" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+   </div>
+   <p style="font-size:15px;font-weight:700;color:#A33;margin:0 0 8px;">Analysis failed</p>
+   <p style="font-size:12px;color:#5A6685;margin:0 0 20px;line-height:1.6;">
+    The mapping workflow encountered an error and couldn't complete. Pick the policy again to retry.
+   </p>
+   {% if analysis.error %}
+   <pre style="text-align:left;font-size:10px;background:#FFF7F7;border:1px solid #FDE0E0;border-radius:8px;padding:12px;color:#A33;overflow-x:auto;margin-bottom:20px;white-space:pre-wrap;max-height:260px;">{{ analysis.error|truncatechars:1200 }}</pre>
+   {% endif %}
+   <a href="/mapping/" style="display:inline-flex;align-items:center;gap:6px;padding:9px 22px;border-radius:50px;font-size:12px;font-weight:700;background:#002583;color:#fff;text-decoration:none;box-shadow:0 2px 10px rgba(0,37,131,.22);">
+    ← Back to policies
+   </a>
+  </div>
+
+  {% else %}
+  <div id="run-card"
+       x-data="mappingProgress({{ analysis.pk }}, {{ analysis.progress_pct|default:0 }}, '{{ analysis.current_obligation_label|escapejs }}')"
+       x-init="init()"
+       style="width:100%;max-width:540px;background:#fff;border:1px solid #E5E8EF;border-radius:18px;padding:28px 32px;box-shadow:0 2px 14px rgba(0,37,131,.07);">
+
+   <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px;">
+    <div style="width:44px;height:44px;border:4px solid #E5E8EF;border-top-color:#002583;border-radius:50%;animation:spin 0.9s linear infinite;flex-shrink:0;"></div>
+    <div style="min-width:0;">
+     <p style="font-size:14px;font-weight:700;color:#002583;margin:0;">Mapping policy coverage</p>
+     <p style="font-size:11px;color:#7B8499;margin:2px 0 0;">Reading the policy, retrieving regulation clauses, scoring each obligation, verifying citations.</p>
+    </div>
+   </div>
+
+   {# Progress bar #}
+   <div style="background:#F0F3F9;border-radius:99px;height:8px;overflow:hidden;margin-bottom:8px;">
+    <div :style="'width:' + Math.max(pct, 4) + '%;'"
+         style="height:100%;border-radius:99px;background:#002583;transition:width .4s ease;"></div>
+   </div>
+   <div style="display:flex;justify-content:space-between;align-items:center;font-size:10.5px;color:#7B8499;margin-bottom:14px;">
+    <span x-text="label || 'Starting…'" style="color:#002583;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+    <span style="font-weight:700;color:#002583;flex-shrink:0;margin-left:8px;cursor:help;"
+          :title="'Step ' + current + ' of ' + total + ' regulations'">
+      <span x-text="pct"></span>% of regulations
+    </span>
+   </div>
+
+   {# Status row — what's happening + elapsed time #}
+   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;">
+    <div style="background:#F4F6FB;border-radius:8px;padding:9px 12px;cursor:help;" title="Each step is one regulation being mapped. Progress = step / total regulations.">
+     <p style="font-size:9px;font-weight:700;color:#7B8499;text-transform:uppercase;letter-spacing:.07em;margin:0 0 2px;">Regulation</p>
+     <p style="font-size:13px;font-weight:700;color:#002583;margin:0;">
+      <span x-text="current"></span> of <span x-text="total || '?'"></span>
+     </p>
+    </div>
+    <div style="background:#F4F6FB;border-radius:8px;padding:9px 12px;">
+     <p style="font-size:9px;font-weight:700;color:#7B8499;text-transform:uppercase;letter-spacing:.07em;margin:0 0 2px;">Elapsed</p>
+     <p style="font-size:13px;font-weight:700;color:#002583;margin:0;font-variant-numeric:tabular-nums;" x-text="elapsedDisplay"></p>
+    </div>
+   </div>
+
+   <form method="post" action="{% url 'mapping-cancel' analysis.pk %}" style="text-align:center;">
+    {% csrf_token %}
+    <button type="submit"
+            style="padding:7px 18px;border-radius:50px;font-size:11px;font-weight:700;border:1px solid #E5E8EF;background:#fff;color:#7B8499;cursor:pointer;font-family:inherit;">
+     Cancel
+    </button>
+   </form>
+  </div>
+  {% endif %}
+
+ </div>
+</div>
+
+<style>@keyframes spin { to { transform:rotate(360deg); } }</style>
+
+{% if not failed %}
+<script>
+function mappingProgress(analysisId, initialPct, initialLabel) {
+  return {
+    pct:   initialPct,
+    label: initialLabel,
+    current: 0,
+    total:   0,
+    elapsedDisplay: '0s',
+    _started: 0,
+    _done:   false,
+    _pollHandle: null,
+    init() {
+      this._started = Date.now();
+      // Elapsed timer — updates every 250ms locally so the user always sees motion.
+      setInterval(() => {
+        if (this._done) return;
+        const s = Math.floor((Date.now() - this._started) / 1000);
+        this.elapsedDisplay = s < 60 ? s + 's' : Math.floor(s/60) + 'm ' + (s%60) + 's';
+      }, 250);
+      // Progress poll — fire once immediately, then every 2s.
+      this.poll();
+      this._pollHandle = setInterval(() => this.poll(), 2000);
+    },
+    async poll() {
+      if (this._done) return;
+      try {
+        const r = await fetch('/mapping/' + analysisId + '/progress/', {
+          cache: 'no-store',
+          credentials: 'same-origin',
+        });
+        if (!r.ok) return;
+        const d = await r.json();
+        // Take pct unconditionally so 0% doesn't silently revert to a stale value.
+        if (typeof d.pct === 'number')     this.pct = d.pct;
+        if (typeof d.label === 'string')   this.label = d.label;
+        if (typeof d.current === 'number') this.current = d.current;
+        if (typeof d.total === 'number')   this.total = d.total;
+        const status = (d.status || '').toLowerCase();
+        // Any terminal status leaves this page. `complete` and `approved`
+        // go to the workspace; failure or cancellation reloads so the
+        // backend renders the failed/cancelled banner.
+        if (status === 'complete' || status === 'review' || status === 'approved') {
+          this._done = true;
+          if (this._pollHandle) clearInterval(this._pollHandle);
+          // `replace` so the running URL isn't kept in the back-stack.
+          window.location.replace('/mapping/' + analysisId + '/');
+        } else if (status === 'failed' || status === 'cancelled') {
+          this._done = true;
+          if (this._pollHandle) clearInterval(this._pollHandle);
+          window.location.reload();
+        }
+      } catch (e) { /* keep polling */ }
+    },
+  };
+}
+</script>
+{% endif %}
+{% endblock %}

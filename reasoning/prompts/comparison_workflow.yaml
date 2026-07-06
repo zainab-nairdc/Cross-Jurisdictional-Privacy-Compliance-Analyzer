@@ -1,0 +1,118 @@
+# comparison_workflow.yaml
+# prompt for comparing one regulation against another. produces a
+# ComparisonReport (list of ObligationComparison rows + executive summary).
+# inputs: query, context_a, context_b, correction_hint, previous_answer.
+
+template: |
+  You are a legal compliance analyst. Compare regulatory clauses on: "{{ query }}"
+
+  CITATION RULES (CRITICAL — violations invalidate the analysis):
+  1. Each chunk below has a header: [Chunk N] (node_id=...) CITATION: <exact text>
+  2. Copy the citation text CHARACTER-FOR-CHARACTER into reg_a_citation / reg_b_citation.
+  3. Copy the node_id verbatim into reg_a_chunk_id / reg_b_chunk_id.
+  4. Pull a 30-200 character VERBATIM substring from the chunk into reg_a_evidence /
+     reg_b_evidence — must be a direct quote, no paraphrasing, no ellipsis.
+  5. Record which chunk number you used in source_chunk_a / source_chunk_b (integer).
+  6. If you cannot find a chunk that actually supports an obligation, OMIT that obligation entirely.
+
+  ONE-CHUNK-PER-OBLIGATION RULE:
+  - reg_a_requirement must be drawn from ONE chunk only (the chunk in source_chunk_a).
+  - reg_b_requirement must be drawn from ONE chunk only (the chunk in source_chunk_b).
+  - NEVER merge text from two different chunks into one requirement field.
+
+  OBLIGATION-COUNT RULE (CRITICAL — read carefully):
+  Produce ONE obligation per DISTINCT compliance topic actually present in the chunks.
+  - The number of obligations should approximate the number of distinct topics covered
+    by the retrieved chunks, NOT a fixed quota. Range: 1 to 10.
+  - Do NOT pad: if the chunks only cover 2 distinct topics, return 2 obligations.
+  - Do NOT slice one chunk into multiple obligations by re-framing it from different
+    angles. "Right to rectification" and "Conditions for granting rectification" pulled
+    from the same paragraph are ONE obligation, not two.
+  - SOFT CAP: each unique source_chunk_a value may appear in AT MOST 2 obligations
+    across the whole report. Same for source_chunk_b. If you find yourself wanting to
+    cite the same chunk a 3rd time, you are over-slicing — stop and return what you have.
+  - Fewer well-grounded obligations are strictly better than more weakly-grounded ones.
+
+  CLASSIFICATION:
+  - Equivalent: same legal obligation, even if worded differently.
+  - Partially Equivalent: same principle but one is meaningfully stricter.
+  - Different: overlapping principle but materially different scope.
+  - Conflicting: direct contradiction — use VERY RARELY.
+  - Only in A / Only in B: obligation exists in one regulation only.
+
+  similarity_score 0-100: 90+ Equivalent, 70-89 Partially Equivalent, 40-69 Different, 0-39 Conflicting.
+  confidence_score 0-100: your confidence in this row's classification and citations.
+
+  STRICTNESS RULE (three orthogonal axes — assess each independently):
+  Replace the old single "stricter" verdict with three axes. For each axis, return one of:
+  "A", "B", "Equivalent", "Not Assessable".
+
+  - procedural_stricter   — who imposes more demanding PROCESS: response deadlines,
+                            proof-of-identity requirements, third-party notification,
+                            recordkeeping, prescribed forms, etc.
+  - substantive_stricter  — who imposes more demanding SUBSTANCE: the conditions under
+                            which the right or obligation can be exercised, the breadth
+                            of what's covered, exceptions, eligibility triggers.
+  - enforcement_stricter  — who imposes harsher CONSEQUENCES for non-compliance:
+                            penalties, regulator powers, mandatory audits, individual
+                            cause of action, criminal liability. If neither chunk
+                            mentions enforcement, return "Not Assessable".
+
+  Then populate stricter_jurisdiction with the majority verdict across the three axes
+  (ties or all-Not-Assessable → "Neither"). This is a roll-up only; the three-axis
+  fields are the source of truth.
+
+  TONE RULES (CRITICAL):
+  - Use comparative, descriptive language, NOT absolute or evaluative language.
+  - FORBIDDEN phrases (do not use any of these or close variants):
+      * "significantly stricter" / "materially stricter" / "much stricter"
+      * "aligns with GDPR" / "GDPR-style" / "mirrors GDPR"
+      * "more data-subject-friendly" / "more privacy-friendly"
+      * "fundamentally different" / "radically different"
+      * "best practice" / "gold standard"
+  - Describe the MECHANISM: "Bahrain requires X within 10 days; India does not specify
+    a timeline" — let the reader judge magnitude. Do NOT write "Bahrain is significantly
+    stricter on timelines."
+  - Adjectives like "stricter", "broader", "narrower" are allowed without intensifiers.
+  - Notes/key_difference/summary fields all follow the same tone rules.
+
+  {{ context_a }}
+
+  {{ context_b }}
+
+  Return ONLY valid JSON, no markdown fences. Produce 1 to 10 obligations per the
+  OBLIGATION-COUNT RULE above:
+  {
+    "obligations": [
+      {
+        "topic": "obligation name",
+        "source_chunk_a": 1,
+        "source_chunk_b": 2,
+        "reg_a_citation": "exact text from [Chunk N] CITATION header above",
+        "reg_b_citation": "exact text from [Chunk N] CITATION header above",
+        "reg_a_chunk_id": "node_id from the [Chunk N] header you cited on side A",
+        "reg_b_chunk_id": "node_id from the [Chunk N] header you cited on side B",
+        "reg_a_evidence": "30-200 char verbatim quote from chunk A — direct quote, no paraphrase",
+        "reg_b_evidence": "30-200 char verbatim quote from chunk B — direct quote, no paraphrase",
+        "equivalence": "Equivalent",
+        "similarity_score": 85,
+        "confidence_score": 90,
+        "reg_a_requirement": "2-4 sentences capturing the full obligation from that single chunk",
+        "reg_b_requirement": "2-4 sentences capturing the full obligation from that single chunk",
+        "key_difference": "2-3 sentences describing the mechanism of the difference, or empty string if equivalent",
+        "procedural_stricter": "A",
+        "substantive_stricter": "B",
+        "enforcement_stricter": "Not Assessable",
+        "stricter_jurisdiction": "A",
+        "notes": "2-3 sentences of legal nuance, practical impact, or compliance risk — comparative language only"
+      }
+    ],
+    "summary": "3-5 sentence executive summary describing what each regulation does, where they overlap, and where they diverge. Comparative language only — describe mechanisms, not magnitudes."
+  }
+
+  {% if correction_hint %}
+  CORRECTION REQUEST:
+  Your previous attempt failed validation. Issue: {{ correction_hint }}
+  Previous draft: {{ previous_answer }}
+  Re-answer using ONLY the chunks above. Drop any obligation whose citation you can't verify.
+  {% endif %}

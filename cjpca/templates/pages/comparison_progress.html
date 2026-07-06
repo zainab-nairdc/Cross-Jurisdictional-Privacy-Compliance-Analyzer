@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Running Comparison — CJPCA{% endblock %}
+
+{% block extra_head %}
+<style>
+ @keyframes spin { to { transform: rotate(360deg); } }
+ @keyframes pulse { 0%,100%{opacity:.5} 50%{opacity:1} }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="flex flex-col h-full items-center justify-center bg-gray-50" style="padding:40px;">
+
+ {# ── Progress card ──────────────────────────────────────────────────────── #}
+ <div style="background:#fff;border:1px solid #E5E8EF;border-radius:16px;padding:36px 40px;max-width:520px;width:100%;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.06);">
+
+ {# Spinner #}
+ <div style="display:flex;align-items:center;justify-content:center;margin-bottom:20px;">
+ <div style="width:40px;height:40px;border:3px solid #E5E8EF;border-top-color:#002583;border-radius:50%;animation:spin .8s linear infinite;"></div>
+ </div>
+
+ <p style="font-size:15px;font-weight:700;color:#002583;margin:0 0 4px;">Analyzing regulations…</p>
+ <p style="font-size:12px;color:#002583;margin:0 0 20px;">
+ {{ run.reg_a.name }} vs {{ run.reg_b.name }}
+ </p>
+
+ {# Topics #}
+ {% if run.topics %}
+ <div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-bottom:20px;">
+ {% for topic in run.topics %}
+ <span style="padding:3px 10px;border-radius:20px;background:#ffffff;color:#002583;font-size:10px;font-weight:600;">{{ topic|title }}</span>
+ {% endfor %}
+ </div>
+ {% else %}
+ <div style="margin-bottom:20px;">
+ <span style="padding:3px 10px;border-radius:20px;background:#ffffff;color:#002583;font-size:10px;font-weight:600;">Full comparison</span>
+ </div>
+ {% endif %}
+
+ {# Live poll area — HTMX updates this every 2.5s #}
+ <div
+ id="progress-poll"
+ hx-get="{% url 'comparison-run-status' run.pk %}"
+ hx-trigger="load, every 2500ms"
+ hx-target="#progress-poll"
+ hx-swap="outerHTML"
+ >
+ {% include 'partials/_run_progress_poll.html' %}
+ </div>
+
+ <p style="font-size:10px;color:#ffffff;margin-top:20px;">
+ The AI is reading both regulations and generating clause-pair analysis. CPU inference typically takes
+ <strong style="color:#002583;">2–5 minutes</strong> — the page will redirect automatically when done.
+ </p>
+
+ <p style="font-size:10px;color:#002583;margin-top:8px;">
+ Running for <span id="elapsed-time" style="font-weight:700;">0s</span>
+ </p>
+
+ {# Cancel #}
+ <a href="{% url 'comparison' %}"
+ style="display:inline-block;margin-top:16px;font-size:11px;color:#002583;text-decoration:underline;">
+ Cancel and return
+ </a>
+
+ </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+ const start = Date.now();
+ setInterval(function () {
+ const s = Math.floor((Date.now() - start) / 1000);
+ const el = document.getElementById('elapsed-time');
+ if (!el) return;
+ el.textContent = s >= 60 ? Math.floor(s / 60) + 'm ' + (s % 60) + 's' : s + 's';
+ }, 1000);
+})();
+</script>
+{% endblock %}

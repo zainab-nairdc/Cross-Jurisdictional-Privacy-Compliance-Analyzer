@@ -1,0 +1,73 @@
+﻿{% load tz %}
+{% if grouped_events %}
+
+ {% for date, events in grouped_events %}
+
+ {# Sticky date header #}
+ <div style="position:sticky;top:0;z-index:10;background:#F7F9FC;border-bottom:1px solid #E5E8EF;padding:6px 16px;display:flex;align-items:center;gap:8px;">
+ <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#002583;white-space:nowrap;">
+ {{ date|date:"D, d M Y" }}
+ </span>
+ <div style="flex:1;height:1px;background:#E5E8EF;"></div>
+ <span style="font-size:9px;font-weight:700;color:#6B7280;font-family:'Satoshi',sans-serif;background:#E5E8EF;padding:2px 7px;border-radius:20px;">{{ events|length }}</span>
+ </div>
+
+ {# Events for this date #}
+ {% for event in events %}
+ <div class="hs-event-row"
+ hx-get="{% url 'history-event' event.pk %}"
+ hx-target="#history-detail"
+ hx-swap="innerHTML">
+ <div style="display:flex;align-items:flex-start;gap:10px;">
+
+ {# Colored dot #}
+ <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px;background:{{ event.meta.color }};"></div>
+
+ {# Content #}
+ <div style="flex:1;min-width:0;">
+ <p style="font-size:12px;font-weight:600;color:#002583;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+ {{ event.description|truncatechars:55 }}
+ </p>
+ <div style="display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap;">
+ <span style="padding:1px 7px;border-radius:4px;font-size:9px;font-weight:700;background:{{ event.meta.bg }};color:{{ event.meta.color }};">
+ {{ event.meta.label }}
+ </span>
+ <span style="font-size:10px;color:#002583;font-family:'Satoshi',sans-serif;">
+ {{ event.timestamp|localtime|date:"H:i" }}
+ </span>
+ {% if event.user_label %}
+ <span style="display:inline-flex;align-items:center;gap:5px;margin-left:4px;">
+ <span style="width:16px;height:16px;border-radius:50%;background:#002583;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff;flex-shrink:0;">
+ {{ event.user_label|first|upper }}
+ </span>
+ <span style="font-size:10px;color:#1F2937;font-weight:500;">{{ event.user_label }}</span>
+ </span>
+ {% endif %}
+ </div>
+ </div>
+
+ {# Chevron #}
+ <svg style="flex-shrink:0;color:#9CA3AF;margin-top:2px;" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+ </svg>
+
+ </div>
+ </div>
+ {% endfor %}
+
+ {% endfor %}
+
+{% else %}
+
+ {# Empty state #}
+ <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 24px;text-align:center;">
+ <div style="width:44px;height:44px;border-radius:12px;background:#E5E8EF;display:flex;align-items:center;justify-content:center;margin-bottom:12px;">
+ <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="1.5">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
+ </svg>
+ </div>
+ <p style="font-size:12px;font-weight:600;color:#002583;margin-bottom:3px;">No events found</p>
+ <p style="font-size:11px;color:#6B7280;line-height:1.5;">Try adjusting your filters or clearing the search.</p>
+ </div>
+
+{% endif %}

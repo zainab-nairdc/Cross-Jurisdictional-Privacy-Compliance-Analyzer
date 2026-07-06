@@ -1,0 +1,125 @@
+D:\Cross-Jurisdictional Privacy Compliance Analyzer\.venv\Lib\site-packages\langchain_core\_api\deprecation.py:25: UserWarning: Core Pydantic V1 functionality isn't compatible with Python 3.14 or greater.
+  from pydantic.v1.fields import FieldInfo as FieldInfoV1
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+====================================================================================================
+  RETRIEVER COMPARISON: custom (function-based) vs llamaindex (class-based)
+====================================================================================================
+
+  warming up llamaindex retriever...
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 9982.62it/s]
+[1mBertModel LOAD REPORT[0m from: BAAI/bge-small-en-v1.5
+Key                     | Status     |  | 
+------------------------+------------+--+-
+embeddings.position_ids | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+  init: 6.6s
+  warming up models with one query each...
+  [retriever] Loading embedding model: BAAI/bge-small-en-v1.5... Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 9353.58it/s]
+[1mBertModel LOAD REPORT[0m from: BAAI/bge-small-en-v1.5
+Key                     | Status     |  | 
+------------------------+------------+--+-
+embeddings.position_ids | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+done
+  [reranker] Loading bge-reranker-large... The Transformer `cache_dir` argument is deprecated. Please pass `cache_dir` via `model_kwargs`, `processor_kwargs`, and/or `config_kwargs` instead.
+Loading weights:   0%|          | 0/393 [00:00<?, ?it/s]Loading weights: 100%|██████████| 393/393 [00:00<00:00, 8661.86it/s]
+[1mXLMRobertaForSequenceClassification LOAD REPORT[0m from: BAAI/bge-reranker-large
+Key                             | Status     |  | 
+--------------------------------+------------+--+-
+roberta.embeddings.position_ids | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+D:\Cross-Jurisdictional Privacy Compliance Analyzer\.venv\Lib\site-packages\huggingface_hub\file_download.py:138: UserWarning: `huggingface_hub` cache-system uses symlinks by default to efficiently store duplicated files but your machine does not support them in C:\Users\Uni\.cache\huggingface\hub\models--cross-encoder--ms-marco-MiniLM-L-6-v2. Caching files will still work but in a degraded version that might require more space on your disk. This warning can be disabled by setting the `HF_HUB_DISABLE_SYMLINKS_WARNING` environment variable. For more details, see https://huggingface.co/docs/huggingface_hub/how-to-cache#limitations.
+To support symlinks on Windows, you either need to activate Developer Mode or to run Python as an administrator. In order to activate developer mode, see this article: https://docs.microsoft.com/en-us/windows/apps/get-started/enable-your-device-for-development
+  warnings.warn(message)
+done
+Loading weights:   0%|          | 0/105 [00:00<?, ?it/s]Loading weights: 100%|██████████| 105/105 [00:00<00:00, 8521.38it/s]
+[1mBertForSequenceClassification LOAD REPORT[0m from: cross-encoder/ms-marco-MiniLM-L-6-v2
+Key                          | Status     |  | 
+-----------------------------+------------+--+-
+bert.embeddings.position_ids | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+  done.
+
+====================================================================================================
+  Q1 cross-jurisdictional
+  query : 'What are the penalties for unauthorized disclosure of personal data?'
+
+  CUSTOM ( 33913ms)                                                      LLAMAINDEX (  1998ms)
+  -----------------------------------------------------------------------------------------------
+  #1 [Bahrain] +0.387  Personal Data Protection Law 30/2018 > L  |  #1 [Kuwait ] +2.814  Kuwait Cybercrime Law No. 63/2015
+  #2 [Kuwait ] +0.112  Kuwait Cybercrime Law No. 63/2015        |  #2 [Bahrain] +1.228  Personal Data Protection Law 30/2018 > L
+  #3 [India  ] +0.094  Information Technology Act 2000 > THE IN  |  #3 [India  ] -0.410  Information Technology Act 2000 > THE IN
+
+  top-1 match: NO
+
+====================================================================================================
+  Q2 bahrain-only breach timeline
+  query : 'breach notification timeline'
+  filter: {'jurisdiction': 'bahrain'}
+
+  CUSTOM ( 35526ms)                                                      LLAMAINDEX (  1464ms)
+  -----------------------------------------------------------------------------------------------
+  #1 [Bahrain] +0.372                                           |  #1 [Bahrain] +1.734  PDPA Ministerial Order 43/2022 > Article
+  #2 [Bahrain] +0.372  PDPA Ministerial Order 43/2022 > Article  |  #2 [Bahrain] +0.460  PDPA Ministerial Order 43/2022 > For the
+  #3 [Bahrain] +0.028  PDPA Ministerial Order 44/2022 > Article  |  #3 [Bahrain] -4.683  Personal Data Protection Law 30/2018 > L
+
+  top-1 match: NO
+
+====================================================================================================
+  Q3 entity-heavy children's data
+  query : "processing children's personal data with parental consent"
+
+  CUSTOM ( 35765ms)                                                      LLAMAINDEX (  1652ms)
+  -----------------------------------------------------------------------------------------------
+  #1 [India  ] +0.961  Digital Personal Data Protection Rules 2  |  #1 [India  ] +1.342  Digital Personal Data Protection Rules 2
+  #2 [India  ] +0.910  Digital Personal Data Protection Act 202  |  #2 [India  ] +0.697  
+  #3 [India  ] +0.553                                           |  #3 [India  ] +0.365  
+
+  top-1 match: NO
+
+====================================================================================================
+  Q4 bbk vendor agreements
+  query : 'vendor agreement requirements for sharing customer data'
+  filter: {'jurisdiction': 'bbk'}
+
+  CUSTOM ( 17044ms)                                                      LLAMAINDEX (  1107ms)
+  -----------------------------------------------------------------------------------------------
+  #1 [BBK    ] +0.810                                           |  #1 [BBK    ] +2.411  BBK Third Party Data Sharing Guideline v
+  #2 [BBK    ] +0.810  BBK Customer Data Handling Procedure v1   |  #2 [BBK    ] +1.313  
+  #3 [BBK    ] +0.635                                           |  #3 [BBK    ] +1.216  BBK Third Party Vendor Data Processing P
+
+  top-1 match: NO
+
+====================================================================================================
+  Q5 dpo appointment
+  query : 'When is appointment of a Data Protection Officer mandatory?'
+
+  CUSTOM ( 36569ms)                                                      LLAMAINDEX (  1625ms)
+  -----------------------------------------------------------------------------------------------
+  #1 [BBK    ] +0.386  BBK Data Privacy Statement (Board Approv  |  #1 [Bahrain] +2.451  PDPA Ministerial Order 46/2022 > Article
+  #2 [BBK    ] +0.099  BBK Data Privacy Protection Policy v1 (L  |  #2 [India  ] -0.891  
+  #3 [BBK    ] +0.099                                           |  #3 [India  ] -1.019  Digital Personal Data Protection Rules 2
+
+  top-1 match: NO
+
+====================================================================================================
+  SUMMARY
+====================================================================================================
+  query                                         agree       custom       llama
+  Q1 cross-jurisdictional                       N           33913ms       1998ms
+  Q2 bahrain-only breach timeline               N           35526ms       1464ms
+  Q3 entity-heavy children's data               N           35765ms       1652ms
+  Q4 bbk vendor agreements                      N           17044ms       1107ms
+  Q5 dpo appointment                            N           36569ms       1625ms
+
+  agreement on top-1 : 0 / 5
+  avg custom latency : 31763 ms
+  avg llama  latency : 1569 ms

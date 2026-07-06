@@ -1,0 +1,355 @@
+{% load static %}
+{% comment %}Collapsible sidebar — expands to 192px, collapses to 52px (icon only).{% endcomment %}
+{% url 'home' as url_home %}
+{% url 'comparison' as url_comparison %}
+{% url 'comparison-analyst' as url_comparison_analyst %}
+{% url 'mapping' as url_mapping %}
+{% url 'review' as url_review %}
+{% url 'analytics' as url_analytics %}
+{% url 'history' as url_history %}
+{% url 'library-regulations' as url_regulations %}
+{% url 'library-policies' as url_policies %}
+
+{% with cur=request.resolver_match.url_name %}
+
+<aside :class="sidebarOpen ? 'w-56' : 'w-[72px]'"
+ class="flex-shrink-0 h-full flex flex-col border-r transition-all duration-200 overflow-hidden"
+ style="background:#fff;border-color:#E5E8EF;">
+
+ {# Logo header — clicking toggles the sidebar. #}
+ <div class="flex items-center justify-center flex-shrink-0 cursor-pointer"
+ @click="sidebarOpen = !sidebarOpen; localStorage.setItem('sidebarOpen', sidebarOpen)"
+ style="height:96px;border-bottom:1px solid #E5E8EF;background:#FAFBFD;"
+ :title="sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'">
+ <img src="{% static 'img/logo.png' %}" alt="Logo"
+      :style="sidebarOpen
+       ? 'height:64px;width:64px;object-fit:cover;border-radius:16px;border:1px solid #E5E8EF;background:#fff;box-shadow:0 2px 10px rgba(0,37,131,.14);transition:all .2s;'
+       : 'height:48px;width:48px;object-fit:cover;border-radius:12px;border:1px solid #E5E8EF;background:#fff;box-shadow:0 2px 8px rgba(0,37,131,.12);transition:all .2s;'">
+ </div>
+
+ {# ── Navigation ── #}
+ <nav class="flex-1 overflow-y-auto py-3 space-y-4 overflow-x-hidden">
+
+ {# ── Main ── #}
+ <div>
+ <p x-show="sidebarOpen" class="px-3 mb-1 text-[10px] font-bold uppercase tracking-[0.07em]" style="color:#002583;">Main</p>
+ <ul class="space-y-0.5 px-2">
+
+ {# Home #}
+ <li>
+ <a href="{{ url_home }}" title="Home"
+ class="flex items-center py-1.5 rounded-md text-sm transition-colors"
+ :class="sidebarOpen ? 'gap-2.5 px-2' : 'justify-center px-1'"
+ {% if cur == 'home' %}
+ style="background:#ffffff;color:#002583;font-weight:600;"
+ {% else %}
+ style="color:#002583;"
+ onmouseover="this.style.background='#ffffff';this.style.color='#002583'"
+ onmouseout="this.style.background='';this.style.color='#002583'"
+ {% endif %}>
+ <svg class="h-3.5 w-3.5 flex-shrink-0"
+ style="color:{% if cur == 'home' %}#002583{% else %}#002583{% endif %};"
+ fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"/>
+ </svg>
+ <span x-show="sidebarOpen" class="whitespace-nowrap">Home</span>
+ </a>
+ </li>
+
+ {% comment %}
+ Comparison — analyst-only nav. Reviewers/admins reach individual
+ comparison results via the Review & Validate queue rather than the
+ pair-picker landing, so the link itself is hidden for them.
+ {% endcomment %}
+ {% if is_analyst %}
+ <li>
+ <a href="{{ url_comparison }}" title="Comparison"
+ class="flex items-center py-1.5 rounded-md text-sm transition-colors"
+ :class="sidebarOpen ? 'gap-2.5 px-2' : 'justify-center px-1'"
+ {% if cur == 'comparison-analyst' or cur == 'comparison' or cur == 'comparison-setup' or cur == 'comparison-workspace' or cur == 'comparison-pair' %}
+ style="background:#ffffff;color:#002583;font-weight:600;"
+ {% else %}
+ style="color:#002583;"
+ onmouseover="this.style.background='#ffffff';this.style.color='#002583'"
+ onmouseout="this.style.background='';this.style.color='#002583'"
+ {% endif %}>
+ <svg class="h-3.5 w-3.5 flex-shrink-0"
+ style="color:{% if cur == 'comparison-analyst' or cur == 'comparison' or cur == 'comparison-setup' or cur == 'comparison-workspace' or cur == 'comparison-pair' %}#002583{% else %}#002583{% endif %};"
+ fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/>
+ </svg>
+ <span x-show="sidebarOpen" class="whitespace-nowrap">Comparison</span>
+ </a>
+ </li>
+ {% endif %}
+
+ {# Policy Mapping — analyst-only nav (see comment above on Comparison). #}
+ {% if is_analyst %}
+ <li>
+ <a href="{{ url_mapping }}" title="Policy Mapping"
+ class="flex items-center py-1.5 rounded-md text-sm transition-colors"
+ :class="sidebarOpen ? 'gap-2.5 px-2 justify-between' : 'justify-center px-1'"
+ {% if cur == 'mapping' or cur == 'mapping-setup' or cur == 'mapping-run' or cur == 'mapping-running' or cur == 'mapping-workspace' or cur == 'mapping-evidence' or cur == 'mapping-send-to-review' %}
+ style="background:#ffffff;color:#002583;font-weight:600;"
+ {% else %}
+ style="color:#002583;"
+ onmouseover="this.style.background='#ffffff';this.style.color='#002583'"
+ onmouseout="this.style.background='';this.style.color='#002583'"
+ {% endif %}>
+ <span class="flex items-center" :class="sidebarOpen ? 'gap-2.5' : ''">
+ <svg class="h-3.5 w-3.5 flex-shrink-0"
+ style="color:{% if cur == 'mapping' or cur == 'mapping-setup' or cur == 'mapping-run' or cur == 'mapping-running' or cur == 'mapping-workspace' or cur == 'mapping-evidence' or cur == 'mapping-send-to-review' %}#002583{% else %}#002583{% endif %};"
+ fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0z"/>
+ </svg>
+ <span x-show="sidebarOpen" class="whitespace-nowrap">Policy Mapping</span>
+ </span>
+ {% if nav_open_gaps %}
+ <span x-show="sidebarOpen" class="px-1.5 py-0.5 rounded-full text-[10px] font-bold leading-none" style="background:#002583;color:#fff;">{{ nav_open_gaps }}</span>
+ {% endif %}
+ </a>
+ </li>
+ {% endif %}
+
+ {# Review & Validate — reviewer only (admin excluded by request) #}
+ {% if is_reviewer %}
+ <li>
+ <a href="{{ url_review }}" title="Review & Validate"
+ class="flex items-center py-1.5 rounded-md text-sm transition-colors"
+ :class="sidebarOpen ? 'gap-2.5 px-2 justify-between' : 'justify-center px-1'"
+ {% if cur == 'review' or cur == 'review-item' or cur == 'review-export' %}
+ style="background:#ffffff;color:#002583;font-weight:600;"
+ {% else %}
+ style="color:#002583;"
+ onmouseover="this.style.background='#ffffff';this.style.color='#002583'"
+ onmouseout="this.style.background='';this.style.color='#002583'"
+ {% endif %}>
+ <span class="flex items-center" :class="sidebarOpen ? 'gap-2.5' : ''">
+ <svg class="h-3.5 w-3.5 flex-shrink-0"
+ style="color:{% if cur == 'review' or cur == 'review-item' or cur == 'review-export' %}#002583{% else %}#002583{% endif %};"
+ fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M11.35 3.836c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m8.9-4.414c.376.023.75.05 1.124.08 1.131.094 1.976 1.057 1.976 2.192V16.5A2.25 2.25 0 0118 18.75h-2.25m-7.5-10.5H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V18.75m-7.5-10.5h6.375c.621 0 1.125.504 1.125 1.125v9.375m-8.25-3l1.5 1.5 3-3.75"/>
+ </svg>
+ <span x-show="sidebarOpen" class="whitespace-nowrap">Review & Validate</span>
+ </span>
+ {% if nav_pending_review %}
+ <span x-show="sidebarOpen" class="px-1.5 py-0.5 rounded-full text-[10px] font-bold leading-none" style="background:#002583;color:#fff;">{{ nav_pending_review }}</span>
+ {% endif %}
+ </a>
+ </li>
+ {% endif %}
+
+ </ul>
+ </div>
+
+ {# ── Insights ── #}
+ <div>
+ <p x-show="sidebarOpen" class="px-3 mb-1 text-[10px] font-bold uppercase tracking-[0.07em]" style="color:#002583;">Insights</p>
+ <ul class="space-y-0.5 px-2">
+
+ {% comment %}
+ History is admin-only by request — analysts and reviewers no longer
+ see the audit log at all. View gate lives in apps.history.views.
+ {% endcomment %}
+ {% if is_admin %}
+ <li>
+ <a href="{{ url_history }}" title="History"
+ class="flex items-center py-1.5 rounded-md text-sm transition-colors"
+ :class="sidebarOpen ? 'gap-2.5 px-2' : 'justify-center px-1'"
+ {% if cur == 'history' %}
+ style="background:#ffffff;color:#002583;font-weight:600;"
+ {% else %}
+ style="color:#002583;"
+ onmouseover="this.style.background='#ffffff';this.style.color='#002583'"
+ onmouseout="this.style.background='';this.style.color='#002583'"
+ {% endif %}>
+ <svg class="h-3.5 w-3.5 flex-shrink-0"
+ style="color:{% if cur == 'history' %}#002583{% else %}#002583{% endif %};"
+ fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
+ </svg>
+ <span x-show="sidebarOpen" class="whitespace-nowrap">History</span>
+ </a>
+ </li>
+ {% endif %}
+
+ <li>
+ <a href="{{ url_analytics }}" title="Analytics"
+ class="flex items-center py-1.5 rounded-md text-sm transition-colors"
+ :class="sidebarOpen ? 'gap-2.5 px-2' : 'justify-center px-1'"
+ {% if cur == 'analytics' or cur == 'analytics-data' %}
+ style="background:#ffffff;color:#002583;font-weight:600;"
+ {% else %}
+ style="color:#002583;"
+ onmouseover="this.style.background='#ffffff';this.style.color='#002583'"
+ onmouseout="this.style.background='';this.style.color='#002583'"
+ {% endif %}>
+ <svg class="h-3.5 w-3.5 flex-shrink-0"
+ style="color:{% if cur == 'analytics' or cur == 'analytics-data' %}#002583{% else %}#002583{% endif %};"
+ fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"/>
+ </svg>
+ <span x-show="sidebarOpen" class="whitespace-nowrap">Analytics</span>
+ </a>
+ </li>
+
+ </ul>
+ </div>
+
+ {# ── Admin section removed for the PoC (no roles / user management) ── #}
+ {% if False %}
+ <div>
+ <p x-show="sidebarOpen" class="px-3 mb-1 text-[10px] font-bold uppercase tracking-[0.07em]" style="color:#002583;">Admin</p>
+ <ul class="space-y-0.5 px-2">
+
+ <li>
+ <a href="{{ url_users }}" title="User Management"
+ class="flex items-center py-1.5 rounded-md text-sm transition-colors"
+ :class="sidebarOpen ? 'gap-2.5 px-2' : 'justify-center px-1'"
+ {% if cur == 'user-management' %}
+ style="background:#ffffff;color:#002583;font-weight:600;"
+ {% else %}
+ style="color:#002583;"
+ onmouseover="this.style.background='#ffffff';this.style.color='#002583'"
+ onmouseout="this.style.background='';this.style.color='#002583'"
+ {% endif %}>
+ <svg class="h-3.5 w-3.5 flex-shrink-0"
+ style="color:{% if cur == 'user-management' %}#002583{% else %}#002583{% endif %};"
+ fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"/>
+ </svg>
+ <span x-show="sidebarOpen" class="whitespace-nowrap">Users</span>
+ </a>
+ </li>
+
+ <li>
+ <a href="{{ url_monitoring }}" title="System Monitoring"
+ class="flex items-center py-1.5 rounded-md text-sm transition-colors"
+ :class="sidebarOpen ? 'gap-2.5 px-2' : 'justify-center px-1'"
+ {% if cur == 'system-monitoring' %}
+ style="background:#ffffff;color:#002583;font-weight:600;"
+ {% else %}
+ style="color:#002583;"
+ onmouseover="this.style.background='#ffffff';this.style.color='#002583'"
+ onmouseout="this.style.background='';this.style.color='#002583'"
+ {% endif %}>
+ <svg class="h-3.5 w-3.5 flex-shrink-0"
+ style="color:{% if cur == 'system-monitoring' %}#002583{% else %}#002583{% endif %};"
+ fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25"/>
+ </svg>
+ <span x-show="sidebarOpen" class="whitespace-nowrap">Monitoring</span>
+ </a>
+ </li>
+
+ <li>
+ <a href="{{ url_quarantine }}" title="Injection Quarantine Queue"
+ class="flex items-center py-1.5 rounded-md text-sm transition-colors"
+ :class="sidebarOpen ? 'gap-2.5 px-2 justify-between' : 'justify-center px-1'"
+ {% if cur == 'quarantine-queue' %}
+ style="background:#ffffff;color:#002583;font-weight:600;"
+ {% else %}
+ style="color:#002583;"
+ onmouseover="this.style.background='#ffffff';this.style.color='#002583'"
+ onmouseout="this.style.background='';this.style.color='#002583'"
+ {% endif %}>
+ <span class="flex items-center" :class="sidebarOpen ? 'gap-2.5' : ''">
+ <svg class="h-3.5 w-3.5 flex-shrink-0"
+ style="color:{% if cur == 'quarantine-queue' %}#002583{% else %}#002583{% endif %};"
+ fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z"/>
+ </svg>
+ <span x-show="sidebarOpen" class="whitespace-nowrap">Quarantine</span>
+ </span>
+ {% if nav_quarantine_pending %}
+ <span x-show="sidebarOpen" class="px-1.5 py-0.5 rounded-full text-[10px] font-bold leading-none" style="background:#002583;color:#fff;">{{ nav_quarantine_pending }}</span>
+ {% endif %}
+ </a>
+ </li>
+
+ </ul>
+ </div>
+ {% endif %}
+
+ {# ── Library ── #}
+ <div>
+ <p x-show="sidebarOpen" class="px-3 mb-1 text-[10px] font-bold uppercase tracking-[0.07em]" style="color:#002583;">Library</p>
+ <ul class="space-y-0.5 px-2">
+
+ <li>
+ <a href="{{ url_regulations }}" title="Regulations"
+ class="flex items-center py-1.5 rounded-md text-sm transition-colors"
+ :class="sidebarOpen ? 'gap-2.5 px-2 justify-between' : 'justify-center px-1'"
+ {% if cur == 'library-regulations' %}
+ style="background:#ffffff;color:#002583;font-weight:600;"
+ {% else %}
+ style="color:#002583;"
+ onmouseover="this.style.background='#ffffff';this.style.color='#002583'"
+ onmouseout="this.style.background='';this.style.color='#002583'"
+ {% endif %}>
+ <span class="flex items-center" :class="sidebarOpen ? 'gap-2.5' : ''">
+ <svg class="h-3.5 w-3.5 flex-shrink-0"
+ style="color:{% if cur == 'library-regulations' %}#002583{% else %}#002583{% endif %};"
+ fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
+ </svg>
+ <span x-show="sidebarOpen" class="whitespace-nowrap">Regulations</span>
+ </span>
+ {% if nav_reg_count %}
+ <span x-show="sidebarOpen" class="px-1.5 py-0.5 rounded-full text-[10px] font-bold leading-none" style="background:#ffffff;color:#002583;">{{ nav_reg_count }}</span>
+ {% endif %}
+ </a>
+ </li>
+
+ <li>
+ <a href="{{ url_policies }}" title="Internal Policies"
+ class="flex items-center py-1.5 rounded-md text-sm transition-colors"
+ :class="sidebarOpen ? 'gap-2.5 px-2 justify-between' : 'justify-center px-1'"
+ {% if cur == 'library-policies' %}
+ style="background:#ffffff;color:#002583;font-weight:600;"
+ {% else %}
+ style="color:#002583;"
+ onmouseover="this.style.background='#ffffff';this.style.color='#002583'"
+ onmouseout="this.style.background='';this.style.color='#002583'"
+ {% endif %}>
+ <span class="flex items-center" :class="sidebarOpen ? 'gap-2.5' : ''">
+ <svg class="h-3.5 w-3.5 flex-shrink-0"
+ style="color:{% if cur == 'library-policies' %}#002583{% else %}#002583{% endif %};"
+ fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21"/>
+ </svg>
+ <span x-show="sidebarOpen" class="whitespace-nowrap">Internal Policies</span>
+ </span>
+ {% if nav_policy_count %}
+ <span x-show="sidebarOpen" class="px-1.5 py-0.5 rounded-full text-[10px] font-bold leading-none" style="background:#ffffff;color:#002583;">{{ nav_policy_count }}</span>
+ {% endif %}
+ </a>
+ </li>
+
+ </ul>
+ </div>
+
+ </nav>
+
+ {# ── Bottom: Copilot + user ── #}
+ <div class="px-2 pb-4 pt-3 space-y-2" style="border-top:1px solid #E5E8EF;">
+
+ {% if is_analyst or is_reviewer %}
+ <button @click="copilotOpen = !copilotOpen; if (copilotOpen) docViewerOpen = false"
+ class="w-full flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors py-2"
+ :style="copilotOpen ? 'background:#002583;color:#fff;' : 'background:#002583;color:#fff;'"
+ onmouseover="this.style.background='#002583'"
+ onmouseout="this.style.background=this.dataset.bg||'#002583'"
+ :data-bg="copilotOpen ? '#002583' : '#002583'">
+ <svg class="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z"/>
+ </svg>
+ <span x-show="sidebarOpen" class="whitespace-nowrap">Copilot</span>
+ </button>
+ {% endif %}
+
+ </div>
+
+</aside>
+
+{% endwith %}

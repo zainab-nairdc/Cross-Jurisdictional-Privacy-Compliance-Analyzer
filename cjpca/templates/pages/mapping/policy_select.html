@@ -1,0 +1,404 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Policy Mapping — CJPCA{% endblock %}
+
+{% block extra_head %}
+<style>
+ :root {
+   --c-navy:        #002583;
+   --c-amber:       #FFB800;
+   --c-line:        #E5E8EF;
+   --c-line-strong: #C8CFE0;
+   --c-bg-soft:     #F4F6FB;
+   --c-bg-tint:     #EDF1FA;
+   --c-text:        #1A2440;
+   --c-text-muted:  #5A6685;
+   --c-success:     #1E7E48;
+   --c-success-bg:  #E6F5EC;
+   --c-warn:        #B86E00;
+   --c-warn-bg:     #FFF1D6;
+   --c-danger:      #C03A3A;
+   --c-danger-bg:   #FCE8E8;
+ }
+
+ /* Status pill — color-coded, distinct for attention/clean/never */
+ .status-pill {
+   display:inline-flex; align-items:center; gap:5px;
+   padding:3px 10px; border-radius:999px;
+   font-size:10px; font-weight:700; white-space:nowrap;
+ }
+ .status-pill.attention { background:var(--c-danger-bg); color:var(--c-danger); }
+ .status-pill.clean     { background:var(--c-success-bg); color:var(--c-success); }
+ .status-pill.never     { background:var(--c-bg-soft); color:var(--c-text-muted); }
+ .status-pill .dot {
+   width:6px; height:6px; border-radius:50%; background:currentColor;
+ }
+ .status-pill.attention .dot { animation: pulsedot 1.5s ease-in-out infinite; }
+
+ /* Filter chips */
+ .pol-chip {
+   padding:6px 14px; border-radius:999px;
+   font-size:11px; font-weight:600;
+   border:1px solid var(--c-line); background:#fff;
+   color:var(--c-text-muted); cursor:pointer; font-family:inherit;
+   white-space:nowrap;
+   transition:background .12s, color .12s, border-color .12s;
+ }
+ .pol-chip:hover:not(.active) { color:var(--c-text); background:var(--c-bg-soft); }
+ .pol-chip.active {
+   background:var(--c-navy); border-color:var(--c-navy); color:#fff;
+ }
+ .pol-chip .ct {
+   margin-left:6px; padding:1px 7px; border-radius:999px;
+   font-size:9px; font-weight:700;
+   background:var(--c-bg-soft); color:var(--c-text-muted);
+ }
+ .pol-chip.active .ct { background:rgba(255,255,255,0.22); color:#fff; }
+
+ /* Policy card */
+ .pol-row {
+   background:#fff; border:1px solid var(--c-line);
+   border-radius:12px;
+   padding:16px 18px;
+   display:grid;
+   grid-template-columns: minmax(0, 1fr) auto auto;
+   gap:18px; align-items:center;
+   text-decoration:none;
+   transition:border-color .12s, box-shadow .12s, transform .12s;
+   animation: faderow .15s ease both;
+ }
+ .pol-row:hover {
+   border-color:var(--c-line-strong);
+   box-shadow:0 3px 12px rgba(0,37,131,0.06);
+ }
+ .pol-row.attention { border-left:4px solid var(--c-danger); }
+ .pol-row.attention:hover { border-color:var(--c-danger); }
+ .pol-row.clean     { border-left:4px solid var(--c-success); }
+ .pol-row.clean:hover { border-color:var(--c-success); }
+ .pol-row.never     { border-left:4px solid var(--c-line-strong); }
+ .pol-row.never:hover { border-color:var(--c-text-muted); }
+
+ .pol-name {
+   font-size:13.5px; font-weight:700; color:var(--c-text);
+   line-height:1.35; margin:0 0 3px;
+ }
+ .pol-meta {
+   font-size:10.5px; color:var(--c-text-muted); margin:0;
+   display:flex; align-items:center; gap:6px; flex-wrap:wrap;
+ }
+ .pol-tag {
+   padding:1px 7px; border-radius:4px;
+   font-size:9.5px; font-weight:700;
+   background:var(--c-bg-tint); color:var(--c-navy);
+   text-transform:uppercase; letter-spacing:.04em;
+ }
+ .pol-meta .sep { color:var(--c-line-strong); }
+
+ /* Score column — compact gauge on the right of each card */
+ .pol-score {
+   display:flex; align-items:center; gap:10px;
+   flex-shrink:0;
+ }
+ .pol-score-bar {
+   width:120px; height:6px; border-radius:3px;
+   background:var(--c-bg-soft); overflow:hidden;
+ }
+ .pol-score-bar > span {
+   display:block; height:100%;
+   transition:width .4s cubic-bezier(.4,0,.2,1);
+ }
+ .pol-score-pct {
+   font-size:13px; font-weight:800; min-width:42px; text-align:right;
+   font-variant-numeric:tabular-nums;
+ }
+
+ /* Action button */
+ .map-btn {
+   display:inline-flex; align-items:center; gap:6px;
+   padding:9px 16px; border-radius:9px;
+   font-size:11.5px; font-weight:700;
+   color:#fff; background:var(--c-navy);
+   border:none; cursor:pointer; font-family:inherit;
+   text-decoration:none; white-space:nowrap; flex-shrink:0;
+   transition:background .12s, transform .12s;
+ }
+ .map-btn:hover { background:#011c66; }
+ .map-btn:active { transform:scale(.98); }
+
+ /* Top KPI tiles */
+ .kpi-tile {
+   background:#fff; border:1px solid var(--c-line);
+   border-radius:12px; padding:14px 16px;
+   display:flex; flex-direction:column; gap:3px;
+ }
+ .kpi-tile .lbl {
+   font-size:9px; font-weight:800; text-transform:uppercase;
+   letter-spacing:.08em; color:var(--c-text-muted);
+ }
+ .kpi-tile .num {
+   font-size:24px; font-weight:800; line-height:1;
+   font-variant-numeric:tabular-nums;
+ }
+ .kpi-tile .sub { font-size:10px; color:var(--c-text-muted); }
+ .kpi-tile.attention .num { color:var(--c-danger); }
+ .kpi-tile.clean     .num { color:var(--c-success); }
+ .kpi-tile.never     .num { color:var(--c-text); }
+
+ @keyframes faderow {
+   from { opacity:0; transform:translateY(4px); }
+   to   { opacity:1; transform:translateY(0); }
+ }
+ @keyframes pulsedot {
+   0%, 100% { opacity:1; }
+   50%      { opacity:.4; }
+ }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="flex flex-col h-full" style="background:var(--c-bg-soft);overflow:hidden;">
+
+ {# ── Page header ── #}
+ <div style="background:#fff;border-bottom:1px solid var(--c-line);padding:18px 32px;flex-shrink:0;">
+   <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;">
+     <div>
+       <h1 style="font-size:18px;font-weight:800;color:var(--c-text);margin:0 0 4px;letter-spacing:-.02em;">Policy Mapping</h1>
+       <p style="font-size:12px;color:var(--c-text-muted);margin:0;">Pick a BBK policy to map against active regulations. The system shows you what's covered, what's missing, and where to act.</p>
+     </div>
+     <a href="{% url 'analytics' %}"
+        style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:8px;border:1px solid var(--c-line);font-size:11px;font-weight:600;color:var(--c-text);background:#fff;text-decoration:none;transition:background .12s;flex-shrink:0;"
+        onmouseover="this.style.background='var(--c-bg-soft)';"
+        onmouseout="this.style.background='#fff';">
+       <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"/></svg>
+       Open analytics
+     </a>
+   </div>
+ </div>
+
+ {# ── KPI tiles strip ── #}
+ {% if policies %}
+ <div style="background:var(--c-bg-soft);border-bottom:1px solid var(--c-line);padding:14px 32px;flex-shrink:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;">
+   <div class="kpi-tile attention">
+     <span class="lbl">Need attention</span>
+     <span class="num">{{ attention_count }}</span>
+     <span class="sub">policies with open gaps</span>
+   </div>
+   <div class="kpi-tile clean">
+     <span class="lbl">Up to date</span>
+     <span class="num">{{ clean_count }}</span>
+     <span class="sub">analyzed and gap-free</span>
+   </div>
+   <div class="kpi-tile never">
+     <span class="lbl">Never analyzed</span>
+     <span class="num">{{ never_count }}</span>
+     <span class="sub">awaiting first run</span>
+   </div>
+ </div>
+ {% endif %}
+
+ {# ── Filter bar ── #}
+ <div style="background:#fff;border-bottom:1px solid var(--c-line);padding:12px 32px;flex-shrink:0;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+   <div style="position:relative;">
+     <svg style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--c-text-muted);pointer-events:none;" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+       <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+     </svg>
+     <input id="pol-search" type="text" placeholder="Search policies…" autocomplete="off"
+            style="padding:8px 12px 8px 32px;border:1px solid var(--c-line);border-radius:8px;font-size:12px;outline:none;background:#fff;font-family:inherit;width:240px;color:var(--c-text);transition:border-color .12s;"
+            oninput="applyFilters()"
+            onfocus="this.style.borderColor='var(--c-navy)';"
+            onblur="this.style.borderColor='var(--c-line)';">
+   </div>
+   <div style="display:flex;gap:6px;flex-wrap:wrap;">
+     <button class="pol-chip active" data-chip="all" onclick="setChip('all')">All<span class="ct">{{ policies|length }}</span></button>
+     <button class="pol-chip" data-chip="attention" onclick="setChip('attention')">Needs attention<span class="ct">{{ attention_count }}</span></button>
+     <button class="pol-chip" data-chip="never" onclick="setChip('never')">Never analyzed<span class="ct">{{ never_count }}</span></button>
+     <button class="pol-chip" data-chip="clean" onclick="setChip('clean')">Up to date<span class="ct">{{ clean_count }}</span></button>
+   </div>
+   <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+     <span style="font-size:11px;color:var(--c-text-muted);">Sort:</span>
+     <select id="pol-sort" onchange="applyFilters()"
+             style="padding:7px 10px;border:1px solid var(--c-line);border-radius:8px;font-size:11px;background:#fff;color:var(--c-text);outline:none;cursor:pointer;font-family:inherit;">
+       <option value="urgency">Most urgent first</option>
+       <option value="gaps">Most gaps</option>
+       <option value="alpha">A → Z</option>
+     </select>
+   </div>
+ </div>
+
+ {# ── Policy list ── #}
+ <div style="flex:1;overflow-y:auto;padding:16px 32px 48px;">
+
+ {% if policies %}
+ <div id="policy-list" style="display:flex;flex-direction:column;gap:8px;">
+
+ {% for p in policies %}
+ <a href="{% url 'mapping-setup' p.pk %}"
+    class="pol-row {% if p.current_gap_count > 0 %}attention{% elif p.prior_mapping_count == 0 %}never{% else %}clean{% endif %}"
+    data-status="{% if p.current_gap_count > 0 %}attention{% elif p.prior_mapping_count == 0 %}never{% else %}clean{% endif %}"
+    data-name="{{ p.name|lower }}"
+    data-gaps="{{ p.current_gap_count }}"
+    data-mapped="{{ p.prior_mapping_count }}"
+    data-score="{% if p.compliance_score is not None %}{{ p.compliance_score }}{% else %}-1{% endif %}">
+
+   {# ── Identity column ── #}
+   <div style="min-width:0;">
+     <p class="pol-name">{{ p.name }}</p>
+     <p class="pol-meta">
+       <span class="pol-tag">
+         {% with n=p.name|lower %}{% if 'sop' in n or 'procedure' in n %}SOP{% elif 'guideline' in n or 'guide' in n %}GUIDELINE{% elif 'standard' in n %}STANDARD{% else %}POLICY{% endif %}{% endwith %}
+       </span>
+       {% if p.issuing_authority %}
+       <span>{{ p.issuing_authority }}</span>
+       <span class="sep">·</span>
+       {% endif %}
+       {% if p.version %}
+       <span>v{{ p.version }}</span>
+       <span class="sep">·</span>
+       {% endif %}
+       <span>{{ p.chunk_count }} section{{ p.chunk_count|pluralize }}</span>
+       {% if p.last_analysis.completed_at %}
+       <span class="sep">·</span>
+       <span>last run {{ p.last_analysis.completed_at|date:"d M Y" }}</span>
+       {% endif %}
+     </p>
+   </div>
+
+   {# ── Compliance score column ── #}
+   <div class="pol-score">
+     {% if p.compliance_score is not None %}
+     <div class="pol-score-bar">
+       <span style="width:{{ p.compliance_score }}%;background:{% if p.compliance_score >= 80 %}var(--c-success){% elif p.compliance_score >= 50 %}var(--c-amber){% else %}var(--c-danger){% endif %};"></span>
+     </div>
+     <span class="pol-score-pct" style="color:{% if p.compliance_score >= 80 %}var(--c-success){% elif p.compliance_score >= 50 %}var(--c-warn){% else %}var(--c-danger){% endif %};">{{ p.compliance_score }}%</span>
+     {% else %}
+     <div class="pol-score-bar">
+       <span style="width:0%;"></span>
+     </div>
+     <span class="pol-score-pct" style="color:var(--c-text-muted);font-style:italic;font-weight:600;">—</span>
+     {% endif %}
+   </div>
+
+   {# ── Status pill + action ── #}
+   <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
+     {% if p.current_gap_count %}
+     <span class="status-pill attention">
+       <span class="dot"></span>
+       {{ p.current_gap_count }} gap{{ p.current_gap_count|pluralize }}
+     </span>
+     {% elif p.prior_mapping_count > 0 %}
+     <span class="status-pill clean">
+       <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+       no open gaps
+     </span>
+     {% else %}
+     <span class="status-pill never">
+       <span class="dot"></span>
+       not yet analyzed
+     </span>
+     {% endif %}
+
+     {% if is_analyst %}
+     <span class="map-btn">
+       {% if p.prior_mapping_count > 0 %}Re-run{% else %}Start analysis{% endif %}
+       <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+         <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/>
+       </svg>
+     </span>
+     {% else %}
+     <span style="font-size:10.5px;color:var(--c-text-muted);font-style:italic;padding-right:6px;">View only</span>
+     {% endif %}
+   </div>
+
+ </a>
+ {% endfor %}
+
+ </div>
+
+ <div id="empty-filter" style="display:none;text-align:center;padding:64px 32px;">
+   <div style="width:48px;height:48px;border-radius:12px;background:#fff;border:1px solid var(--c-line);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;">
+     <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="var(--c-text-muted)" stroke-width="1.8"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+   </div>
+   <p style="font-size:13px;font-weight:700;color:var(--c-text);margin:0 0 6px;">No policies match your filter</p>
+   <p style="font-size:11px;color:var(--c-text-muted);margin:0 0 16px;">Try a different search or clear the filter to see all policies.</p>
+   <button onclick="setChip('all');document.getElementById('pol-search').value='';applyFilters();"
+           style="padding:8px 18px;border-radius:8px;border:1px solid var(--c-line);font-size:11.5px;font-weight:600;color:var(--c-text);background:#fff;cursor:pointer;font-family:inherit;transition:background .12s;"
+           onmouseover="this.style.background='var(--c-bg-soft)';"
+           onmouseout="this.style.background='#fff';">
+     Clear filter
+   </button>
+ </div>
+
+ {% else %}
+
+ <div style="text-align:center;padding:80px 32px;">
+   <div style="width:56px;height:56px;border-radius:14px;background:#fff;border:1px solid var(--c-line);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+     <svg width="26" height="26" fill="none" viewBox="0 0 24 24" stroke="var(--c-navy)" stroke-width="1.5">
+       <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
+     </svg>
+   </div>
+   <p style="font-size:15px;font-weight:700;color:var(--c-text);margin:0 0 6px;">No internal policies indexed yet</p>
+   <p style="font-size:12px;color:var(--c-text-muted);margin:0 0 22px;">Upload a policy document in the Internal Policies library to get started.</p>
+   <a href="{% url 'library-policies' %}"
+      style="display:inline-flex;align-items:center;gap:6px;padding:10px 20px;border-radius:9px;font-size:12px;font-weight:700;background:var(--c-navy);color:#fff;text-decoration:none;transition:background .12s;"
+      onmouseover="this.style.background='#011c66';"
+      onmouseout="this.style.background='var(--c-navy)';">
+     <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+       <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/>
+     </svg>
+     Go to Internal Policies
+   </a>
+ </div>
+
+ {% endif %}
+ </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let activeChip = 'all';
+
+function setChip(val) {
+  activeChip = val;
+  document.querySelectorAll('.pol-chip').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.chip === val);
+  });
+  applyFilters();
+}
+
+function applyFilters() {
+  const q = (document.getElementById('pol-search')?.value || '').toLowerCase();
+  const sort = document.getElementById('pol-sort')?.value || 'urgency';
+  const rows = [...document.querySelectorAll('.pol-row')];
+
+  let visible = 0;
+  rows.forEach(r => {
+    const show = (!q || r.dataset.name.includes(q))
+      && (activeChip === 'all' || r.dataset.status === activeChip);
+    r.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+
+  const empty = document.getElementById('empty-filter');
+  if (empty) empty.style.display = visible === 0 ? 'block' : 'none';
+
+  const list = document.getElementById('policy-list');
+  if (!list) return;
+  // Sort the visible rows; "score" is -1 for unanalyzed policies so they drop to the bottom in score-based sorts.
+  const sorted = rows.filter(r => r.style.display !== 'none').sort((a, b) => {
+    if (sort === 'alpha') return a.dataset.name.localeCompare(b.dataset.name);
+    if (sort === 'gaps')  return parseInt(b.dataset.gaps) - parseInt(a.dataset.gaps);
+    // urgency: attention first (most gaps first), then never, then clean (lowest score first to highlight risk)
+    const rank = { attention: 0, never: 1, clean: 2 };
+    const diff = (rank[a.dataset.status] ?? 3) - (rank[b.dataset.status] ?? 3);
+    if (diff !== 0) return diff;
+    return parseInt(b.dataset.gaps) - parseInt(a.dataset.gaps);
+  });
+  sorted.forEach(r => list.appendChild(r));
+}
+
+applyFilters();
+</script>
+{% endblock %}

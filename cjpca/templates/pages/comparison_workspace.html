@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ run.reg_a.name }} vs {{ run.reg_b.name }} — CJPCA{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+<script src="{% static 'js/d3.v7.min.js' %}"></script>
+<script src="{% static 'js/equivalency_arc.js' %}"></script>
+<style>
+ [x-cloak] { display:none !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="flex flex-col h-full overflow-hidden bg-gray-50" x-data="{ showSendModal: false }">
+
+ {# Header #}
+ <div style="background:#fff;border-bottom:1px solid #E5E8EF;padding:12px 24px;flex-shrink:0;display:flex;align-items:center;gap:12px;">
+  {% comment %}
+  Back-button destination is role-aware: reviewers/admins land here from the
+  review queue and want to go back there; analysts came from /comparison/
+  and want to go back there.
+  {% endcomment %}
+  <a href="{% if is_reviewer or is_admin %}{% url 'review' %}{% else %}{% url 'comparison' %}{% endif %}"
+     title="Back to {% if is_reviewer or is_admin %}Review &amp; Validate{% else %}comparison picker{% endif %}"
+     style="width:30px;height:30px;border-radius:8px;background:#F4F6FB;display:flex;align-items:center;justify-content:center;color:#002583;text-decoration:none;flex-shrink:0;border:1px solid #E5E8EF;transition:background .12s;"
+     onmouseover="this.style.background='#E5E8EF'" onmouseout="this.style.background='#F4F6FB'">
+   <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"/></svg>
+  </a>
+  <div style="flex:1;min-width:0;">
+   <p style="font-size:14px;font-weight:700;color:#002583;margin:0;line-height:1.3;">
+    Run #{{ run.pk }}: <span style="font-weight:600;">{{ run.reg_a.name }}</span>
+    <span style="color:#7B8499;font-weight:400;margin:0 4px;">vs</span>
+    <span style="font-weight:600;">{{ run.reg_b.name }}</span>
+   </p>
+   <p style="font-size:11px;color:#7B8499;margin:1px 0 0;">{{ run.topics_display }} · created {{ run.created_at|date:"d M Y H:i" }}{% if run.submitted_for_review_at %} · sent for review {{ run.submitted_for_review_at|date:"d M Y H:i" }}{% endif %}</p>
+  </div>
+  <span style="padding:3px 11px;border-radius:20px;font-size:10px;font-weight:700;background:#ffffff;color:#002583;border:1px solid #E5E8EF;">{{ run.get_status_display }}</span>
+
+  {% if request.user.profile.role == 'analyst' and run.status == 'complete' %}
+    {% if run.submitted_for_review_at %}
+    <span style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:50px;background:#F0F5FF;color:#002583;font-size:11px;font-weight:700;border:1px solid #002583;">
+      <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+      Sent to reviewer
+    </span>
+    {% else %}
+    <button @click="showSendModal = true" type="button"
+            style="display:inline-flex;align-items:center;gap:7px;padding:8px 18px;border-radius:50px;border:none;font-family:inherit;font-size:12px;font-weight:700;color:#fff;background:#002583;cursor:pointer;box-shadow:0 2px 10px rgba(0,37,131,.22);">
+      <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.125A59.769 59.769 0 0121.485 12 59.768 59.768 0 013.27 20.875L5.999 12zm0 0h7.5"/></svg>
+      Send to reviewer
+    </button>
+    {% endif %}
+  {% endif %}
+
+  {% if run.status == 'complete' or run.status == 'partially_failed' %}
+  <div x-data="{ exportOpen: false }" style="position:relative;">
+   <button @click="exportOpen = !exportOpen" type="button"
+    style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:50px;background:#fff;color:#002583;font-size:11px;font-weight:700;border:1px solid #E5E8EF;cursor:pointer;font-family:inherit;">
+    <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M12 3v13.5m0 0l-3.75-3.75M12 16.5l3.75-3.75"/></svg>
+    Download package
+    <svg width="9" height="9" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg>
+   </button>
+   <div x-show="exportOpen" x-cloak @click.outside="exportOpen = false"
+        style="position:absolute;right:0;top:calc(100% + 6px);min-width:300px;background:#fff;border:1px solid #E5E8EF;border-radius:10px;box-shadow:0 8px 24px rgba(0,37,131,.12);z-index:50;padding:6px;">
+    <a href="{% url 'comparison-export-pdf' run.pk %}"
+       style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:8px;text-decoration:none;color:inherit;"
+       onmouseover="this.style.background='#F7F9FC'" onmouseout="this.style.background=''">
+     <div style="width:30px;height:30px;border-radius:7px;background:#FCE8E8;color:#D93939;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
+     </div>
+     <div style="min-width:0;flex:1;">
+      <p style="font-size:12px;font-weight:700;color:#002583;margin:0;line-height:1.3;">Executive Summary (PDF)</p>
+      <p style="font-size:10px;color:#6B7280;margin:2px 0 0;line-height:1.4;">One-page board-pack summary with alignment score, flagged rows, and audit hash.</p>
+     </div>
+    </a>
+    <a href="{% url 'comparison-export-xlsx' run.pk %}"
+       style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:8px;text-decoration:none;color:inherit;"
+       onmouseover="this.style.background='#F7F9FC'" onmouseout="this.style.background=''">
+     <div style="width:30px;height:30px;border-radius:7px;background:#E1F4E5;color:#1B7F3A;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3.375 19.5h17.25M3.375 5.25h17.25m-17.25 0v13.125c0 .621.504 1.125 1.125 1.125h15c.621 0 1.125-.504 1.125-1.125V5.25"/></svg>
+     </div>
+     <div style="min-width:0;flex:1;">
+      <p style="font-size:12px;font-weight:700;color:#002583;margin:0;line-height:1.3;">Comparison Register (Excel)</p>
+      <p style="font-size:10px;color:#6B7280;margin:2px 0 0;line-height:1.4;">Flagged-rows register: conflicting, stricter-side, and additional clauses with citations.</p>
+     </div>
+    </a>
+   </div>
+  </div>
+  {% endif %}
+ </div>
+
+ {# Analyst note panel — shown to reviewer (and to analyst after submission) #}
+ {% if run.analyst_note %}
+ <div style="background:#FFFBEB;border-bottom:1px solid #FFE9A8;padding:10px 24px;flex-shrink:0;">
+   <p style="font-size:9px;font-weight:800;color:#7A5500;text-transform:uppercase;letter-spacing:.07em;margin:0 0 3px;">Analyst note for reviewer</p>
+   <p style="font-size:12px;color:#3F2A00;line-height:1.55;margin:0;">{{ run.analyst_note }}</p>
+   {% if run.submitted_by %}<p style="font-size:10px;color:#7A5500;margin:4px 0 0;">— {{ run.submitted_by.username }}</p>{% endif %}
+ </div>
+ {% endif %}
+
+ {# Send-to-reviewer modal #}
+ <div x-show="showSendModal" x-cloak
+      style="position:fixed;inset:0;background:rgba(0,37,131,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;"
+      @click.self="showSendModal = false">
+   <form method="post" action="{% url 'comparison-submit-review' run.pk %}"
+         style="background:#fff;border-radius:14px;padding:24px;width:520px;max-width:100%;box-shadow:0 12px 40px rgba(0,0,0,.25);">
+     {% csrf_token %}
+     <p style="font-size:14px;font-weight:800;color:#002583;margin:0 0 4px;">Send to reviewer</p>
+     <p style="font-size:11px;color:#7B8499;margin:0 0 14px;line-height:1.55;">
+       The reviewer will see all {{ run.completed_pairs }} obligation(s) in this run, your note below, and can approve or reject each row individually.
+     </p>
+     <label style="display:block;font-size:10px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;">Note for reviewer (optional)</label>
+     <textarea name="analyst_note" rows="4" maxlength="2000"
+               placeholder="e.g. Focus on the consent-formality row — DPDPA §6 retrieval was thin, please verify against the source."
+               style="width:100%;padding:10px 12px;border:1px solid #E5E8EF;border-radius:8px;font-size:12px;font-family:inherit;color:#002583;resize:vertical;outline:none;"></textarea>
+     <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
+       <button type="button" @click="showSendModal = false"
+               style="padding:8px 18px;border-radius:50px;background:#fff;border:1.5px solid #E5E8EF;font-size:12px;font-weight:600;color:#002583;cursor:pointer;font-family:inherit;">
+         Cancel
+       </button>
+       <button type="submit"
+               style="padding:8px 22px;border-radius:50px;background:#002583;border:none;font-size:12px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit;box-shadow:0 2px 10px rgba(0,37,131,.22);">
+         Send to reviewer
+       </button>
+     </div>
+   </form>
+ </div>
+
+ {% if run.status == 'failed' %}
+ <div style="background:#FFF4E5;border-bottom:1px solid #FFB800;padding:12px 24px;flex-shrink:0;">
+  <p style="font-size:12px;font-weight:700;color:#002583;margin:0;">Comparison failed</p>
+  {% if run.error_message %}
+  <p style="font-size:11px;color:#002583;margin:2px 0 0;">{{ run.error_message }}</p>
+  {% endif %}
+ </div>
+ {% endif %}
+
+ {# All 8 tabs — same partial the analyst page uses #}
+ <div style="flex:1;min-height:0;overflow-y:auto;padding:16px 24px;">
+  {% include 'partials/_analyst_comparison_results.html' %}
+ </div>
+
+</div>
+{% endblock %}

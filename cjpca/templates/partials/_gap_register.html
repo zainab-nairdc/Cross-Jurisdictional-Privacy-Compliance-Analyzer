@@ -1,0 +1,86 @@
+﻿{% comment %}
+ Gap Register partial — rendered by GapRegisterView.
+ Loaded/refreshed via HTMX when a heatmap cell is clicked.
+
+ Context:
+ gaps queryset of Gap (up to 50, pre-filtered)
+ jur_code str e.g. "BH"
+ jur_name str e.g. "Bahrain"
+ principle str slug
+ principle_label str friendly name
+ filter_active bool
+{% endcomment %}
+
+{% comment %}
+ Always-visible CTA: run a fresh cross-jurisdiction gap analysis (the third
+ reasoning workflow). The list below shows historical gaps from approved
+ mapping analyses; this button kicks off a one-shot live run on a new topic.
+{% endcomment %}
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;flex-wrap:wrap;gap:6px;">
+ <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+ {% if filter_active %}
+ <span style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:#002583;">Filter</span>
+ {% if jur_name %}
+ <span style="padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700;background:#ffffff;color:#002583;">{{ jur_name }}</span>
+ {% endif %}
+ {% if principle_label %}
+ <span style="padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700;background:#ffffff;color:#002583;">{{ principle_label }}</span>
+ {% endif %}
+ {% else %}
+ <span style="font-size:10px;color:#002583;">Historical gaps from approved mapping analyses</span>
+ {% endif %}
+ </div>
+ <div style="display:flex;align-items:center;gap:8px;">
+ {# Run-AI CTA is analyst-only — new analyses are analyst territory. #}
+ {% if user_role == 'analyst' %}
+ <a href="{% url 'analytics-cross-gap' %}"
+ style="display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:6px;background:#002583;color:#fff;font-size:10px;font-weight:600;text-decoration:none;">
+ <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+ </svg>
+ Run AI gap analysis
+ </a>
+ {% endif %}
+ {% if filter_active %}
+ <span style="font-size:10px;color:#002583;flex-shrink:0;">{{ gaps|length }} gap{{ gaps|length|pluralize }}</span>
+ {% endif %}
+ </div>
+</div>
+
+{% if gaps %}
+<div style="display:flex;flex-direction:column;gap:6px;">
+ {% for gap in gaps %}
+ <div style="background:#fff;border:1px solid #E5E8EF;border-radius:9px;padding:10px 13px;
+ border-left:3px solid {% if gap.priority == 'high' %}#002583{% elif gap.priority == 'medium' %}#002583{% else %}#ffffff{% endif %};">
+ <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:3px;">
+ <span style="font-size:10px;font-weight:700;color:#002583;">{{ gap.obligation_mapping.article_ref }}</span>
+ {% if gap.priority == 'high' %}
+ <span style="padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;background:color-mix(in srgb,#002583 10%,transparent);color:#002583;white-space:nowrap;flex-shrink:0;">High</span>
+ {% elif gap.priority == 'medium' %}
+ <span style="padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;background:#ffffff;color:#002583;white-space:nowrap;flex-shrink:0;">Medium</span>
+ {% else %}
+ <span style="padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;background:#ffffff;color:#002583;white-space:nowrap;flex-shrink:0;">Low</span>
+ {% endif %}
+ </div>
+ <p style="font-size:10px;color:#002583;font-weight:500;margin-bottom:3px;line-height:1.4;">{{ gap.obligation_mapping.obligation_title|truncatechars:80 }}</p>
+ <p style="font-size:10px;color:#002583;">{{ gap.obligation_mapping.regulation.name|truncatechars:45 }}</p>
+ </div>
+ {% endfor %}
+</div>
+
+{% elif filter_active %}
+<div style="padding:28px 16px;text-align:center;">
+ <p style="font-size:12px;color:#002583;">No approved gaps for this combination.</p>
+</div>
+
+{% else %}
+<div style="padding:32px 16px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:8px;">
+ <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.5">
+ <path stroke-linecap="round" stroke-linejoin="round"
+ d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12"/>
+ </svg>
+ <p style="font-size:11px;color:#002583;line-height:1.55;max-width:200px;">
+ Click a heatmap cell to see its open gaps here.
+ </p>
+</div>
+{% endif %}

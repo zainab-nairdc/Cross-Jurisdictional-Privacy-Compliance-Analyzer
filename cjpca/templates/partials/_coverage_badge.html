@@ -1,0 +1,9 @@
+{% comment %}Coverage badge button — HTMX POST cycles coverage state on click.
+Context vars: om (ObligationMapping), fg (text color hex), bg (bg color hex), lbl (label string){% endcomment %}
+<button hx-post="{% url 'mapping-coverage-override' om.pk %}"
+ hx-target="this"
+ hx-swap="outerHTML"
+ @click.stop
+ style="padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;border:none;cursor:pointer;color:{{ fg }};background:{{ bg }};">
+ {{ lbl }}{% if om.human_override %} *{% endif %}
+</button>

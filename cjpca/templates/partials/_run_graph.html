@@ -1,0 +1,145 @@
+{% comment %}
+_run_graph.html — Force-directed graph for the workspace Graph tab.
+Each node = one cited article (A or B); each edge = one ObligationComparison row.
+{% endcomment %}
+
+{{ graph_payload|json_script:"graph-payload" }}
+
+<div style="display:flex;flex-direction:column;">
+
+ {# Legend strip #}
+ <div style="background:#fff;border:1px solid #E5E8EF;border-radius:10px;padding:8px 14px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:10px;color:#002583;margin-bottom:10px;">
+  <span style="font-weight:700;">{{ graph_payload.reg_a_name|truncatechars:32 }} ↔ {{ graph_payload.reg_b_name|truncatechars:32 }}</span>
+  <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:14px;height:3px;background:#3FB85C;border-radius:2px;"></span>Equivalent</span>
+  <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:14px;height:3px;background:#002583;border-radius:2px;"></span>Stricter A</span>
+  <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:14px;height:3px;background:#FFB800;border-radius:2px;"></span>Stricter B</span>
+  <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:14px;height:3px;background:#7B8499;border-radius:2px;"></span>Additional</span>
+  <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:14px;height:3px;background:#D93939;border-radius:2px;"></span>Conflicting</span>
+  <span style="margin-left:auto;color:#7B8499;">Drag nodes · hover edges for detail</span>
+ </div>
+
+ {# Fixed-height SVG container. #}
+ <div style="height:560px;position:relative;background:#FAFBFD;border:1px solid #E5E8EF;border-radius:10px;overflow:hidden;">
+  <svg id="run-graph-svg" viewBox="0 0 900 540" preserveAspectRatio="xMidYMid meet"
+       style="width:100%;height:100%;display:block;"></svg>
+
+  <div id="run-graph-tip"
+       style="position:absolute;top:8px;left:8px;background:#fff;border:1px solid #E5E8EF;border-radius:8px;padding:8px 12px;font-size:11px;color:#002583;max-width:380px;line-height:1.55;display:none;box-shadow:0 4px 14px rgba(0,0,0,.08);pointer-events:none;z-index:10;"></div>
+
+  <div id="run-graph-empty"
+       style="position:absolute;inset:0;display:none;align-items:center;justify-content:center;text-align:center;padding:30px;color:#7B8499;font-size:12px;">
+    No nodes to draw — this run has no cited articles.
+  </div>
+ </div>
+</div>
+
+<script>
+(function() {
+  // D3's <script src=...> in the page <head> loads asynchronously while the
+  // body is parsed; HTMX can swap this partial into the DOM before D3
+  // finishes parsing. Poll for up to 5s before giving up, then render.
+  let waited = 0;
+  const _interval = setInterval(() => {
+    if (typeof d3 !== 'undefined') { clearInterval(_interval); _render(); }
+    else if (waited > 5000) {
+      clearInterval(_interval);
+      const c = document.getElementById('run-graph-empty');
+      if (c) { c.textContent = 'Graph requires D3 (which failed to load). Try a hard refresh.'; c.style.display = 'flex'; }
+    } else waited += 100;
+  }, 100);
+
+function _render() {
+  const payloadEl = document.getElementById('graph-payload');
+  if (!payloadEl) return;
+  const data = JSON.parse(payloadEl.textContent);
+
+  if (!data.nodes || !data.nodes.length) {
+    document.getElementById('run-graph-empty').style.display = 'flex';
+    return;
+  }
+
+  const REL_COLORS = {
+    equivalent:      '#3FB85C',
+    stricter_in_a:   '#002583',
+    stricter_in_b:   '#FFB800',
+    additional_in_a: '#7B8499',
+    additional_in_b: '#7B8499',
+    conflicting:     '#D93939',
+  };
+
+  // viewBox-anchored coordinate space: 900x540. forceX targets A on the left
+  // band and B on the right band; forceY pulls toward vertical centre.
+  const W = 900, H = 540;
+
+  const svg = d3.select('#run-graph-svg');
+  svg.selectAll('*').remove();
+  const tip = document.getElementById('run-graph-tip');
+
+  const nodes = data.nodes.map(n => ({...n}));
+  const links = data.edges.map(e => ({...e}));
+
+  const sim = d3.forceSimulation(nodes)
+    .force('link',   d3.forceLink(links).id(d => d.id).distance(120).strength(0.4))
+    .force('charge', d3.forceManyBody().strength(-340))
+    .force('x',      d3.forceX(d => d.side === 'a' ? W * 0.28 : W * 0.72).strength(0.22))
+    .force('y',      d3.forceY(H / 2).strength(0.07))
+    .force('collide', d3.forceCollide(34));
+
+  const g = svg.append('g');
+
+  svg.call(d3.zoom()
+    .scaleExtent([0.4, 3])
+    .on('zoom', e => g.attr('transform', e.transform)));
+
+  const linkSel = g.append('g').attr('stroke-opacity', 0.65)
+    .selectAll('line').data(links).enter().append('line')
+    .attr('stroke',       d => REL_COLORS[d.relationship] || '#7B8499')
+    .attr('stroke-width', d => 1.2 + (d.similarity || 0) * 3.5)
+    .style('cursor', 'help')
+    .on('mouseenter', (ev, d) => {
+      const a = (d.reg_a_text || '').slice(0, 180);
+      const b = (d.reg_b_text || '').slice(0, 180);
+      const v = d.citation_verified ? '' : ' · ⚠ unverified citation';
+      tip.innerHTML =
+        '<strong>' + d.relationship.replace(/_/g, ' ') + '</strong> · conf ' +
+        Math.round((d.confidence||0)*100) + '% · sim ' + Math.round((d.similarity||0)*100) + '%' + v +
+        (d.key_difference ? '<br><em>' + d.key_difference.slice(0,180) + '</em>' : '') +
+        (a ? '<br><b>A:</b> ' + a : '') +
+        (b ? '<br><b>B:</b> ' + b : '');
+      tip.style.display = 'block';
+    })
+    .on('mouseleave', () => tip.style.display = 'none');
+
+  const nodeG = g.append('g').selectAll('g').data(nodes).enter().append('g')
+    .call(d3.drag()
+      .on('start', (e, d) => { if (!e.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+      .on('drag',  (e, d) => { d.fx = e.x; d.fy = e.y; })
+      .on('end',   (e, d) => { if (!e.active) sim.alphaTarget(0); d.fx = null; d.fy = null; }));
+
+  nodeG.append('circle')
+    .attr('r',           d => 9 + Math.min(d.obligations || 1, 5) * 1.8)
+    .attr('fill',        d => d.side === 'a' ? '#002583' : '#FFB800')
+    .attr('stroke',      '#fff')
+    .attr('stroke-width', 2);
+
+  nodeG.append('title').text(d => d.label);
+
+  nodeG.append('text')
+    .attr('x', 16).attr('y', 4)
+    .attr('font-size', 11).attr('fill', '#002583').attr('font-weight', 600)
+    .text(d => (d.short_label || d.label || '').slice(0, 30));
+
+  sim.on('tick', () => {
+    // Clamp nodes inside the viewBox so they don't drift off-screen.
+    nodes.forEach(d => {
+      d.x = Math.max(50, Math.min(W - 50, d.x));
+      d.y = Math.max(30, Math.min(H - 30, d.y));
+    });
+    linkSel
+      .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+      .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    nodeG.attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
+  });
+}  // end _render
+})();
+</script>

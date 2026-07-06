@@ -1,0 +1,258 @@
+[
+  {
+    "query": "What is the process for the Chief Executive to make a decision on temporary suspension or blocking of data processing?",
+    "expected_chunk_id": "Article_56_Cases_of_Urgency_1d3349_s55_1",
+    "expected_node_id": "679582d3a20c94f98da4f701b4e7aff4",
+    "jurisdiction": "Bahrain",
+    "doc_title": "Bahrain_PDPL_Law_30_2018",
+    "snippet": "1. In cases of urgency, and upon a request submitted by the party of interest, where existing evidence is suggestive of"
+  },
+  {
+    "query": "What Legislative-Decree specifically governs electronic transactions in Romania?",
+    "expected_chunk_id": "Article_26_Submission_of_reque_2d9a84_s28_1",
+    "expected_node_id": "fd86fc7f2fdb4788061809c16a80b7d9",
+    "jurisdiction": "Bahrain",
+    "doc_title": "Bahrain_PDPL_Law_30_2018",
+    "snippet": "Pursuant to Legislative-Decree No (28) of 2002 with respect to Electronic transactions, any electronic medium, as subseq"
+  },
+  {
+    "query": "Who is required to notify the Board in writing if a conflict of interest arises with their post?",
+    "expected_chunk_id": "Article_32_Conflict_of_Interes_414f68_s33_1",
+    "expected_node_id": "5fcf650625255defac63116c911399b4",
+    "jurisdiction": "Bahrain",
+    "doc_title": "Bahrain_PDPL_Law_30_2018",
+    "snippet": "1. If the Board is considering a matter of, direct or indirect personal interest to a Board member, which conflicts with"
+  },
+  {
+    "query": "What notifications are subject to simplified provisions under Article 14 of this Law?",
+    "expected_chunk_id": "Article_16_The_Register_2e91b2_s19_1",
+    "expected_node_id": "6192e7ec1192899082bbd3674bc76967",
+    "jurisdiction": "Bahrain",
+    "doc_title": "Bahrain_PDPL_Law_30_2018",
+    "snippet": "1. The Authority shall maintain a register entitled 'The Notifications and Authorisations Register' recording the follow"
+  },
+  {
+    "query": "What is the timeframe for the Authority to respond to a prior authorization request?",
+    "expected_chunk_id": "Article_3_Prior_authorization__3ba7f1_s3_1",
+    "expected_node_id": "4f996317fcbf57380e6dcc285ed4676c",
+    "jurisdiction": "Bahrain",
+    "doc_title": "Bahrain_PDPA_Order_44_2022_Notifications_Authorisations",
+    "snippet": "It is prohibited to process any of the operations stipulated in paragraph (1) of Article (15) of the Law without obtaini"
+  },
+  {
+    "query": "Does a holder of a Bachelor's Degree in information technology need practical experience for full competence?",
+    "expected_chunk_id": "First_Natural_Persons_677174_s6_1",
+    "expected_node_id": "b8f7f1c31c751017dee8d65b79d8dffd",
+    "jurisdiction": "Bahrain",
+    "doc_title": "Bahrain_PDPA_Order_46_2022_Data_Protection_Guardian_DPO",
+    "snippet": "1. To be fully competent.\n2. To be a holder of a Bachelor's Degree in information technology at least, or a holder of a"
+  },
+  {
+    "query": "What processing of personal data is allowed by law (Article 1) for criminal proceedings?",
+    "expected_chunk_id": "Article_7_Processing_of_data_w_bd4c95_s11_1",
+    "expected_node_id": "3a1c987fca191da787f12df0fc5500fd",
+    "jurisdiction": "Bahrain",
+    "doc_title": "Bahrain_PDPL_Law_30_2018",
+    "snippet": "1. It is prohibited to process personal data concerning instituting and pursuing of criminal proceedings, or processing"
+  },
+  {
+    "query": "What is the timeframe for notifying the Authority of changes to the data under notification or prior authorization request?",
+    "expected_chunk_id": "Article_7_Notification_regardi_568761_s7_1",
+    "expected_node_id": "c9db1717ea4d54697fd07b3ffbc9be18",
+    "jurisdiction": "Bahrain",
+    "doc_title": "Bahrain_PDPA_Order_44_2022_Notifications_Authorisations",
+    "snippet": "The Data Controller shall notify the Authority of any change that occurs to the data stipulated in the notification or p"
+  },
+  {
+    "query": "Who is the regulator that customers can contact if dissatisfied with BBK's response regarding a complex request?",
+    "expected_chunk_id": "8_Escalation_5113a7_s8_1",
+    "expected_node_id": "8bc77f1e1ecbd7b9217126afe3a7877e",
+    "jurisdiction": "Bbk",
+    "doc_title": "BBK-DSR-003_Data_Subject_Rights_Procedure_PARTIAL",
+    "snippet": "Complex or unusual requests should be escalated to the Head of Compliance. Where a customer is dissatisfied with BBK's r"
+  },
+  {
+    "query": "Does BBK determine the purposes and means of processing sensitive personal data?",
+    "expected_chunk_id": "2_Definitions_57f9d8_s2_1",
+    "expected_node_id": "ab0ce41ca3f43ddbb68a14a2a030edfa",
+    "jurisdiction": "Bbk",
+    "doc_title": "BBK-LGL-001_Data_Privacy_Protection_Policy",
+    "snippet": "| **Term**                | **Definition**"
+  },
+  {
+    "query": "What specific laws are violated when personal data is processed incorrectly?",
+    "expected_chunk_id": "Right_to_Demand_Rectification__f79ac9_s17_1",
+    "expected_node_id": "b29548589f2ce629c95e026556d029b7",
+    "jurisdiction": "Bbk",
+    "doc_title": "BBK-Data-Privacy-Statement-Final-and-Approved-by-BoD-1",
+    "snippet": "You may submit an application to request to rectify, block or erase your Personal Data, as the case may be, if the proce"
+  },
+  {
+    "query": "Does the Bahrain PDPL explicitly designate health and medical data as strictly confidential?",
+    "expected_chunk_id": "3_1_Sensitive_Personal_Data_Ex_e1a6ca_s4_1",
+    "expected_node_id": "74d7460d742ea26c5a0a68fee535218d",
+    "jurisdiction": "Bbk",
+    "doc_title": "BBK-OPS-012-BH_Data_Handling_SOP_Bahrain_Branch",
+    "snippet": "Under Bahrain's PDPL, the following categories are explicitly designated as sensitive and must be treated as Strictly Co"
+  },
+  {
+    "query": "Does the document supersede BBK-OPS-012's requirements for data handling and classification in Kuwait?",
+    "expected_chunk_id": "1_Purpose_and_Relationship_to__314e57_s1_1",
+    "expected_node_id": "bf7e7ab65ed371cc4c6ae81988c0fddb",
+    "jurisdiction": "Bbk",
+    "doc_title": "BBK-OPS-012-KW_Data_Handling_SOP_Kuwait_Branch",
+    "snippet": "This document is a jurisdiction-specific supplement to the BBK Group Data Handling & Classification SOP (BBK-OPS-012). I"
+  },
+  {
+    "query": "Does the law require automated means of modifying personal data?",
+    "expected_chunk_id": "Processing_643562_s6_1",
+    "expected_node_id": "43a01e59bb4ad50ea25a3993a143225a",
+    "jurisdiction": "Bbk",
+    "doc_title": "BBK-Data-Privacy-Statement-Final-and-Approved-by-BoD-1",
+    "snippet": "Any operation or set of operations carried out on personal data by automated or nonautomated means, such as collecting,"
+  },
+  {
+    "query": "What is the required timeframe for monitoring restored systems after recovery?",
+    "expected_chunk_id": "Phase_5_Eradication_and_Recove_c25b2b_s14_1",
+    "expected_node_id": "3efb38d5cde12598bea539853c054bad",
+    "jurisdiction": "Bbk",
+    "doc_title": "BBK-PROC-012_Security_Incident_Response_SOP",
+    "snippet": "Following containment and notification, the IT Security and Operations teams shall:  \n1. Remove malware, backdoors, and"
+  },
+  {
+    "query": "What is the contact for regulatory notification approvals within Legal & Compliance?",
+    "expected_chunk_id": "Appendix_A_Incident_Response_C_3ad8ef_s20_1",
+    "expected_node_id": "2672613af1e972b298c8c0e3fdd42467",
+    "jurisdiction": "Bbk",
+    "doc_title": "BBK-PROC-012_Security_Incident_Response_SOP",
+    "snippet": "| **Role**             | **Contact**                         | **Escalation Path**                              |\n|-----"
+  },
+  {
+    "query": "Does law 8 require banks to provide a free monthly statement of account to their customers?",
+    "expected_chunk_id": "Banks_Shall_in_This_Regard_Com_62aae3_s17_2",
+    "expected_node_id": "770eecfc2f11678dbde49d2ef8c15b26",
+    "jurisdiction": "Kuwait",
+    "doc_title": "Kuwait_CBK_Bank_Customer_Protection_Guide_October_2025",
+    "snippet": "7. Make clear to customer any expense or fees related to the products and services they render, including the cheque ser"
+  },
+  {
+    "query": "Does the regulated entity implement cryptographic techniques for protecting information against breaches?",
+    "expected_chunk_id": "5_7_Cryptography_0478e4_s152_1",
+    "expected_node_id": "9053d6b1908b3d8d7e87de3db8b90efc",
+    "jurisdiction": "Kuwait",
+    "doc_title": "Kuwait_CBK_CORF_Cyber_Operational_Resilience_Framework_December_2025",
+    "snippet": "Objective : To protect from unintentional information disclosures, breaches, and integrity compromises, Regulated Entiti"
+  },
+  {
+    "query": "Does Article (8) require notification of a breach within 72 hours or after knowledge of the incident?",
+    "expected_chunk_id": "Notification_to_Communications_ce091b_s11_1",
+    "expected_node_id": "be3241c21445b1a309f3514cc545b43a",
+    "jurisdiction": "Kuwait",
+    "doc_title": "Kuwait_DPPR_Administrative_Decision_26_2024",
+    "snippet": "**Article (8)**  \nI) The service provider shall, within a period not exceeding 72 hours following its knowledge of the i"
+  },
+  {
+    "query": "What specific security controls must Regulated Entities include in their supply chain management process?",
+    "expected_chunk_id": "6_2_Supply_Chain_Management_53ff67_s185_1",
+    "expected_node_id": "74c8539d2723d00b7360a678b83d5389",
+    "jurisdiction": "Kuwait",
+    "doc_title": "Kuwait_CBK_CORF_Cyber_Operational_Resilience_Framework_December_2025",
+    "snippet": "Objective : To ensure risks arising throughout the organizational supply chain are sufficiently identified, assessed, an"
+  },
+  {
+    "query": "Does the Entity have a cyber risk appetite approved by law or regulation?",
+    "expected_chunk_id": "4_1_2_5_The_Cybersecurity_Stee_1eb994_s130_1",
+    "expected_node_id": "d67844bf373c13c76f5ddf937d520c7e",
+    "jurisdiction": "Kuwait",
+    "doc_title": "Kuwait_CBK_CORF_Cyber_Operational_Resilience_Framework_December_2025",
+    "snippet": "- a) review and endorse the cybersecurity strategy and policy;\n- b) recommend the Entity's cyber risk appetite and overs"
+  },
+  {
+    "query": "Who is responsible for implementing risk management strategies according to CORF requirements?",
+    "expected_chunk_id": "4_1_3_Executive_Senior_Managem_b657e5_s131_1",
+    "expected_node_id": "4489c1d7298676a5a114b64df17227ee",
+    "jurisdiction": "Kuwait",
+    "doc_title": "Kuwait_CBK_CORF_Cyber_Operational_Resilience_Framework_December_2025",
+    "snippet": "- 4.1.3.1. Executive/ Senior Management shall be the approving authority of cyber resilience policy and cybersecurity in"
+  },
+  {
+    "query": "What specific laws were enacted in 2013 regarding combating money laundering and financing terrorism?",
+    "expected_chunk_id": "Law_81588d_s0_3",
+    "expected_node_id": "a657ea0e7e5d1cd3695f2a3a5c5f8dc0",
+    "jurisdiction": "Kuwait",
+    "doc_title": "Kuwait_Cybercrime_Law_63_2015",
+    "snippet": "Law No. 106 for the year 2013, regarding combating money laundry and financing terrorism,  \nLaw No. 111 for the year 201"
+  },
+  {
+    "query": "What specific laws regulate banks' handling of customer financial and personal information?",
+    "expected_chunk_id": "Principle_Six_Protection_of_Co_015780_s12_1",
+    "expected_node_id": "ef3db22bd911bdbb1488cefabc413411",
+    "jurisdiction": "Kuwait",
+    "doc_title": "Kuwait_CBK_Bank_Customer_Protection_Guide_October_2025",
+    "snippet": "Banks shall have to lay down the regulatory systems,mechanisms and policies that ensure the protection of financial and"
+  },
+  {
+    "query": "Are KYC documents sufficient for opening accounts of eligible Foreign Portfolio Investors (FPIs)?",
+    "expected_chunk_id": "45_Simplified_KYC_norms_for_Fo_0ecc42_s32_1",
+    "expected_node_id": "513d430b917212f08ea483ccb7353c2b",
+    "jurisdiction": "India",
+    "doc_title": "India_RBI_KYC_Master_Direction",
+    "snippet": "Accounts of FPIs which are eligible/ registered as per SEBI guidelines, for the purpose of investment under Portfolio In"
+  },
+  {
+    "query": "Does the amendment to Act 18 of 1891 omit its provisions under section 48 of the Information Technology Act?",
+    "expected_chunk_id": "CHAPTER_XIII_MISCELLANEOUS_0083e5_s16_10",
+    "expected_node_id": "a11a39b39dd054604c8a313ecf70c4bf",
+    "jurisdiction": "India",
+    "doc_title": "India_IT_Act_2000",
+    "snippet": "91. [Amendment of Act 45 of 1860.) Omitted by the Information Technology (Amendment) Act, 2008 (10 of 2009), s. 48 (w.ef"
+  },
+  {
+    "query": "When were copies of the Official Gazette containing the notification made available to the public?",
+    "expected_chunk_id": "MINISTRY_OF_ELECTRONICS_AND_IN_a9853e_s0_1",
+    "expected_node_id": "f3cdf937e94d7e84674b471857c211bb",
+    "jurisdiction": "India",
+    "doc_title": "India_DPDP_Rules_2025",
+    "snippet": "New Delhi, the 13th November, 2025  \nG.S.R. 846(E) . ---Whereas draft of the Digital Personal Data Protection Rules, 202"
+  },
+  {
+    "query": "Does the Outsourcing of IT Services policy address the entire lifecycle of data?",
+    "expected_chunk_id": "Appendix_I_Usage_of_Cloud_Comp_caaf7a_s25_1",
+    "expected_node_id": "f0c2074e5fc062d00e766253a92dd18e",
+    "jurisdiction": "India",
+    "doc_title": "India_RBI_Outsourcing_of_Information_Technology_Services_Directions_2023",
+    "snippet": "There are several cloud deployment and service models that have emerged over time. These are generally based on the exte"
+  },
+  {
+    "query": "What is the definition of an intermediary in relation to electronic records?",
+    "expected_chunk_id": "CHAPTER_1_PRELIMINARY_121f44_s1_4",
+    "expected_node_id": "8e24bf5fa7fc41902c517df5ef2b8f34",
+    "jurisdiction": "India",
+    "doc_title": "India_IT_Act_2000",
+    "snippet": "(s) \"Electronic Gazette\" means the Official Gazette published in the electronic form;  \n(t) \"electronic record\" means da"
+  },
+  {
+    "query": "Is the subject of this document a Scheduled Commercial Bank as defined by RBI/2023-24/102?",
+    "expected_chunk_id": "Section_1_a0d475_s0_1",
+    "expected_node_id": "ba0fb53d446ccaca5e46df01e049e1bd",
+    "jurisdiction": "India",
+    "doc_title": "India_RBI_Outsourcing_of_Information_Technology_Services_Directions_2023",
+    "snippet": "RBI/2023-24/102  \nDoS.CO.CSITEG/SEC.1/31.01.015/2023-24 April 10, 2023  \nThe Chairman/Managing Director/Chief Executive"
+  },
+  {
+    "query": "What specific records must REs preserve for at least five years after a business relationship is ended?",
+    "expected_chunk_id": "Chapter_VII_Record_Management_e1f15b_s33_1",
+    "expected_node_id": "b401e60c8dfaf22c1ca8a13e5052f9d5",
+    "jurisdiction": "India",
+    "doc_title": "India_RBI_KYC_Master_Direction",
+    "snippet": "46. 131 The following steps shall be taken regarding maintenance, preservation and reporting of customer information, wi"
+  },
+  {
+    "query": "Does the RE have procedures for mitigating country risk, including contingency plans, in place?",
+    "expected_chunk_id": "21_Additional_requirements_for_8a600a_s23_1",
+    "expected_node_id": "f28f1fc13f0f72bcbb4c412590fb8946",
+    "jurisdiction": "India",
+    "doc_title": "India_RBI_Outsourcing_of_Information_Technology_Services_Directions_2023",
+    "snippet": "- a) The engagement of a service provider based in a different jurisdiction exposes the RE to country risk. To manage su"
+  }
+]

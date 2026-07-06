@@ -1,0 +1,154 @@
+﻿{% load tz %}
+<div style="padding:24px;">
+
+ {# ── Event header ──────────────────────────────────────────────────────── #}
+ <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:20px;">
+ <div style="min-width:0;flex:1;">
+ <p style="font-size:14px;font-weight:700;color:#002583;line-height:1.4;margin-bottom:6px;">
+ {{ event.description }}
+ </p>
+ <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+ <span style="padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;background:{{ event.meta.bg }};color:{{ event.meta.color }};">
+ {{ event.meta.label }}
+ </span>
+ <span style="font-size:10px;color:#002583;font-family:'Satoshi',sans-serif;">{{ event.etype }}</span>
+ </div>
+ </div>
+ <div style="width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:{{ event.meta.bg }};">
+ {% if event.category == 'comparison' %}
+ <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="{{ event.meta.color }}" stroke-width="1.8">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/>
+ </svg>
+ {% elif event.category == 'mapping' %}
+ <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="{{ event.meta.color }}" stroke-width="1.8">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0z"/>
+ </svg>
+ {% elif event.category == 'review' %}
+ <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="{{ event.meta.color }}" stroke-width="1.8">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+ </svg>
+ {% elif event.category == 'upload' %}
+ <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="{{ event.meta.color }}" stroke-width="1.8">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
+ </svg>
+ {% endif %}
+ </div>
+ </div>
+
+ {# ── Details table ─────────────────────────────────────────────────────── #}
+ <div style="margin-bottom:16px;">
+ <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#002583;margin-bottom:8px;">Event details</p>
+ <div style="border:1px solid #E5E8EF;border-radius:9px;overflow:hidden;">
+ <table style="width:100%;border-collapse:collapse;">
+ <tr style="border-bottom:1px solid #E5E8EF;">
+ <td style="padding:8px 12px;font-size:11px;color:#002583;width:38%;white-space:nowrap;">Date / time</td>
+ <td style="padding:8px 12px;font-size:11px;font-family:'Satoshi',sans-serif;color:#002583;">
+ {{ event.timestamp|localtime|date:"d M Y, H:i:s" }}
+ </td>
+ </tr>
+ <tr style="border-bottom:1px solid #E5E8EF;">
+ <td style="padding:8px 12px;font-size:11px;color:#002583;">User</td>
+ <td style="padding:8px 12px;font-size:11px;color:#002583;">{{ event.user_label }}</td>
+ </tr>
+ <tr style="border-bottom:1px solid #E5E8EF;">
+ <td style="padding:8px 12px;font-size:11px;color:#002583;">Action type</td>
+ <td style="padding:8px 12px;font-size:11px;font-family:'Satoshi',sans-serif;color:#002583;">{{ event.etype }}</td>
+ </tr>
+ {% if event.detail.status %}
+ <tr>
+ <td style="padding:8px 12px;font-size:11px;color:#002583;">Status</td>
+ <td style="padding:8px 12px;font-size:11px;color:#002583;">{{ event.detail.status }}</td>
+ </tr>
+ {% endif %}
+ </table>
+ </div>
+ </div>
+
+ {# ── Category-specific detail ──────────────────────────────────────────── #}
+ {% if event.category == 'comparison' %}
+ <div style="margin-bottom:16px;">
+ <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#002583;margin-bottom:8px;">Comparison info</p>
+ <div style="background:#fff;border:1px solid #E5E8EF;border-radius:9px;padding:12px;display:flex;flex-direction:column;gap:5px;">
+ {% if event.detail.metadata.pair_key %}
+ <p style="font-size:11px;color:#1F2937;margin:0;"><span style="color:#6B7280;">Pair:</span> <b style="color:#002583;">{{ event.detail.metadata.pair_key|upper }}</b></p>
+ {% endif %}
+ {% if event.detail.metadata.reg_a or event.detail.metadata.reg_b %}
+ <p style="font-size:11px;color:#1F2937;margin:0;"><span style="color:#6B7280;">Regulations:</span> {{ event.detail.metadata.reg_a|default:"—" }} ↔ {{ event.detail.metadata.reg_b|default:"—" }}</p>
+ {% endif %}
+ {% if event.detail.metadata.topics %}
+ <p style="font-size:11px;color:#1F2937;margin:0;"><span style="color:#6B7280;">Topics:</span> {{ event.detail.metadata.topics|join:", " }}</p>
+ {% endif %}
+ {% if event.detail.metadata.completed_pairs is not None %}
+ <p style="font-size:11px;color:#1F2937;margin:0;"><span style="color:#6B7280;">Pairs produced:</span> <b style="color:#002583;">{{ event.detail.metadata.completed_pairs }}</b></p>
+ {% endif %}
+ {% if event.detail.metadata.error %}
+ <p style="font-size:11px;color:#D93939;margin:0;"><span style="color:#6B7280;">Error:</span> {{ event.detail.metadata.error|truncatechars:140 }}</p>
+ {% endif %}
+ </div>
+ </div>
+ {% elif event.category == 'review' %}
+ <div style="margin-bottom:16px;">
+ <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#002583;margin-bottom:8px;">Review action</p>
+ <div style="background:#fff;border:1px solid #E5E8EF;border-radius:9px;padding:12px;display:flex;flex-direction:column;gap:5px;">
+ <p style="font-size:11px;color:#1F2937;margin:0;"><span style="color:#6B7280;">Action:</span> <b style="color:#002583;">{{ event.detail.action }}</b></p>
+ {% if event.detail.metadata.from_lifecycle %}
+ <p style="font-size:11px;color:#1F2937;margin:0;"><span style="color:#6B7280;">Transition:</span> {{ event.detail.metadata.from_lifecycle }} → {{ event.detail.metadata.to_lifecycle }}</p>
+ {% endif %}
+ {% if event.detail.metadata.citation_a %}
+ <p style="font-size:11px;color:#1F2937;margin:0;"><span style="color:#6B7280;">Clause A:</span> {{ event.detail.metadata.citation_a }}</p>
+ {% endif %}
+ {% if event.detail.metadata.citation_b %}
+ <p style="font-size:11px;color:#1F2937;margin:0;"><span style="color:#6B7280;">Clause B:</span> {{ event.detail.metadata.citation_b }}</p>
+ {% endif %}
+ {% if event.detail.metadata.note_len %}
+ <p style="font-size:11px;color:#1F2937;margin:0;"><span style="color:#6B7280;">Analyst note:</span> {{ event.detail.metadata.note_len }} char{{ event.detail.metadata.note_len|pluralize }}</p>
+ {% endif %}
+ </div>
+ </div>
+ {% elif event.category == 'upload' %}
+ <div style="margin-bottom:16px;">
+ <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#002583;margin-bottom:8px;">Document info</p>
+ <div style="background:#fff;border:1px solid #E5E8EF;border-radius:9px;padding:12px;display:flex;flex-direction:column;gap:5px;">
+ {% if event.detail.metadata.document_name %}
+ <p style="font-size:11px;color:#1F2937;margin:0;"><span style="color:#6B7280;">Document:</span> <b style="color:#002583;">{{ event.detail.metadata.document_name }}</b></p>
+ {% endif %}
+ {% if event.detail.metadata.jurisdiction %}<p style="font-size:11px;color:#1F2937;margin:0;"><span style="color:#6B7280;">Jurisdiction:</span> {{ event.detail.metadata.jurisdiction|title }}</p>{% endif %}
+ {% if event.detail.metadata.doc_type %}<p style="font-size:11px;color:#1F2937;margin:0;"><span style="color:#6B7280;">Type:</span> {{ event.detail.metadata.doc_type|title }}</p>{% endif %}
+ {% if event.detail.metadata.chunk_count %}<p style="font-size:11px;color:#1F2937;margin:0;"><span style="color:#6B7280;">Sections:</span> <b style="color:#002583;">{{ event.detail.metadata.chunk_count }}</b></p>{% endif %}
+ </div>
+ </div>
+ {% elif event.category == 'mapping' %}
+ <div style="margin-bottom:16px;">
+ <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#002583;margin-bottom:8px;">Mapping info</p>
+ <div style="background:#fff;border:1px solid #E5E8EF;border-radius:9px;padding:12px;display:flex;flex-direction:column;gap:5px;">
+ <p style="font-size:11px;color:#1F2937;margin:0;"><span style="color:#6B7280;">Obligations:</span> <b style="color:#002583;">{{ event.detail.metadata.obligation_count|default:"—" }}</b></p>
+ <p style="font-size:11px;color:#1F2937;margin:0;"><span style="color:#6B7280;">Gaps found:</span> <b style="color:#B07A00;">{{ event.detail.metadata.gap_count|default:"—" }}</b></p>
+ {% if event.detail.metadata.error %}
+ <p style="font-size:11px;color:#D93939;margin:0;"><span style="color:#6B7280;">Error:</span> {{ event.detail.metadata.error|truncatechars:140 }}</p>
+ {% endif %}
+ </div>
+ </div>
+ {% endif %}
+
+ {# ── Action buttons ────────────────────────────────────────────────────── #}
+ <div style="display:flex;flex-direction:column;gap:6px;padding-top:4px;">
+
+ {% if event.detail.target_type and event.detail.target_id %}
+   {% if 'ComparisonRun' in event.detail.target_type %}
+   <a href="{% url 'comparison-workspace' event.detail.target_id %}"
+    style="display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border-radius:8px;background:#002583;color:#fff;font-size:12px;font-weight:500;text-decoration:none;">
+    <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/></svg>
+    Open comparison workspace
+   </a>
+   {% elif 'MappingAnalysis' in event.detail.target_type %}
+   <a href="{% url 'mapping-workspace' event.detail.target_id %}"
+    style="display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border-radius:8px;background:#002583;color:#fff;font-size:12px;font-weight:500;text-decoration:none;">
+    <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/></svg>
+    Open mapping workspace
+   </a>
+   {% endif %}
+ {% endif %}
+
+ </div>
+
+</div>

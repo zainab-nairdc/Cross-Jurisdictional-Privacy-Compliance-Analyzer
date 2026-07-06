@@ -1,0 +1,44 @@
+/* overlay.css — Visual 8: Term Frequency / Semantic Overlay */
+
+/* Concept spans are always rendered with inline background/color/padding.
+ The .overlay-off class suppresses those inline styles by overriding with
+ !important — no JS traversal needed, just a single class toggle. */
+
+.overlay-off .concept-span {
+ background: transparent !important;
+ color: inherit !important;
+ padding: 0 !important;
+ border-radius: 0 !important;
+}
+
+/* Hover dimming — applied by JS, but CSS transition makes it smooth */
+.concept-span {
+ transition: opacity 0.12s, outline 0.08s;
+}
+
+/* Concept sidebar row hover */
+.concept-row:hover {
+ background: rgba(27, 58, 107, 0.06);
+}
+.concept-row.concept-active {
+ border-left: 1.5px solid currentColor;
+ background: rgba(27, 58, 107, 0.04);
+}
+
+/* Filter chip */
+.filter-chip {
+ display: inline-flex;
+ align-items: center;
+ gap: 5px;
+ padding: 2px 8px;
+ border-radius: 20px;
+ background: rgba(27, 58, 107, 0.08);
+ font-size: 10px;
+ font-family: 'DM Mono', ui-monospace, monospace;
+ color: #002583;
+ cursor: pointer;
+ border: none;
+}
+.filter-chip:hover {
+ background: rgba(27, 58, 107, 0.14);
+}

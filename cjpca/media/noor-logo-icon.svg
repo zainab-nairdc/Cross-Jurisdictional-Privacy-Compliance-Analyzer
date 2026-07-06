@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 420" width="400" height="420">
+<title>CJPCA — BBK owl logo icon</title>
+
+<!-- Body -->
+<ellipse cx="200" cy="290" rx="120" ry="110" fill="#22478A"/>
+
+<!-- Belly -->
+<ellipse cx="200" cy="305" rx="78" ry="82" fill="#D8E4F5"/>
+
+<!-- Belly scallops -->
+<path d="M148 262 Q161 254 174 262 Q187 270 200 262 Q213 254 226 262 Q239 270 252 262" stroke="#B8CCEB" stroke-width="2" fill="none" stroke-linecap="round"/>
+<path d="M142 280 Q156 272 170 280 Q185 288 200 280 Q215 272 230 280 Q244 288 258 280" stroke="#B8CCEB" stroke-width="2" fill="none" stroke-linecap="round"/>
+<path d="M140 298 Q155 290 170 298 Q185 306 200 298 Q215 290 230 298 Q245 306 260 298" stroke="#B8CCEB" stroke-width="2" fill="none" stroke-linecap="round"/>
+<path d="M142 316 Q156 308 170 316 Q185 324 200 316 Q215 308 230 316 Q244 324 258 316" stroke="#B8CCEB" stroke-width="2" fill="none" stroke-linecap="round"/>
+<path d="M148 334 Q162 326 176 334 Q190 342 200 334 Q210 326 224 334 Q238 342 252 334" stroke="#B8CCEB" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+<!-- Left wing -->
+<path d="M80 248 C60 232 36 222 22 222 C10 222 6 234 12 244 C22 260 50 270 76 276 C60 284 36 294 28 304 C20 314 26 326 38 322 C60 314 88 296 98 276 C98 290 94 308 96 318 C98 328 110 330 114 318 C120 300 114 268 80 248Z" fill="#1B3A6B"/>
+<path d="M76 252 C56 244 34 234 18 228" stroke="#0D2040" stroke-width="1.2" fill="none" stroke-linecap="round" opacity="0.5"/>
+<path d="M70 272 C50 278 30 286 20 294" stroke="#0D2040" stroke-width="1.2" fill="none" stroke-linecap="round" opacity="0.5"/>
+
+<!-- Right wing -->
+<path d="M320 248 C340 232 364 222 378 222 C390 222 394 234 388 244 C378 260 350 270 324 276 C340 284 364 294 372 304 C380 314 374 326 362 322 C340 314 312 296 302 276 C302 290 306 308 304 318 C302 328 290 330 286 318 C280 300 286 268 320 248Z" fill="#1B3A6B"/>
+<path d="M324 252 C344 244 366 234 382 228" stroke="#0D2040" stroke-width="1.2" fill="none" stroke-linecap="round" opacity="0.5"/>
+<path d="M330 272 C350 278 370 286 380 294" stroke="#0D2040" stroke-width="1.2" fill="none" stroke-linecap="round" opacity="0.5"/>
+
+<!-- Feet peeking at bottom -->
+<path d="M148 390 L130 398 M148 390 L138 406 M148 390 L150 408 M148 390 L164 400 M148 390 L168 393" stroke="#F5A800" stroke-width="4" stroke-linecap="round"/>
+<path d="M252 390 L234 393 M252 390 L236 400 M252 390 L250 408 M252 390 L262 406 M252 390 L270 398" stroke="#F5A800" stroke-width="4" stroke-linecap="round"/>
+
+<!-- Head -->
+<circle cx="200" cy="168" r="104" fill="#1B3A6B"/>
+
+<!-- Ear tufts -->
+<path d="M136 98 L110 44 L150 82Z" fill="#1B3A6B"/>
+<path d="M264 98 L290 44 L250 82Z" fill="#1B3A6B"/>
+<path d="M136 94 L116 56 L148 80Z" fill="#22478A" opacity="0.5"/>
+<path d="M264 94 L284 56 L252 80Z" fill="#22478A" opacity="0.5"/>
+<path d="M110 44 L122 64 L138 54Z" fill="#F5A800" opacity="0.9"/>
+<path d="M290 44 L278 64 L262 54Z" fill="#F5A800" opacity="0.9"/>
+
+<!-- Head feather texture -->
+<path d="M112 142 C140 124 170 116 200 116 C230 116 260 124 288 142" stroke="#22478A" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.4"/>
+
+<!-- Left eye -->
+<circle cx="160" cy="158" r="40" fill="#F5A800"/>
+<circle cx="160" cy="158" r="30" fill="#FAFCFF"/>
+<circle cx="160" cy="158" r="20" fill="#1B3A6B"/>
+<circle cx="160" cy="158" r="10" fill="#060E1C"/>
+<circle cx="150" cy="146" r="5.5" fill="#ffffff"/>
+<circle cx="166" cy="164" r="2.5" fill="#ffffff" opacity="0.4"/>
+<circle cx="160" cy="158" r="40" fill="none" stroke="#C9880A" stroke-width="1.2" opacity="0.3"/>
+
+<!-- Right eye -->
+<circle cx="240" cy="158" r="40" fill="#F5A800"/>
+<circle cx="240" cy="158" r="30" fill="#FAFCFF"/>
+<circle cx="240" cy="158" r="20" fill="#1B3A6B"/>
+<circle cx="240" cy="158" r="10" fill="#060E1C"/>
+<circle cx="230" cy="146" r="5.5" fill="#ffffff"/>
+<circle cx="246" cy="164" r="2.5" fill="#ffffff" opacity="0.4"/>
+<circle cx="240" cy="158" r="40" fill="none" stroke="#C9880A" stroke-width="1.2" opacity="0.3"/>
+
+<!-- Beak -->
+<path d="M180 204 Q200 226 220 204 Q215 191 200 190 Q185 191 180 204Z" fill="#F5A800"/>
+<path d="M182 206 Q200 220 218 206" stroke="#C9790A" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+<path d="M186 200 Q200 207 214 200" stroke="#FFCE58" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.5"/>
+
+<!-- Gold collar -->
+<path d="M120 248 C146 240 172 237 200 237 C228 237 254 240 280 248" stroke="#F5A800" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+
+</svg>

@@ -1,0 +1,399 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Configure Comparison — CJPCA{% endblock %}
+
+{% block extra_head %}
+<style>
+ [x-cloak] { display:none!important; }
+
+ .scope-btn {
+ flex:1;display:flex;align-items:center;justify-content:center;gap:5px;
+ padding:8px 10px;border-radius:9px;border:1.5px solid #E5E8EF;
+ background:#ffffff;font-size:11px;font-weight:600;color:#002583;
+ cursor:pointer;font-family:inherit;transition:all .12s;
+ }
+ .scope-btn:hover { border-color:#E5E8EF;color:#002583;background:#ffffff; }
+ .scope-btn.s-on { border-color:#002583;background:#002583;color:#fff; }
+
+ .topic-tile {
+ border:1.5px solid #E5E8EF;border-radius:10px;background:#fff;
+ padding:10px;cursor:pointer;
+ transition:border-color .13s,background .13s;user-select:none;
+ }
+ .topic-tile:hover:not(.sel) { background:#ffffff;border-color:#E5E8EF; }
+ .topic-tile.sel { border-color:#002583;background:#ffffff; }
+ .cbox {
+ width:14px;height:14px;border-radius:4px;border:1.5px solid #E5E8EF;
+ display:flex;align-items:center;justify-content:center;
+ flex-shrink:0;transition:background .1s,border-color .1s;
+ }
+ .cbox.sel { background:#002583;border-color:#002583; }
+
+ .tag-wrap {
+ display:flex;flex-wrap:wrap;gap:4px;align-items:center;
+ min-height:32px;padding:4px 8px;
+ border:1.5px solid #E5E8EF;border-radius:8px;background:#ffffff;cursor:text;
+ transition:border-color .12s,box-shadow .12s,background .12s;
+ }
+ .tag-wrap.a-f { border-color:#002583;background:#fff;box-shadow:0 0 0 2px rgba(27,48,104,.07); }
+ .tag-wrap.b-f { border-color:#002583;background:#fff;box-shadow:0 0 0 2px rgba(250,166,51,.10); }
+ .tag-chip {
+ display:inline-flex;align-items:center;gap:3px;
+ padding:2px 7px;border-radius:20px;font-size:10px;font-weight:600;white-space:nowrap;
+ }
+ .tag-chip.a { background:#ffffff;color:#002583; }
+ .tag-chip.b { background:#ffffff;color:#002583; }
+ .tag-chip button { background:none;border:none;cursor:pointer;color:inherit;padding:0;line-height:1;font-size:12px;opacity:.5; }
+ .tag-chip button:hover { opacity:1; }
+ .tag-field { font-size:10px;border:none;outline:none;background:transparent;font-family:inherit;color:#002583;min-width:60px;flex:1; }
+ .tag-field::placeholder { color:#002583; }
+
+ @keyframes pulsedot { 0%,100%{opacity:1} 50%{opacity:.35} }
+ .divider { height:1px;background:#E5E8EF;margin:14px 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="flex flex-col h-full overflow-hidden" style="background:#ffffff;"
+ x-data="scopeSel()" x-init="init()">
+
+ {# ── Header ── #}
+ <div style="background:#fff;border-bottom:1px solid #E5E8EF;padding:12px 24px;flex-shrink:0;display:flex;align-items:center;gap:12px;">
+ <a href="{% url 'comparison' %}"
+ style="width:30px;height:30px;border-radius:8px;background:#ffffff;display:flex;align-items:center;justify-content:center;color:#002583;text-decoration:none;flex-shrink:0;"
+ onmouseover="this.style.background='#ffffff'" onmouseout="this.style.background='#ffffff'">
+ <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"/></svg>
+ </a>
+ <div style="flex:1;">
+ <p style="font-size:14px;font-weight:800;color:#002583;margin:0;letter-spacing:-.02em;">Configure Comparison</p>
+ <p style="font-size:11px;color:#002583;margin:0;">Set scope and run</p>
+ </div>
+ </div>
+
+ {# ── Single card layout ── #}
+ <form id="scope-form" method="post" action="{% url 'comparison-run' %}"
+ style="flex:1;min-height:0;display:flex;align-items:stretch;justify-content:center;padding:16px 24px 76px;">
+ {% csrf_token %}
+ <input type="hidden" name="pair_key" value="{{ pair_key }}">
+ <input type="hidden" name="scope_mode" :value="scopeMode">
+ <input type="hidden" name="include_orphans" :value="includeOrphans ? '1' : '0'">
+ <input type="hidden" name="reg_a_pk" :value="regAPk">
+ <input type="hidden" name="reg_b_pk" :value="regBPk">
+
+ {# The card #}
+ <div style="display:flex;width:100%;max-width:900px;background:#fff;border-radius:18px;border:1px solid #E5E8EF;box-shadow:0 2px 16px rgba(27,48,104,.07);overflow:hidden;">
+
+ {# ── LEFT PANEL ── #}
+ <div style="width:272px;flex-shrink:0;border-right:1px solid #E5E8EF;display:flex;flex-direction:column;overflow-y:auto;padding:20px;">
+
+ <p style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#002583;margin:0 0 12px;">Regulations</p>
+
+ {# Reg A card #}
+ <div style="border:1.5px solid #002583;border-radius:11px;background:#ffffff;padding:12px 14px;margin-bottom:8px;">
+ <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+ {% if flag_a %}<img src="https://flagcdn.com/w40/{{ flag_a }}.png" style="width:20px;height:14px;border-radius:2px;object-fit:cover;border:1px solid #E5E8EF;">{% endif %}
+ <span style="font-size:9px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#002583;">Regulation A</span>
+ </div>
+ {% if all_regs_a|length > 1 %}
+ <select @change="regAPk=$event.target.value; window.location.href='{% url 'comparison-scope' pair_key %}?reg_a_pk='+$event.target.value+'&reg_b_pk='+regBPk"
+ style="width:100%;padding:5px 8px;border:1.5px solid #002583;border-radius:7px;font-size:11px;font-weight:700;color:#002583;background:#ffffff;cursor:pointer;outline:none;font-family:inherit;margin-bottom:4px;">
+ {% for r in all_regs_a %}<option value="{{ r.pk }}" {% if r.pk == reg_a.pk %}selected{% endif %}>{{ r.name }}</option>{% endfor %}
+ </select>
+ {% else %}
+ <p style="font-size:12px;font-weight:700;color:#002583;margin:0 0 3px;line-height:1.3;">{{ reg_a.name }}</p>
+ {% endif %}
+ <p style="font-size:9px;color:#002583;margin:0;">{{ reg_a.chunk_count }} sections · {{ reg_a.get_jurisdiction_display }}</p>
+ </div>
+
+ {# VS #}
+ <div style="display:flex;align-items:center;gap:8px;margin:4px 0;">
+ <div style="flex:1;height:1px;background:#E5E8EF;"></div>
+ <span style="font-size:9px;font-weight:900;color:#ffffff;letter-spacing:.04em;">vs</span>
+ <div style="flex:1;height:1px;background:#E5E8EF;"></div>
+ </div>
+
+ {# Reg B card #}
+ <div style="border:1.5px solid #002583;border-radius:11px;background:#ffffff;padding:12px 14px;margin-top:8px;">
+ <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+ {% if flag_b %}<img src="https://flagcdn.com/w40/{{ flag_b }}.png" style="width:20px;height:14px;border-radius:2px;object-fit:cover;border:1px solid #E5E8EF;">{% endif %}
+ <span style="font-size:9px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#002583;">Regulation B</span>
+ </div>
+ {% if all_regs_b|length > 1 %}
+ <select @change="regBPk=$event.target.value; window.location.href='{% url 'comparison-scope' pair_key %}?reg_a_pk='+regAPk+'&reg_b_pk='+$event.target.value"
+ style="width:100%;padding:5px 8px;border:1.5px solid #002583;border-radius:7px;font-size:11px;font-weight:700;color:#002583;background:#ffffff;cursor:pointer;outline:none;font-family:inherit;margin-bottom:4px;">
+ {% for r in all_regs_b %}<option value="{{ r.pk }}" {% if r.pk == reg_b.pk %}selected{% endif %}>{{ r.name }}</option>{% endfor %}
+ </select>
+ {% else %}
+ <p style="font-size:12px;font-weight:700;color:#002583;margin:0 0 3px;line-height:1.3;">{{ reg_b.name }}</p>
+ {% endif %}
+ <p style="font-size:9px;color:#002583;margin:0;">{{ reg_b.chunk_count }} sections · {{ reg_b.get_jurisdiction_display }}</p>
+ </div>
+
+ <div class="divider"></div>
+
+ {# Scope toggle #}
+ <p style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#002583;margin:0 0 8px;">Scope</p>
+ <div style="display:flex;gap:6px;margin-bottom:14px;">
+ <button type="button" class="scope-btn" :class="scopeMode==='full'?'s-on':''" @click="scopeMode='full'">
+ <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+ Full
+ </button>
+ <button type="button" class="scope-btn" :class="scopeMode==='topics'?'s-on':''" @click="scopeMode='topics'">
+ <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12"/></svg>
+ Topics
+ </button>
+ </div>
+
+ <div class="divider" style="margin-top:0;"></div>
+
+ {# Specific articles (collapsible) #}
+ <button type="button" @click="showAdvanced=!showAdvanced"
+ style="display:flex;align-items:center;justify-content:space-between;width:100%;background:none;border:none;cursor:pointer;padding:0;font-family:inherit;">
+ <span style="font-size:11px;font-weight:600;color:#002583;">Specific articles</span>
+ <div style="display:flex;align-items:center;gap:5px;">
+ <span style="font-size:9px;padding:1px 6px;border-radius:4px;background:#ffffff;color:#002583;font-weight:600;">Optional</span>
+ <svg :style="showAdvanced?'transform:rotate(180deg)':''" style="transition:transform .15s;" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#002583" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg>
+ </div>
+ </button>
+ <div x-show="showAdvanced" x-cloak style="margin-top:10px;display:flex;flex-direction:column;gap:8px;">
+ <p style="font-size:9px;color:#002583;margin:0;line-height:1.5;">Press <kbd style="background:#ffffff;border-radius:3px;padding:1px 4px;font-size:8px;">Enter</kbd> to add</p>
+ <div>
+ <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;">
+ <div style="width:6px;height:6px;border-radius:50%;background:#002583;flex-shrink:0;"></div>
+ <span style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#002583;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ reg_a.name }}</span>
+ </div>
+ <div class="tag-wrap" id="tag-wrap-a" onclick="document.getElementById('tag-field-a').focus()">
+ <input type="text" class="tag-field" id="tag-field-a" placeholder="Art. 5…"
+ onfocus="this.closest('.tag-wrap').classList.add('a-f')"
+ onblur="this.closest('.tag-wrap').classList.remove('a-f')"
+ onkeydown="handleTagKey(event,'a')">
+ </div>
+ </div>
+ <div>
+ <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;">
+ <div style="width:6px;height:6px;border-radius:50%;background:#002583;flex-shrink:0;"></div>
+ <span style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#002583;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ reg_b.name }}</span>
+ </div>
+ <div class="tag-wrap" id="tag-wrap-b" onclick="document.getElementById('tag-field-b').focus()">
+ <input type="text" class="tag-field" id="tag-field-b" placeholder="Art. 12…"
+ onfocus="this.closest('.tag-wrap').classList.add('b-f')"
+ onblur="this.closest('.tag-wrap').classList.remove('b-f')"
+ onkeydown="handleTagKey(event,'b')">
+ </div>
+ </div>
+ <p style="font-size:9px;color:#002583;margin:0;" x-text="tagsA.length + ' × ' + tagsB.length + ' = ' + (tagsA.length * tagsB.length) + ' pairs'"></p>
+ </div>
+
+ </div>
+
+ {# ── RIGHT PANEL ── #}
+ <div style="flex:1;min-width:0;overflow:hidden;position:relative;">
+
+ {# Full mode #}
+ <div x-show="scopeMode==='full'" x-cloak style="position:absolute;inset:0;">
+ <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:40px;">
+ <div style="display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;">
+ <div style="width:54px;height:54px;border-radius:50%;background:#ffffff;display:flex;align-items:center;justify-content:center;">
+ <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+ </div>
+ <p style="font-size:16px;font-weight:800;color:#002583;margin:0;letter-spacing:-.02em;">Full Comparison</p>
+ <p style="font-size:12px;color:#002583;margin:0;line-height:1.6;max-width:240px;">Every clause across all privacy principles</p>
+ </div>
+ </div>
+ </div>
+
+ {# Topics mode #}
+ <div x-show="scopeMode==='topics'" x-cloak style="position:absolute;inset:0;">
+ <div style="width:100%;height:100%;display:flex;flex-direction:column;overflow:hidden;">
+ {% if scan.both_covered %}
+ <div style="padding:18px 20px 10px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+ <p style="font-size:11px;font-weight:700;color:#002583;margin:0;">Choose topics</p>
+ <div style="display:flex;gap:5px;">
+ <button type="button" @click="selectAll()" style="font-size:10px;font-weight:700;color:#002583;background:#ffffff;border:none;cursor:pointer;padding:4px 10px;border-radius:6px;font-family:inherit;">All</button>
+ <button type="button" @click="clearAll()" style="font-size:10px;font-weight:700;color:#002583;background:#ffffff;border:none;cursor:pointer;padding:4px 10px;border-radius:6px;font-family:inherit;">None</button>
+ </div>
+ </div>
+ <div style="flex:1;min-height:0;overflow-y:auto;padding:0 20px 16px;">
+ <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:12px;">
+ {% for topic in scan.both_covered %}
+ <div class="topic-tile" data-tile id="tile-{{ topic.principle_id }}"
+ onclick="toggleTile(this,'{{ topic.principle_id }}')">
+ <input type="checkbox" name="topics" value="{{ topic.principle_id }}"
+ data-pairs="{{ topic.estimated_pairs }}"
+ id="cb-{{ topic.principle_id }}"
+ @change="onTopicToggle()"
+ style="display:none;">
+ <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:5px;margin-bottom:7px;">
+ <div style="display:flex;align-items:center;gap:6px;">
+ <div class="cbox" id="chkbox-{{ topic.principle_id }}"></div>
+ <span style="font-size:10px;font-weight:700;color:#002583;line-height:1.3;">{{ topic.label }}</span>
+ </div>
+ <span style="font-size:8px;font-weight:700;padding:2px 5px;border-radius:4px;background:#ffffff;color:#002583;white-space:nowrap;flex-shrink:0;">~{{ topic.estimated_pairs }}p</span>
+ </div>
+ <div style="display:flex;flex-direction:column;gap:3px;">
+ <div style="display:flex;align-items:center;gap:5px;">
+ <span style="font-size:8px;font-weight:800;color:#002583;width:7px;flex-shrink:0;">A</span>
+ <div style="flex:1;height:3px;background:#ffffff;border-radius:2px;overflow:hidden;"><div style="height:100%;width:{{ topic.bar_width_a }}%;background:#002583;border-radius:2px;"></div></div>
+ <span style="font-size:8px;color:#002583;width:14px;text-align:right;flex-shrink:0;">{{ topic.articles_a }}</span>
+ </div>
+ <div style="display:flex;align-items:center;gap:5px;">
+ <span style="font-size:8px;font-weight:800;color:#002583;width:7px;flex-shrink:0;">B</span>
+ <div style="flex:1;height:3px;background:#ffffff;border-radius:2px;overflow:hidden;"><div style="height:100%;width:{{ topic.bar_width_b }}%;background:#002583;border-radius:2px;"></div></div>
+ <span style="font-size:8px;color:#002583;width:14px;text-align:right;flex-shrink:0;">{{ topic.articles_b }}</span>
+ </div>
+ </div>
+ </div>
+ {% endfor %}
+ </div>
+
+ {% if scan.only_in_a or scan.only_in_b %}
+ <div style="border-top:1px solid #E5E8EF;padding-top:12px;">
+ <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+ <p style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:#002583;margin:0;">Only in one regulation</p>
+ <label style="display:flex;align-items:center;gap:5px;cursor:pointer;">
+ <input type="checkbox" x-model="includeOrphans" style="accent-color:#002583;width:12px;height:12px;">
+ <span style="font-size:10px;color:#002583;font-weight:600;">Include in analysis</span>
+ </label>
+ </div>
+ <div style="display:flex;flex-wrap:wrap;gap:5px;">
+ {% for t in scan.only_in_a %}
+ <div style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;background:#002583;">
+ <span style="font-size:10px;font-weight:600;color:#fff;">{{ t.label }}</span>
+ <span style="font-size:9px;color:rgba(255,255,255,.5);">A</span>
+ </div>
+ {% endfor %}
+ {% for t in scan.only_in_b %}
+ <div style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;background:#002583;">
+ <span style="font-size:10px;font-weight:600;color:#fff;">{{ t.label }}</span>
+ <span style="font-size:9px;color:rgba(255,255,255,.55);">B</span>
+ </div>
+ {% endfor %}
+ </div>
+ </div>
+ {% endif %}
+ </div>
+ {% else %}
+ <div style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;text-align:center;color:#002583;">
+ <p style="font-size:12px;font-weight:600;margin:0;">No shared topics detected</p>
+ <p style="font-size:11px;margin:0;">Switch to Full comparison.</p>
+ </div>
+ {% endif %}
+ </div>{# /inner flex wrapper #}
+ </div>
+
+ </div>
+ </div>
+ </form>
+
+ {# ── Sticky run bar ── #}
+ <div style="position:absolute;bottom:0;left:0;right:0;background:#fff;border-top:1.5px solid #E5E8EF;padding:12px 28px;display:flex;align-items:center;justify-content:space-between;gap:20px;z-index:30;box-shadow:0 -3px 12px rgba(27,48,104,.07);">
+ <div style="display:flex;align-items:center;gap:12px;">
+ <div>
+ <p style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:#002583;margin:0 0 1px;">Estimated run</p>
+ <p style="font-size:15px;font-weight:800;color:#002583;margin:0;letter-spacing:-.02em;">
+ <span x-text="estimatedPairs" style="color:#002583;"></span><span style="font-size:11px;font-weight:500;color:#002583;margin:0 4px;">pairs ·</span><span style="font-size:12px;font-weight:600;color:#002583;" x-text="formatTime(estimatedSeconds)"></span>
+ </p>
+ </div>
+ <div style="display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;background:#ffffff;border:1px solid #002583;">
+ <div style="width:6px;height:6px;border-radius:50%;background:#002583;animation:pulsedot 1.5s ease-in-out infinite;"></div>
+ <span style="font-size:9px;font-weight:700;color:#002583;">Ready</span>
+ </div>
+ </div>
+ <div style="display:flex;align-items:center;gap:10px;">
+ <a href="{% url 'comparison' %}" style="padding:9px 20px;border-radius:50px;font-size:12px;font-weight:600;border:1.5px solid #E5E8EF;color:#002583;background:#fff;text-decoration:none;"
+ onmouseover="this.style.background='#ffffff'" onmouseout="this.style.background='#fff'">Cancel</a>
+ <button type="submit" form="scope-form" :disabled="!canRun"
+ style="display:inline-flex;align-items:center;gap:8px;padding:9px 26px;border-radius:50px;font-size:13px;font-weight:700;color:#fff;border:none;font-family:inherit;background:#002583;cursor:pointer;box-shadow:0 2px 10px rgba(27,48,104,.24);transition:opacity .15s;"
+ :style="canRun ? '' : 'opacity:.35;cursor:not-allowed;'">
+ <svg style="flex-shrink:0;" width="11" height="11" fill="currentColor" viewBox="0 0 24 24"><path d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 010 1.972l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z"/></svg>
+ Run comparison
+ </button>
+ </div>
+ </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const tagsA = [], tagsB = [];
+function handleTagKey(e, side) {
+ if (e.key === 'Enter' || e.key === ',') {
+ e.preventDefault();
+ const val = e.target.value.replace(/,$/, '').trim();
+ if (val) addTag(side, val); e.target.value = '';
+ } else if (e.key === 'Backspace' && !e.target.value) {
+ const arr = side==='a'?tagsA:tagsB; if(arr.length) removeTag(side,arr.length-1);
+ }
+}
+function addTag(side, val) { const arr=side==='a'?tagsA:tagsB; if(arr.includes(val))return; arr.push(val); renderTags(side); }
+function removeTag(side, idx) { const arr=side==='a'?tagsA:tagsB; arr.splice(idx,1); renderTags(side); }
+function renderTags(side) {
+ const arr=side==='a'?tagsA:tagsB;
+ const wrap=document.getElementById(`tag-wrap-${side}`), field=document.getElementById(`tag-field-${side}`);
+ if(!wrap||!field) return;
+ wrap.querySelectorAll('.tag-chip').forEach(el=>el.remove());
+ arr.forEach((tag,i)=>{
+ const chip=document.createElement('span'); chip.className=`tag-chip ${side}`;
+ const esc=tag.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+ chip.innerHTML=`${esc} <button type="button" onclick="removeTag('${side}',${i})" tabindex="-1">&times;</button>`;
+ wrap.insertBefore(chip,field);
+ });
+}
+document.getElementById('scope-form').addEventListener('submit', function() {
+ ['a','b'].forEach(side=>{
+ const arr=side==='a'?tagsA:tagsB; if(!arr.length) return;
+ const inp=document.createElement('input'); inp.type='hidden'; inp.name=`articles_${side}`; inp.value=arr.join('\n');
+ this.appendChild(inp);
+ });
+});
+function toggleTile(tile, id) {
+ const cb=document.getElementById('cb-'+id), box=document.getElementById('chkbox-'+id);
+ if(!cb) return; cb.checked=!cb.checked; tile.classList.toggle('sel',cb.checked);
+ if(box) box.classList.toggle('sel',cb.checked);
+ cb.dispatchEvent(new Event('change',{bubbles:true}));
+}
+function scopeSel() {
+ return {
+ scopeMode:'full', includeOrphans:false, showAdvanced:false,
+ estimatedPairs:{{ scan.total_estimated_pairs_full }},
+ estimatedSeconds:{{ scan.total_estimated_seconds_full }},
+ regAPk:'{{ reg_a.pk }}', regBPk:'{{ reg_b.pk }}',
+ tagsA, tagsB,
+ get canRun() {
+ if(this.scopeMode==='full') return true;
+ return document.querySelectorAll('input[name="topics"]:checked').length>0;
+ },
+ init() {
+ this.$watch('scopeMode', val=>{
+ if(val!=='topics'){this.estimatedPairs={{ scan.total_estimated_pairs_full }};this.estimatedSeconds={{ scan.total_estimated_seconds_full }};}
+ else{this.onTopicToggle();}
+ });
+ },
+ onTopicToggle() {
+ if(this.scopeMode==='full') return;
+ let p=0; document.querySelectorAll('input[name="topics"]:checked').forEach(cb=>{p+=parseInt(cb.dataset.pairs||0);});
+ this.estimatedPairs=p; this.estimatedSeconds=p*10;
+ },
+ selectAll() {
+ this.scopeMode='topics';
+ document.querySelectorAll('[data-tile]').forEach(tile=>{
+ const id=tile.id.replace('tile-',''); const cb=document.getElementById('cb-'+id), box=document.getElementById('chkbox-'+id);
+ if(cb&&!cb.checked){cb.checked=true;tile.classList.add('sel');if(box)box.classList.add('sel');}
+ }); this.onTopicToggle();
+ },
+ clearAll() {
+ document.querySelectorAll('[data-tile]').forEach(tile=>{
+ const id=tile.id.replace('tile-',''); const cb=document.getElementById('cb-'+id), box=document.getElementById('chkbox-'+id);
+ if(cb){cb.checked=false;tile.classList.remove('sel');if(box)box.classList.remove('sel');}
+ }); this.onTopicToggle();
+ },
+ formatTime(s) {
+ if(!s) return '< 1 min'; if(s<60) return Math.round(s)+'s';
+ const m=Math.floor(s/60),r=Math.round(s%60); return r>0?m+'m '+r+'s':m+'m';
+ },
+ };
+}
+</script>
+{% endblock %}

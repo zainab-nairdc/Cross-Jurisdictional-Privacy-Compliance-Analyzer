@@ -1,0 +1,165 @@
+{% comment %}
+Comparison result review card. Context: result (ComparisonResult), run.
+_enrich() must have been called so result.status_meta is set. Renders the
+same evidence + AI signals the analyst workspace shows, so the reviewer
+can decide with full context.
+{% endcomment %}
+
+{% with rel=result.relationship %}
+<div id="rv-card-{{ result.pk }}"
+     style="background:#fff;border-radius:14px;border:1px solid #E5E8EF;overflow:hidden;margin-bottom:14px;
+            box-shadow:0 1px 3px rgba(27,48,104,0.06);transition:box-shadow .15s;
+            border-left:4px solid {% if rel == 'equivalent' %}#1B7F3A{% elif rel == 'conflicting' %}#D93939{% elif rel == 'stricter_in_a' or rel == 'stricter_in_b' %}#FFB800{% else %}#5A6BBE{% endif %};">
+
+ {# ── Header: relationship + AI signals + lifecycle ── #}
+ <div style="padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0;">
+   <span style="padding:3px 10px;border-radius:5px;font-size:10px;font-weight:800;
+                background:{% if rel == 'equivalent' %}#E1F4E5{% elif rel == 'conflicting' %}#FCE8E8{% elif rel == 'stricter_in_a' or rel == 'stricter_in_b' %}#FFF6E0{% else %}#E5E8EF{% endif %};
+                color:{% if rel == 'equivalent' %}#1B7F3A{% elif rel == 'conflicting' %}#D93939{% elif rel == 'stricter_in_a' or rel == 'stricter_in_b' %}#B07A00{% else %}#002583{% endif %};">
+    {{ result.rel_label }}
+   </span>
+   {% if result.principle_ids %}
+    {% for pid in result.principle_ids|slice:":3" %}
+     <span style="padding:2px 8px;border-radius:20px;font-size:9px;font-weight:600;background:#F4F6FB;color:#6B7280;">{{ pid|title }}</span>
+    {% endfor %}
+   {% endif %}
+  </div>
+  <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap;">
+   <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:9px;font-weight:700;background:#fff;color:#002583;border:1px solid #E5E8EF;"
+         title="AI's self-reported confidence on the verdict.">
+    Conf {{ result.confidence_pct }}%
+   </span>
+   {% if result.similarity_score %}
+    <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:9px;font-weight:700;background:#fff;color:#6B7280;border:1px solid #E5E8EF;"
+          title="Cosine similarity between the two clause embeddings.">
+     Sim {{ result.similarity_pct }}%
+    </span>
+   {% endif %}
+   {% if result.citation_verified %}
+    <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:9px;font-weight:700;background:#E1F4E5;color:#1B7F3A;"
+          title="Both citations matched real chunks in the indexed corpus.">
+     ✓ Verified
+    </span>
+   {% else %}
+    <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:9px;font-weight:700;background:#FFF6E0;color:#B07A00;"
+          title="One or both citations could not be matched verbatim against indexed chunks.">
+     ⚠ Unverified
+    </span>
+   {% endif %}
+   {% if result.hallucination_risk and result.hallucination_risk > 0.4 %}
+    <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:9px;font-weight:700;
+                 background:{% if result.hallucination_risk > 0.7 %}#FCE8E8{% else %}#FFF6E0{% endif %};
+                 color:{% if result.hallucination_risk > 0.7 %}#D93939{% else %}#B07A00{% endif %};"
+          title="NLI cross-encoder hallucination risk — how far the AI prose drifts from cited chunks. 0=entailed, 1=unsupported.">
+     AI risk {{ result.hallucination_risk|floatformat:2 }}
+    </span>
+   {% endif %}
+   {% if result.lifecycle == 'approved' %}
+    <span style="padding:3px 10px;border-radius:20px;font-size:9px;font-weight:700;background:#E1F4E5;color:#1B7F3A;">Approved</span>
+   {% elif result.lifecycle == 'rejected' %}
+    <span style="padding:3px 10px;border-radius:20px;font-size:9px;font-weight:700;background:#FCE8E8;color:#D93939;">Rejected</span>
+   {% endif %}
+  </div>
+ </div>
+
+ {# ── Side-by-side clause comparison ── #}
+ <div style="display:grid;grid-template-columns:1fr 1fr;border-top:1px solid #EEF1F6;border-bottom:1px solid #EEF1F6;">
+
+  <div style="padding:14px 16px;border-right:1px solid #EEF1F6;background:#FAFBFD;">
+   <p style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#002583;margin:0 0 6px;display:flex;align-items:center;gap:6px;">
+    <span style="width:6px;height:6px;border-radius:50%;background:#002583;"></span>Regulation A
+   </p>
+   <p style="font-size:10px;font-weight:700;color:#002583;margin:0 0 6px;line-height:1.4;">{{ result.citation_a|truncatechars:80 }}</p>
+   <p style="font-size:11.5px;color:#1F2937;line-height:1.55;margin:0;">
+    {{ result.clause_text_a|default:result.preview_a|truncatechars:500 }}
+   </p>
+  </div>
+
+  <div style="padding:14px 16px;">
+   <p style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#B07A00;margin:0 0 6px;display:flex;align-items:center;gap:6px;">
+    <span style="width:6px;height:6px;border-radius:50%;background:#FFB800;"></span>Regulation B
+   </p>
+   <p style="font-size:10px;font-weight:700;color:#002583;margin:0 0 6px;line-height:1.4;">{{ result.citation_b|default:"—"|truncatechars:80 }}</p>
+   {% if result.is_orphan or not result.citation_b %}
+    <p style="font-size:11.5px;color:#9CA3AF;font-style:italic;margin:0;">No corresponding clause in Regulation B.</p>
+   {% else %}
+    <p style="font-size:11.5px;color:#1F2937;line-height:1.55;margin:0;">
+     {{ result.clause_text_b|default:result.preview_b|truncatechars:500 }}
+    </p>
+   {% endif %}
+  </div>
+
+ </div>
+
+ {# ── AI rationale + key difference ── #}
+ {% if result.rationale or result.key_difference %}
+ <div style="padding:12px 16px;background:#FAFBFD;border-bottom:1px solid #EEF1F6;display:flex;flex-direction:column;gap:8px;">
+  {% if result.rationale %}
+   <div>
+    <p style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#002583;margin:0 0 3px;">AI verdict reasoning</p>
+    <p style="font-size:11.5px;color:#1F2937;line-height:1.55;margin:0;">{{ result.rationale }}</p>
+   </div>
+  {% endif %}
+  {% if result.key_difference %}
+   <div>
+    <p style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#B07A00;margin:0 0 3px;">Key difference</p>
+    <p style="font-size:11.5px;color:#1F2937;line-height:1.55;margin:0;">{{ result.key_difference }}</p>
+   </div>
+  {% endif %}
+ </div>
+ {% endif %}
+
+ {# ── Decision row: note + actions ── #}
+ <div style="padding:12px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+  {% if run %}
+  <a href="{% url 'comparison-workspace' run.pk %}"
+     title="{{ run.pair_label }}"
+     style="display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:20px;background:#F4F6FB;color:#002583;font-size:10px;font-weight:700;text-decoration:none;white-space:nowrap;flex-shrink:0;">
+   <svg width="9" height="9" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/></svg>
+   Open workspace
+  </a>
+  {% endif %}
+
+  <form hx-post="{% url 'comparison-result-note' result.pk %}" hx-swap="none" style="flex:1;min-width:180px;">
+   {% csrf_token %}
+   <input type="text" name="note" value="{{ result.reviewer_note }}"
+          placeholder="Reviewer note (optional) — your reasoning here travels back to the analyst."
+          style="width:100%;padding:7px 12px;border:1px solid #E5E8EF;border-radius:8px;font-size:11.5px;color:#1F2937;font-family:inherit;outline:none;box-sizing:border-box;background:#fff;transition:border-color .12s;"
+          onfocus="this.style.borderColor='#002583'"
+          onblur="this.style.borderColor='#E5E8EF';this.form.requestSubmit()">
+  </form>
+
+  <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+   {% if result.lifecycle == 'approved' or result.lifecycle == 'rejected' %}
+    <form hx-post="{% url 'comparison-result-transition' result.pk %}" hx-target="#rv-card-{{ result.pk }}" hx-swap="outerHTML">
+     {% csrf_token %}<input type="hidden" name="action" value="reset"><input type="hidden" name="from_review" value="1">
+     <button type="submit" style="padding:6px 14px;border-radius:8px;font-size:11px;font-weight:600;background:#fff;color:#6B7280;border:1px solid #E5E8EF;cursor:pointer;font-family:inherit;">
+      Undo
+     </button>
+    </form>
+   {% else %}
+    <form hx-post="{% url 'comparison-result-transition' result.pk %}" hx-target="#rv-card-{{ result.pk }}" hx-swap="outerHTML">
+     {% csrf_token %}<input type="hidden" name="action" value="rejected"><input type="hidden" name="from_review" value="1">
+     <button type="submit" title="Reject — sends row back to analyst with your note"
+             style="display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;font-size:11px;font-weight:700;background:#fff;color:#D93939;border:1.5px solid #FCE8E8;cursor:pointer;font-family:inherit;transition:background .12s;"
+             onmouseover="this.style.background='#FCE8E8'" onmouseout="this.style.background='#fff'">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      Reject
+     </button>
+    </form>
+    <form hx-post="{% url 'comparison-result-transition' result.pk %}" hx-target="#rv-card-{{ result.pk }}" hx-swap="outerHTML">
+     {% csrf_token %}<input type="hidden" name="action" value="approved"><input type="hidden" name="from_review" value="1">
+     <button type="submit" title="Approve — flows into Copilot's approved data + executive summary"
+             style="display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;font-size:11px;font-weight:700;background:#1B7F3A;color:#fff;border:none;cursor:pointer;font-family:inherit;box-shadow:0 1px 4px rgba(27,127,58,.22);transition:background .12s;"
+             onmouseover="this.style.background='#166830'" onmouseout="this.style.background='#1B7F3A'">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+      Approve
+     </button>
+    </form>
+   {% endif %}
+  </div>
+ </div>
+
+</div>
+{% endwith %}

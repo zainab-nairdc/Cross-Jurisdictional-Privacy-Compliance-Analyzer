@@ -1,0 +1,21 @@
+{# HTMX partial — polled every 2s by the running screen #}
+<div style="display:contents;">
+ <script>
+ (function(){
+ const pct = {{ analysis.progress_pct }};
+ const bar = document.getElementById('prog-bar');
+ const lbl = document.getElementById('prog-label');
+ const num = document.getElementById('prog-pct');
+ if (bar) bar.style.width = Math.max(pct, 5) + '%';
+ if (lbl) lbl.textContent = '{{ analysis.current_obligation_label|escapejs }}' || 'Processing…';
+ if (num) num.textContent = pct + '%';
+
+ {% if analysis.status == 'complete' %}
+ window.location.href = '/mapping/{{ analysis.pk }}/';
+ {% endif %}
+ {% if analysis.status == 'failed' %}
+ window.location.reload();
+ {% endif %}
+ })();
+ </script>
+</div>

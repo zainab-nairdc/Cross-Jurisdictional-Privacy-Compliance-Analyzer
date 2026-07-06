@@ -1,0 +1,209 @@
+﻿{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}History & Audit Log — CJPCA{% endblock %}
+
+{% block extra_head %}
+<style>
+ .hs-filter-select {
+ padding: 5px 28px 5px 10px;
+ border: 1px solid #E5E8EF;
+ border-radius: 8px;
+ font-size: 11px;
+ font-family: inherit;
+ color: #002583;
+ background: #ffffff;
+ outline: none;
+ cursor: pointer;
+ appearance: none;
+ background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+ background-repeat: no-repeat;
+ background-position: right 8px center;
+ transition: border-color .12s;
+ }
+ .hs-filter-select:focus { border-color: #002583; background-color: #fff; }
+
+ .hs-event-row {
+ border-bottom: 1px solid #E5E8EF;
+ padding: 10px 16px;
+ cursor: pointer;
+ transition: background .07s;
+ }
+ .hs-event-row:hover { background: #ffffff; }
+ .hs-event-row.active { background: #ffffff; border-left: 3px solid #002583; padding-left: 13px; }
+
+ .hs-date-input {
+ padding: 5px 8px;
+ border: 1px solid #E5E8EF;
+ border-radius: 8px;
+ font-size: 11px;
+ font-family: 'Satoshi', sans-serif;
+ color: #002583;
+ background: #ffffff;
+ outline: none;
+ flex: 1;
+ min-width: 0;
+ transition: border-color .12s;
+ }
+ .hs-date-input:focus { border-color: #002583; background: #fff; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="flex flex-col h-full bg-gray-50 overflow-hidden">
+
+ {# ── Top bar ───────────────────────────────────────────────────────────── #}
+ <div class="bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between flex-shrink-0">
+ <div>
+ <h1 style="font-size:15px;font-weight:700;color:#002583;display:flex;align-items:center;gap:8px;">
+ History &amp; Audit Log
+ {% if history_scope == 'admin' %}
+  <span style="padding:3px 9px;border-radius:20px;background:#E5E8EF;color:#002583;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;">System view</span>
+ {% elif history_scope == 'reviewer' %}
+  <span style="padding:3px 9px;border-radius:20px;background:#FFF6E0;color:#B07A00;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;">Team work</span>
+ {% elif history_scope == 'analyst' %}
+  <span style="padding:3px 9px;border-radius:20px;background:#E1F4E5;color:#1B7F3A;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;">My activity</span>
+ {% endif %}
+ </h1>
+ <p style="font-size:12px;color:#6B7280;margin-top:1px;">
+ {% if history_scope == 'admin' %}Sign-ins, uploads, user management, quarantine, and all system events
+ {% elif history_scope == 'reviewer' %}Comparison runs, mappings, and review decisions across the team
+ {% elif history_scope == 'analyst' %}Your own runs, mappings, and submissions
+ {% else %}Activity log
+ {% endif %}
+ </p>
+ </div>
+ <div style="display:flex;align-items:center;gap:8px;">
+ <span style="font-size:11px;color:#6B7280;">{{ total_filtered }} event{{ total_filtered|pluralize }} shown</span>
+ <div style="width:1px;height:16px;background:#E5E8EF;"></div>
+ <span style="padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;background:#E5E8EF;color:#002583;">{{ stats.total_events }} total</span>
+ </div>
+ </div>
+
+ {# ── Two-panel body ────────────────────────────────────────────────────── #}
+ <div class="flex flex-1 overflow-hidden">
+
+ {# ── Left panel: filters + timeline ─────────────────────────────────── #}
+ <div class="flex flex-col border-r border-gray-100 bg-white overflow-hidden flex-shrink-0" style="width:320px;">
+
+ {# Filter bar #}
+ <div class="flex flex-col gap-2 px-4 py-3 border-b border-gray-100 flex-shrink-0">
+
+ {# Search #}
+ <div class="relative">
+ <svg class="h-3.5 w-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+ </svg>
+ <input type="text" name="q" value="{{ q }}" placeholder="Search events…"
+ class="w-full pl-8 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-[#002583] focus:ring-2 focus:ring-[#002583]/20 bg-gray-50"
+ hx-get="{% url 'history' %}"
+ hx-trigger="keyup changed delay:400ms"
+ hx-target="#history-list"
+ hx-swap="innerHTML"
+ hx-include="[name='type'],[name='user'],[name='date_from'],[name='date_to']">
+ </div>
+
+ {# Type + user row #}
+ <div style="display:flex;gap:6px;">
+ <select name="type" class="hs-filter-select" style="flex:1;"
+ hx-get="{% url 'history' %}"
+ hx-trigger="change"
+ hx-target="#history-list"
+ hx-swap="innerHTML"
+ hx-include="[name='q'],[name='user'],[name='date_from'],[name='date_to']">
+ <option value="" {% if not type_filter %}selected{% endif %}>All types</option>
+ <option value="comparisons" {% if type_filter == 'comparisons' %}selected{% endif %}>Comparisons</option>
+ <option value="mappings" {% if type_filter == 'mappings' %}selected{% endif %}>Mappings</option>
+ <option value="reviews" {% if type_filter == 'reviews' %}selected{% endif %}>Reviews</option>
+ {% if history_scope == 'admin' %}
+ <option value="uploads" {% if type_filter == 'uploads' %}selected{% endif %}>Uploads</option>
+ <option value="auth" {% if type_filter == 'auth' %}selected{% endif %}>Sign-in / auth</option>
+ <option value="admin" {% if type_filter == 'admin' %}selected{% endif %}>User management</option>
+ <option value="exports" {% if type_filter == 'exports' %}selected{% endif %}>Exports</option>
+ {% endif %}
+ </select>
+ {% if history_scope != 'analyst' %}
+ <select name="user" class="hs-filter-select" style="flex:1;"
+ hx-get="{% url 'history' %}"
+ hx-trigger="change"
+ hx-target="#history-list"
+ hx-swap="innerHTML"
+ hx-include="[name='q'],[name='type'],[name='date_from'],[name='date_to']">
+ <option value="">All users</option>
+ {% for u in users %}
+ <option value="{{ u.username }}" {% if user_filter == u.username %}selected{% endif %}>
+ {{ u.get_full_name|default:u.username }}
+ </option>
+ {% endfor %}
+ </select>
+ {% endif %}
+ </div>
+
+ {# Date range #}
+ <div style="display:flex;align-items:center;gap:6px;">
+ <input type="date" name="date_from" value="{{ date_from }}" class="hs-date-input"
+ hx-get="{% url 'history' %}"
+ hx-trigger="change"
+ hx-target="#history-list"
+ hx-swap="innerHTML"
+ hx-include="[name='q'],[name='type'],[name='user'],[name='date_to']">
+ <span style="font-size:11px;color:#002583;flex-shrink:0;">—</span>
+ <input type="date" name="date_to" value="{{ date_to }}" class="hs-date-input"
+ hx-get="{% url 'history' %}"
+ hx-trigger="change"
+ hx-target="#history-list"
+ hx-swap="innerHTML"
+ hx-include="[name='q'],[name='type'],[name='user'],[name='date_from']">
+ </div>
+
+ </div>{# /filter bar #}
+
+ {# Event timeline — HTMX target #}
+ <div id="history-list" class="flex-1 overflow-y-auto bg-gray-50">
+ {% include 'partials/_history_list.html' %}
+ </div>
+
+ </div>{# /left panel #}
+
+ {# ── Right panel: event detail ───────────────────────────────────────── #}
+ <div id="history-detail" class="flex-1 overflow-y-auto bg-white">
+ <div class="flex flex-col items-center justify-center h-full text-center px-8">
+ <div style="width:48px;height:48px;border-radius:12px;background:#E5E8EF;display:flex;align-items:center;justify-content:center;margin-bottom:12px;">
+ <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="1.5">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
+ </svg>
+ </div>
+ <p style="font-size:13px;font-weight:600;color:#002583;margin-bottom:4px;">Select an event</p>
+ <p style="font-size:11px;color:#6B7280;line-height:1.6;">Click any event in the timeline to view its full details, change log, and available actions.</p>
+ </div>
+ </div>
+
+ </div>{# /two-panel body #}
+
+ {# ── Bottom stats strip ────────────────────────────────────────────────── #}
+ <div class="bg-white border-t border-gray-100 px-6 py-3 flex items-center gap-6 flex-shrink-0">
+ <div style="flex:1;min-width:0;">
+ <p style="font-size:10px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Total events</p>
+ <p style="font-size:22px;font-weight:700;font-family:'Satoshi',sans-serif;line-height:1;color:#002583;">{{ stats.total_events }}</p>
+ </div>
+ <div style="width:1px;height:34px;background:#E5E8EF;flex-shrink:0;"></div>
+ <div style="flex:1;min-width:0;">
+ <p style="font-size:10px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Analyses run</p>
+ <p style="font-size:22px;font-weight:700;font-family:'Satoshi',sans-serif;line-height:1;color:#002583;">{{ stats.analyses }}</p>
+ </div>
+ {% if history_scope == 'admin' %}
+ <div style="width:1px;height:34px;background:#E5E8EF;flex-shrink:0;"></div>
+ <div style="flex:1;min-width:0;">
+ <p style="font-size:10px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Documents uploaded</p>
+ <p style="font-size:22px;font-weight:700;font-family:'Satoshi',sans-serif;line-height:1;color:#002583;">{{ stats.uploads }}</p>
+ </div>
+ {% endif %}
+ <div style="width:1px;height:34px;background:#E5E8EF;flex-shrink:0;"></div>
+ <div style="flex:1;min-width:0;">
+ <p style="font-size:10px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Gaps found</p>
+ <p style="font-size:22px;font-weight:700;font-family:'Satoshi',sans-serif;line-height:1;color:#B07A00;">{{ stats.gaps_found }}</p>
+ </div>
+ </div>
+
+</div>
+{% endblock %}

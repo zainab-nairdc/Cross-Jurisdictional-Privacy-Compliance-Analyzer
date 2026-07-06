@@ -1,0 +1,42 @@
+{% comment %}
+Reviewer-editable severity picker. Renders the 4-button row with the
+current severity highlighted. POSTs to mapping-severity-override, which
+returns this same partial — so hx-swap="outerHTML" replaces the form
+with itself in the new state without losing the other buttons.
+{% endcomment %}
+<form hx-post="{% url 'mapping-severity-override' item.pk %}"
+      hx-swap="outerHTML"
+      style="display:flex;gap:6px;flex-wrap:wrap;">
+ {% csrf_token %}
+ <button type="submit" name="severity" value="critical"
+         style="padding:4px 12px;border-radius:20px;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;
+                border:1.5px solid {% if item.severity == 'critical' %}#D93939{% else %}#E5E8EF{% endif %};
+                background:{% if item.severity == 'critical' %}#FCE8E8{% else %}#fff{% endif %};
+                color:{% if item.severity == 'critical' %}#D93939{% else %}#6B7280{% endif %};">
+  Critical
+ </button>
+ <button type="submit" name="severity" value="high"
+         style="padding:4px 12px;border-radius:20px;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;
+                border:1.5px solid {% if item.severity == 'high' %}#E07A1F{% else %}#E5E8EF{% endif %};
+                background:{% if item.severity == 'high' %}#FFEEDD{% else %}#fff{% endif %};
+                color:{% if item.severity == 'high' %}#E07A1F{% else %}#6B7280{% endif %};">
+  High
+ </button>
+ <button type="submit" name="severity" value="medium"
+         style="padding:4px 12px;border-radius:20px;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;
+                border:1.5px solid {% if item.severity == 'medium' %}#FFB800{% else %}#E5E8EF{% endif %};
+                background:{% if item.severity == 'medium' %}#FFF6E0{% else %}#fff{% endif %};
+                color:{% if item.severity == 'medium' %}#B07A00{% else %}#6B7280{% endif %};">
+  Medium
+ </button>
+ <button type="submit" name="severity" value="low"
+         style="padding:4px 12px;border-radius:20px;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;
+                border:1.5px solid {% if item.severity == 'low' %}#5A6685{% else %}#E5E8EF{% endif %};
+                background:{% if item.severity == 'low' %}#E5E8EF{% else %}#fff{% endif %};
+                color:{% if item.severity == 'low' %}#5A6685{% else %}#6B7280{% endif %};">
+  Low
+ </button>
+ {% if item.human_override %}
+  <span style="display:inline-flex;align-items:center;padding:4px 9px;font-size:9px;font-weight:700;background:#E1F4E5;color:#1B7F3A;border-radius:20px;">Reviewer-set</span>
+ {% endif %}
+</form>

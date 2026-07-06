@@ -1,0 +1,49 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <title>Sign in — CJPCA</title>
+ <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap" rel="stylesheet">
+ <link rel="stylesheet" href="{% static 'css/output.css' %}">
+ <style>*, *::before, *::after { font-family: 'Satoshi', sans-serif; }</style>
+</head>
+<body class="h-full" style="background:#F4F6FB;">
+ <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;">
+  <div style="width:100%;max-width:380px;background:#fff;border:1px solid #E5E8EF;border-radius:14px;box-shadow:0 10px 40px rgba(0,37,131,.08);padding:32px;">
+
+   <div style="text-align:center;margin-bottom:24px;">
+    <img src="{% static 'img/logo.png' %}" alt="Logo"
+         style="height:56px;width:56px;object-fit:cover;border-radius:14px;border:1px solid #E5E8EF;margin:0 auto 14px;display:block;">
+    <h1 style="font-size:18px;font-weight:700;color:#002583;margin:0;">Cross-Jurisdictional</h1>
+    <p style="font-size:13px;color:#002583;opacity:.7;margin:2px 0 0;">Privacy Compliance Analyzer</p>
+   </div>
+
+   {% if form.errors %}
+   <div style="background:#FDECEC;border:1px solid #F5C2C2;color:#B42318;border-radius:8px;padding:9px 12px;font-size:12px;margin-bottom:16px;">
+    Incorrect username or password. Please try again.
+   </div>
+   {% endif %}
+
+   <form method="post" action="{% url 'login' %}">
+    {% csrf_token %}
+    <label style="display:block;font-size:11px;font-weight:700;color:#002583;margin-bottom:4px;">Username</label>
+    <input type="text" name="username" autofocus required
+           style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #E5E8EF;border-radius:8px;font-size:14px;margin-bottom:14px;">
+
+    <label style="display:block;font-size:11px;font-weight:700;color:#002583;margin-bottom:4px;">Password</label>
+    <input type="password" name="password" required
+           style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #E5E8EF;border-radius:8px;font-size:14px;margin-bottom:20px;">
+
+    <input type="hidden" name="next" value="{{ next }}">
+    <button type="submit"
+            style="width:100%;padding:11px;background:#002583;color:#fff;border:0;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;">
+     Sign in
+    </button>
+   </form>
+
+  </div>
+ </div>
+</body>
+</html>

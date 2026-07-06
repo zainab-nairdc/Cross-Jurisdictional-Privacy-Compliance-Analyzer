@@ -1,0 +1,72 @@
+D:\Cross-Jurisdictional Privacy Compliance Analyzer\.venv\Lib\site-packages\langchain_core\_api\deprecation.py:25: UserWarning: Core Pydantic V1 functionality isn't compatible with Python 3.14 or greater.
+  from pydantic.v1.fields import FieldInfo as FieldInfoV1
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+====================================================================================
+  SMOKE TEST: langgraph reasoning pipeline (route + draft + verify)
+====================================================================================
+
+====================================================================================
+  QUERY: 'What is the breach notification timeline to the Bahrain PDPA?'
+  filter: jurisdiction=bahrain
+====================================================================================
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights:  84%|████████▍ | 167/199 [00:00<00:00, 1668.53it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 1728.55it/s]
+[1mBertModel LOAD REPORT[0m from: BAAI/bge-small-en-v1.5
+Key                     | Status     |  | 
+------------------------+------------+--+-
+embeddings.position_ids | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+Loading weights:   0%|          | 0/105 [00:00<?, ?it/s]Loading weights: 100%|██████████| 105/105 [00:00<00:00, 1812.93it/s]
+[1mBertForSequenceClassification LOAD REPORT[0m from: cross-encoder/ms-marco-MiniLM-L-6-v2
+Key                          | Status     |  | 
+-----------------------------+------------+--+-
+bert.embeddings.position_ids | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+
+  [retrieve] 5 chunks in 23.2s
+    [Chunk 1] [Bahrain] PDPA Ministerial Order 43/2022: '- 1- The Controller must establish communication channels with Data Subjects to '
+    [Chunk 2] [Bahrain] PDPA Ministerial Order 43/2022: '- a.Type of data breach or violation.\n- b. Details of the data that has been bre'
+    [Chunk 3] [Bahrain] PDPA Ministerial Order 43/2022: 'The Undersecretary of Justice and Islamic Affairs shall implement the provisions'
+    [Chunk 4] [Bahrain] PDPA Ministerial Order 44/2022: 'The Data Controller shall notify the Authority of any change that occurs to the '
+    [Chunk 5] [Bahrain] PDPA Ministerial Order 44/2022: 'Without prejudice to the exemptions stipulated in paragraph (1) of Article 14 of'
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights:  89%|████████▉ | 178/199 [00:00<00:00, 1778.09it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 1835.07it/s]
+[1mBertModel LOAD REPORT[0m from: BAAI/bge-small-en-v1.5
+Key                     | Status     |  | 
+------------------------+------------+--+-
+embeddings.position_ids | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+D:\Cross-Jurisdictional Privacy Compliance Analyzer\.venv\Lib\site-packages\huggingface_hub\file_download.py:138: UserWarning: `huggingface_hub` cache-system uses symlinks by default to efficiently store duplicated files but your machine does not support them in C:\Users\Uni\.cache\huggingface\hub\models--cross-encoder--nli-deberta-v3-base. Caching files will still work but in a degraded version that might require more space on your disk. This warning can be disabled by setting the `HF_HUB_DISABLE_SYMLINKS_WARNING` environment variable. For more details, see https://huggingface.co/docs/huggingface_hub/how-to-cache#limitations.
+To support symlinks on Windows, you either need to activate Developer Mode or to run Python as an administrator. In order to activate developer mode, see this article: https://docs.microsoft.com/en-us/windows/apps/get-started/enable-your-device-for-development
+  warnings.warn(message)
+Loading weights:   0%|          | 0/202 [00:00<?, ?it/s]Loading weights:  73%|███████▎  | 147/202 [00:00<00:00, 1468.93it/s]Loading weights: 100%|██████████| 202/202 [00:00<00:00, 1528.15it/s]
+[1mDebertaV2ForSequenceClassification LOAD REPORT[0m from: cross-encoder/nli-deberta-v3-base
+Key                             | Status     |  | 
+--------------------------------+------------+--+-
+deberta.embeddings.position_ids | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+
+  [reasoning graph] finished in 251.2s
+
+  ROUTE:      extraction
+  CONFIDENCE: 0.30
+  CITATIONS:  1
+
+  ─ trace ─────────────────────────────────────────────────────
+    retrieve     | routed to: extraction
+    synthesize   | generated draft answer
+    verify       | grounded: True, hallucination risk: 0.00
+
+  ─ summary ───────────────────────────────────────────────────
+    The breach notification timeline to the Bahrain Personal Data Protection Act (PDPA) is not explicitly stated in the provided context. However, it can be inferred that the PDPA requires notification within 72 hours of discovery, as mentioned in [Chunk 1]. Additionally, there is a provision for notification prior to automated processing operations, which may also be relevant. The exact timeline is unclear without further information.
+
+  ─ citations ─────────────────────────────────────────────────
+    [Bahrain] Personal Data Protection Act (PDPA) — (no art)
+      "The Controller is obliged to document cases of breach of personal data, and to indicate their causes, effects of their o..."
+
