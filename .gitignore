@@ -6,6 +6,8 @@ pip-cache/
 .venv/
 venv/
 hf_cache/
+# Scratch / temporary working files
+scratch_*
 # Node / Tailwind CLI deps — reinstall with `npm install`
 node_modules/
 # Django collectstatic output — regenerated with `collectstatic`
