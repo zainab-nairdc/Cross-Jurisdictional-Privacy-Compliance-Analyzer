@@ -96,9 +96,29 @@ def _classify_intent(message: str) -> str:
     return 'regulatory_lookup'
 
 
+def _ollama_reachable() -> bool:
+    """Quick health probe of the local Ollama server (the PoC's primary LLM).
+
+    Lets the Copilot return a precise 'start Ollama' message instantly instead
+    of running the whole orchestrator only to fail on a connection error the
+    catch-all used to mislabel as an OpenRouter/API-key problem. Cheap: a couple
+    of ms when Ollama is up, ~2s worst case when it's down."""
+    import urllib.request
+    try:
+        from config import OLLAMA_URL
+        base = OLLAMA_URL
+    except Exception:
+        base = 'http://localhost:11434'
+    try:
+        urllib.request.urlopen(f'{base}/api/tags', timeout=2)
+        return True
+    except Exception:
+        return False
+
+
 # ── Layer 1 — Regulatory text (indexed regulation chunks) ─────────────────────
 
-def _retrieve_regulatory(message: str, doc_title: str = '') -> tuple[str, list[dict]]:
+def _retrieve_regulatory(message: str, doc_title: str = '', jurisdiction: str = '') -> tuple[str, list[dict]]:
     """Retrieve relevant regulatory chunks for a copilot message.
 
     When ``doc_title`` is non-empty, retrieval is constrained to that one
@@ -117,6 +137,14 @@ def _retrieve_regulatory(message: str, doc_title: str = '') -> tuple[str, list[d
         kwargs = dict(query=message, top_k=5, rerank=True)
         if doc_title:
             kwargs['doc_titles'] = [doc_title]
+        elif jurisdiction:
+            # Country scope: one or more jurisdictions (comma-joined) as a single
+            # source. The retriever normalises the codes (bahrain -> Bahrain).
+            js = [j.strip() for j in jurisdiction.split(',') if j.strip()]
+            if len(js) == 1:
+                kwargs['jurisdiction'] = js[0]
+            elif js:
+                kwargs['jurisdictions'] = js
         nodes = hybrid_search(**kwargs)
     except Exception:
         return '(No relevant regulatory context found.)', []
@@ -163,8 +191,15 @@ def _retrieve_regulatory(message: str, doc_title: str = '') -> tuple[str, list[d
 # ── Layer 2 — Approved comparison results ─────────────────────────────────────
 
 def _retrieve_approved_comparisons(message: str, include_drafts: bool = False
-                                   ) -> tuple[str, list[dict], bool]:
-    """Returns (context_str, citations, has_approved_data)."""
+                                   ) -> tuple[str, list[dict], bool, list[dict]]:
+    """Returns (context_str, citations, has_approved_data, chunks).
+
+    ``chunks`` are orchestrator-ready dicts (node_id + content + metadata) built
+    from the approved comparison rows themselves, so the LLM answers FROM the
+    reviewed analysis — not from freshly re-fetched raw regulation text. Without
+    this the "Approved data" badge was misleading: the citations came from the
+    approved rows but the answer was synthesised from unrelated regulatory chunks.
+    """
     from apps.comparison.models import ComparisonResult
     lifecycle_filter = ['approved']
     if include_drafts:
@@ -185,10 +220,10 @@ def _retrieve_approved_comparisons(message: str, include_drafts: bool = False
     top = [r for _, _, r in scored[:5]]
 
     if not top:
-        return '', [], False
+        return '', [], False, []
 
     has_approved = any(r.lifecycle == 'approved' for r in top)
-    context_lines, citations = [], []
+    context_lines, citations, chunks = [], [], []
     for i, r in enumerate(top, 1):
         reg_a = r.run.reg_a.name if r.run else '—'
         reg_b = r.run.reg_b.name if r.run else '—'
@@ -208,14 +243,38 @@ def _retrieve_approved_comparisons(message: str, include_drafts: bool = False
             'excerpt': (r.preview_a or '')[:150],
             'is_draft': is_draft,
         })
-    return '\n\n'.join(context_lines), citations, has_approved
+        # Ground the LLM on the reviewed verdict itself. The relationship label
+        # (Equivalent / Stricter in A / Conflicting …) is the finding — include
+        # it verbatim so the answer reflects the approved analysis.
+        chunks.append({
+            'node_id': r.chunk_id_a or f'approved-comparison-{r.id}',
+            'content': (
+                f"Approved comparison{draft_tag}: {reg_a} vs {reg_b}.\n"
+                f"Topic / citation: {r.citation_a} vs {r.citation_b}.\n"
+                f"Relationship (reviewed finding): {r.rel_label}.\n"
+                f"{reg_a}: {(r.preview_a or '').strip()}\n"
+                f"{reg_b}: {(r.preview_b or '').strip()}\n"
+                f"{('Key difference: ' + r.key_difference) if r.key_difference else ''}\n"
+                f"{('Rationale: ' + r.rationale) if r.rationale else ''}"
+            ).strip(),
+            'jurisdiction': r.run.reg_a.jurisdiction if r.run else '',
+            'regulation_name': f"{reg_a} vs {reg_b}",
+            'article_ref': f"{r.citation_a} / {r.citation_b}",
+        })
+    return '\n\n'.join(context_lines), citations, has_approved, chunks
 
 
 # ── Layer 3 — Approved policy mappings ────────────────────────────────────────
 
 def _retrieve_approved_mappings(message: str, include_drafts: bool = False
-                                ) -> tuple[str, list[dict], bool]:
-    """Returns (context_str, citations, has_approved_data)."""
+                                ) -> tuple[str, list[dict], bool, list[dict]]:
+    """Returns (context_str, citations, has_approved_data, chunks).
+
+    ``chunks`` are orchestrator-ready dicts built from the approved policy-mapping
+    rows, so a "do our policies cover X?" answer is grounded in the reviewed
+    coverage verdict (covered / partial / none) rather than raw regulation text
+    that never mentions BBK's policies at all.
+    """
     from apps.mapping.models import MappingAnalysis, ObligationMapping
     approved_analyses = MappingAnalysis.objects.filter(status=MappingAnalysis.APPROVED)
     if include_drafts:
@@ -240,10 +299,10 @@ def _retrieve_approved_mappings(message: str, include_drafts: bool = False
     top = [m for _, _, m in scored[:5]]
 
     if not top:
-        return '', [], False
+        return '', [], False, []
 
     has_approved = any(m.analysis.status == MappingAnalysis.APPROVED for m in top)
-    context_lines, citations = [], []
+    context_lines, citations, chunks = [], [], []
     for i, m in enumerate(top, 1):
         policy = m.analysis.policy_doc.name
         is_draft = m.analysis.status != MappingAnalysis.APPROVED
@@ -261,7 +320,22 @@ def _retrieve_approved_mappings(message: str, include_drafts: bool = False
             'excerpt': (m.obligation_title or '')[:150],
             'is_draft': is_draft,
         })
-    return '\n\n'.join(context_lines), citations, has_approved
+        # The coverage status IS the finding — feed it to the LLM verbatim so it
+        # can't contradict the reviewed verdict (e.g. answering "not covered"
+        # when the approved mapping says "covered").
+        chunks.append({
+            'node_id': f'approved-mapping-{m.id}',
+            'content': (
+                f"Approved policy mapping{draft_tag} for {policy}.\n"
+                f"Regulatory obligation: {m.obligation_title} ({m.article_ref}).\n"
+                f"Coverage status (reviewed verdict): {m.coverage}.\n"
+                f"Evidence from policy: {(m.evidence_text or '').strip()}"
+            ).strip(),
+            'jurisdiction': '',
+            'regulation_name': policy,
+            'article_ref': m.article_ref,
+        })
+    return '\n\n'.join(context_lines), citations, has_approved, chunks
 
 
 # ── Top-level retrieval dispatcher ────────────────────────────────────────────
@@ -276,12 +350,13 @@ def _approved_retrieve(message: str, include_drafts: bool = False, doc_title: st
     intent = _classify_intent(message)
 
     if intent == 'comparison_analysis':
-        ctx, cits, has_approved = _retrieve_approved_comparisons(message, include_drafts)
+        ctx, cits, has_approved, chunks = _retrieve_approved_comparisons(message, include_drafts)
         if ctx:
             quality = 'approved' if has_approved else 'draft_fallback'
             label = 'Approved comparison results' if has_approved else 'Draft comparisons (unreviewed)'
             return {'context': ctx, 'citations': cits, 'layer': intent,
-                    'data_quality': quality, 'label': label, 'fallback_msg': None}
+                    'data_quality': quality, 'label': label, 'fallback_msg': None,
+                    'chunks': chunks}
         # No comparison data — fall back to regulatory text
         reg_ctx, reg_cits = _retrieve_regulatory(message, doc_title=doc_title)
         return {
@@ -297,12 +372,13 @@ def _approved_retrieve(message: str, include_drafts: bool = False, doc_title: st
         }
 
     if intent == 'policy_gap':
-        ctx, cits, has_approved = _retrieve_approved_mappings(message, include_drafts)
+        ctx, cits, has_approved, chunks = _retrieve_approved_mappings(message, include_drafts)
         if ctx:
             quality = 'approved' if has_approved else 'draft_fallback'
             label = 'Approved policy mappings' if has_approved else 'Draft mappings (unreviewed)'
             return {'context': ctx, 'citations': cits, 'layer': intent,
-                    'data_quality': quality, 'label': label, 'fallback_msg': None}
+                    'data_quality': quality, 'label': label, 'fallback_msg': None,
+                    'chunks': chunks}
         return {
             'context': '(No approved policy mappings found.)', 'citations': [], 'layer': intent,
             'data_quality': 'none',
@@ -323,8 +399,8 @@ def _approved_retrieve(message: str, include_drafts: bool = False, doc_title: st
                 'fallback_msg': None}
 
     # mixed — combine all three
-    comp_ctx, comp_cits, comp_approved = _retrieve_approved_comparisons(message, include_drafts)
-    map_ctx,  map_cits,  map_approved  = _retrieve_approved_mappings(message, include_drafts)
+    comp_ctx, comp_cits, comp_approved, comp_chunks = _retrieve_approved_comparisons(message, include_drafts)
+    map_ctx,  map_cits,  map_approved,  map_chunks  = _retrieve_approved_mappings(message, include_drafts)
     all_ctx = '\n\n'.join(filter(None, [reg_ctx, comp_ctx, map_ctx]))
     all_cits = reg_cits + comp_cits + map_cits
     has_any_approved = comp_approved or map_approved
@@ -333,7 +409,8 @@ def _approved_retrieve(message: str, include_drafts: bool = False, doc_title: st
              else 'Regulatory text + approved analysis')
     return {'context': all_ctx or '(No context found.)', 'citations': all_cits,
             'layer': 'mixed', 'data_quality': quality,
-            'label': label, 'fallback_msg': None}
+            'label': label, 'fallback_msg': None,
+            'chunks': comp_chunks + map_chunks}
 
 
 @method_decorator(role_required(*COPILOT_ROLES), name='dispatch')
@@ -365,20 +442,69 @@ class CopilotMessageView(View):
         include_drafts: bool = request.session.get('copilot_include_drafts', False)
         history: list[dict]  = request.session.get('copilot_history', [])
         doc_title: str       = (request.POST.get('copilot_doc_select') or '').strip()
+        # Country scope — all documents of a jurisdiction as one source.
+        jurisdiction: str    = (request.POST.get('copilot_jurisdiction') or '').strip()
         # Mode toggle — 'approved' = only reviewed comparison + mapping rows;
-        # 'document' = pure document Q&A against the picked doc_title's chunks.
+        # 'document' = pure document Q&A against the picked scope (doc or country).
         mode: str            = (request.POST.get('copilot_mode') or 'approved').strip()
 
-        if mode == 'document':
-            # Pure doc Q&A — needs a doc_title scope to make sense. Without it
-            # there's nothing to ground answers in, so short-circuit to a
-            # helpful nudge instead of letting retrieval return empty.
+        # ── Arabic documents ──────────────────────────────────────────────────
+        # Arabic docs live in the isolated bge-m3 collection (regulations_ar) and
+        # are answered by the Arabic pipeline: qwen2.5 reads the Arabic and replies
+        # in English with article citations. We detect them by asking the Arabic
+        # store whether it holds chunks for this doc_title (its ``source`` id ==
+        # the doc's chunk_doc_title, the same value the scope chip sends).
+        if doc_title:
+            try:
+                from arabic import store as _ar_store
+                _is_arabic = _ar_store.count(source=doc_title) > 0
+            except Exception:
+                _is_arabic = False
+            if _is_arabic:
+                from arabic.query import answer as _arabic_answer
+                _res = _arabic_answer(message, source=doc_title)
+                _cits = []
+                for h in _res['hits']:
+                    _art = h.get('article_number')
+                    _cits.append({
+                        'reg_name':     h.get('law_name') or doc_title,
+                        'article_ref':  f"Article ({_art})" if _art else '',
+                        'jurisdiction': '',
+                        'label':        f"Article ({_art})" if _art else doc_title,
+                        'excerpt':      (h.get('text') or '')[:220],
+                        'is_draft':     False,
+                    })
+                history.append({'role': 'user',      'content': message})
+                history.append({'role': 'assistant', 'content': _res['answer']})
+                request.session['copilot_history'] = history[-20:]
+                return render(request, 'partials/_copilot_fragment.html', {
+                    'user_message':       message,
+                    'ai_response':        _res['answer'],
+                    'confidence':         0.7,
+                    'hallucination_risk': None,
+                    'citations':          _cits,
+                    'data_quality':       'regulatory',
+                    'fallback_msg':       'Answered from the Arabic source (bge-m3 + qwen2.5).',
+                })
+
+        if jurisdiction:
+            # Country sources selected (from the Sources chip) — answer from the
+            # regulatory text of those jurisdictions, regardless of the mode.
+            reg_ctx, reg_cits = _retrieve_regulatory(message, jurisdiction=jurisdiction)
+            _codes = ', '.join(c.strip().title() for c in jurisdiction.split(',') if c.strip())
+            retrieval = {
+                'context': reg_ctx, 'citations': reg_cits, 'layer': 'document',
+                'data_quality': 'regulatory',
+                'label': f'Sources — {_codes}',
+                'fallback_msg': None,
+            }
+        elif mode == 'document':
+            # Pure doc Q&A — needs a single-document scope to ground answers.
             if not doc_title:
-                from django.template.loader import render_to_string
                 history.append({'role': 'user',      'content': message})
                 history.append({'role': 'assistant', 'content':
-                    "Pick a document from the **Scope** chip above first — Document Q&A mode "
-                    "answers strictly from one document's chunks, so I need to know which one."})
+                    "Pick a **document** from the Scope chip, or toggle a **country** in "
+                    "**Sources** below — I answer strictly from the selected source(s)."})
                 request.session['copilot_history'] = history[-20:]
                 return render(request, 'partials/_copilot_fragment.html', {
                     'user_message':    message,
@@ -387,7 +513,7 @@ class CopilotMessageView(View):
                     'hallucination_risk': None,
                     'citations':       [],
                     'data_quality':    'guidance',
-                    'data_label':      'Document Q&A — pick a doc',
+                    'data_label':      'Document Q&A — pick a scope',
                     'fallback_msg':    None,
                 })
             reg_ctx, reg_cits = _retrieve_regulatory(message, doc_title=doc_title)
@@ -404,29 +530,39 @@ class CopilotMessageView(View):
             retrieval = _approved_retrieve(message, include_drafts=include_drafts,
                                             doc_title=doc_title)
 
-        # convert retrieved chunks (already dicts from _retrieve_*) to the
-        # shape orchestrator.verify_node expects: node_id + content + jurisdiction.
-        # _approved_retrieve returns 'context' (formatted string) and 'citations'
-        # (list of dicts) — citations don't have content. We have to re-fetch
-        # the underlying chunks for the orchestrator's verify step.
-        from retrieval.retriever import hybrid_search
-        try:
-            kwargs_h = dict(query=message, top_k=5, rerank=True)
-            if doc_title:
-                kwargs_h['doc_titles'] = [doc_title]
-            nodes = hybrid_search(**kwargs_h)
-        except Exception:
-            nodes = []
-        chunks = []
-        for n in nodes:
-            m = n.node.metadata
-            chunks.append({
-                'node_id':         m.get('node_id') or n.node.node_id or '',
-                'content':         n.node.get_content(),
-                'jurisdiction':    m.get('jurisdiction', ''),
-                'regulation_name': m.get('regulation_name', ''),
-                'article_ref':     m.get('article_ref', ''),
-            })
+        # Prefer the chunks the retrieval layer already produced. In approved
+        # mode these ARE the reviewed comparison/mapping rows (coverage verdict,
+        # relationship, evidence) — so the LLM grounds its answer on the approved
+        # analysis instead of on freshly re-fetched raw regulation text that the
+        # "Approved data" badge implied but the model never actually saw.
+        chunks = list(retrieval.get('chunks') or [])
+
+        # Only re-fetch raw regulatory chunks when we DON'T already have grounded
+        # chunks (document mode, regulatory lookups, or the no-approved fallback).
+        if not chunks:
+            from retrieval.retriever import hybrid_search
+            try:
+                kwargs_h = dict(query=message, top_k=5, rerank=True)
+                if doc_title:
+                    kwargs_h['doc_titles'] = [doc_title]
+                elif jurisdiction:
+                    js = [j.strip() for j in jurisdiction.split(',') if j.strip()]
+                    if len(js) == 1:
+                        kwargs_h['jurisdiction'] = js[0]
+                    elif js:
+                        kwargs_h['jurisdictions'] = js
+                nodes = hybrid_search(**kwargs_h)
+            except Exception:
+                nodes = []
+            for n in nodes:
+                m = n.node.metadata
+                chunks.append({
+                    'node_id':         m.get('node_id') or n.node.node_id or '',
+                    'content':         n.node.get_content(),
+                    'jurisdiction':    m.get('jurisdiction', ''),
+                    'regulation_name': m.get('regulation_name', ''),
+                    'article_ref':     m.get('article_ref', ''),
+                })
         # Same generic-question fallback as _retrieve_regulatory: if the user
         # has a doc scope set but retrieval found nothing, pull the doc's
         # opening chunks so the orchestrator has substrate for summary-style
@@ -456,6 +592,20 @@ class CopilotMessageView(View):
                 "a comparison/mapping first so I have analysis to draw from."
             )
             confidence = 0.3
+            hall_risk  = None
+            citations  = retrieval.get('citations') or []
+        elif not _ollama_reachable():
+            # Pre-flight: the PoC's LLM is local Ollama. If it isn't running,
+            # say so precisely (and instantly) instead of letting the async
+            # call fail with a connection error the catch-all mislabels as an
+            # OpenRouter/API-key problem.
+            ai_response = (
+                "I can't reach the local AI engine (Ollama), so I can't generate "
+                "an answer right now. Start it with `ollama serve` (or open the "
+                "Ollama app), then ask again. Retrieval is working — I found "
+                f"{len(chunks)} relevant passage(s), I just can't summarise them."
+            )
+            confidence = 0.0
             hall_risk  = None
             citations  = retrieval.get('citations') or []
         else:
@@ -537,9 +687,25 @@ class CopilotMessageView(View):
                         citations  = retrieval.get('citations') or citations
 
             except Exception as exc:
-                # network / parser / auth failure — degrade gracefully
-                ai_response = ("I can't reach the AI engine right now. "
-                                "Check OPENROUTER_API_KEY and try again.")
+                # network / parser / model-host failure — degrade gracefully.
+                # The PoC's LLM is local Ollama, so a connection error means the
+                # Ollama server isn't running — NOT an OpenRouter/API-key issue
+                # (the old message here sent people down the wrong path). Give
+                # the real remedy, and log the actual exception for diagnosis.
+                import logging
+                logging.getLogger(__name__).warning('copilot generation failed: %r', exc)
+                _err = str(exc).lower()
+                if 'connect' in _err or 'refused' in _err or 'timeout' in _err:
+                    ai_response = (
+                        "I can't reach the local AI engine (Ollama). Make sure it's "
+                        "running — start it with `ollama serve` or open the Ollama "
+                        "app — then try again."
+                    )
+                else:
+                    ai_response = (
+                        "The AI engine hit an error while answering. Please try again; "
+                        "if it keeps happening, check the server logs for details."
+                    )
                 confidence = 0.0
                 hall_risk  = None
                 citations  = []

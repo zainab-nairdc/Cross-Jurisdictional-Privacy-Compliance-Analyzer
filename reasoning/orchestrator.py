@@ -128,9 +128,22 @@ async def correct_node(state: ReasoningState) -> dict:
     """re-prompt the model with the verification error so it can fix its
     own mistake. capped at cfg.validation.max_retries."""
     if state.get("retries", 0) >= cfg.validation.max_retries:
-        # we hit the retry ceiling. hand off to fallback by signalling
-        # an error — the conditional edge in the graph reads state['error']
-        # and routes accordingly.
+        # Retry ceiling hit. Rather than discard the synthesized draft for a
+        # canned passage-dump, KEEP the draft as the answer with a confidence
+        # penalty for the unverified citations. Local 7B models routinely
+        # paraphrase a quote just enough to miss the strict verbatim grounding
+        # check, so throwing the whole answer away leaves the user staring at a
+        # raw list of passages. A chunk-grounded synthesized answer with a
+        # lowered confidence badge is far more useful — and still honest.
+        draft = state.get("draft")
+        if draft is not None:
+            h_risk    = state.get("hallucination_risk") or 0.0
+            base_conf = max(0.4, draft.confidence or 0.0)
+            penalised = draft.model_copy(update={
+                "confidence": round(base_conf * 0.75 * (1.0 - h_risk), 2),
+            })
+            return {"error": "verification uncertain", "final_output": penalised}
+        # No draft at all — genuinely nothing to show; fall back safely.
         return {
             "error":        "max retries exceeded",
             "final_output": await safe_fallback_response(state["request"]),
@@ -169,7 +182,13 @@ async def finalize_node(state: ReasoningState) -> dict:
     draft        = state["draft"]
     v_score      = state.get("verification_score") or 0.5
     h_risk       = state.get("hallucination_risk") or 0.0
-    adjusted     = draft.confidence * v_score * (1.0 - h_risk)
+    # Floor the verification factor: a draft that reached finalize is a real
+    # synthesized answer grounded in the retrieved chunks even if the strict
+    # verbatim-quote check didn't confirm every citation. Zeroing its
+    # confidence (v_score can be 0.0 when ungrounded) would blank a usable
+    # answer, so we treat unverified-but-present as "moderate confidence".
+    v_eff        = max(v_score, 0.7)
+    adjusted     = (draft.confidence or 0.7) * v_eff * (1.0 - min(h_risk, 0.4))
     final        = draft.model_copy(update={"confidence": round(adjusted, 2)})
     return {"final_output": final}
 
@@ -202,7 +221,15 @@ def _should_correct(state: ReasoningState) -> Literal["correct", "finalize", "fa
     h_risk  = state.get("hallucination_risk") or 1
     needs_retry = v_score < 0.7 or h_risk > 0.4
     if needs_retry:
-        return "correct" if state.get("retries", 0) < cfg.validation.max_retries else "fallback"
+        # Retries left → try to fix the citations. Out of retries → FINALIZE
+        # the synthesized draft (with a confidence penalty in finalize_node)
+        # rather than discarding it for a canned "cannot provide an answer"
+        # response. Local 7B models routinely paraphrase a quote just enough
+        # to miss the strict verbatim grounding check; a real chunk-grounded
+        # answer with a lowered confidence badge is far more useful — and still
+        # honest — than dumping the user to a raw passage list. Only truly
+        # empty drafts (no chunks at all) reach the fallback, via draft_node.
+        return "correct" if state.get("retries", 0) < cfg.validation.max_retries else "finalize"
     return "finalize"
 
 

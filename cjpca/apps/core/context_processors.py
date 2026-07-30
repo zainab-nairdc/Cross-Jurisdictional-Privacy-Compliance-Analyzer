@@ -62,9 +62,28 @@ def nav_counts(request):
                 })
             cache.set('copilot_doc_options', copilot_doc_options, 10)
 
+        # Copilot country picker — every document of a jurisdiction as ONE
+        # source. Derived from the doc options so it reflects exactly what is
+        # indexed. Retrieval filters chunk metadata by jurisdiction.
+        from collections import Counter
+        juris_label = {'bahrain': 'Bahrain', 'kuwait': 'Kuwait', 'india': 'India',
+                       'bbk': 'BBK', 'other': 'Other', 'saudi': 'Saudi Arabia',
+                       'uae': 'UAE', 'eu': 'EU'}
+        jcount, jflag = Counter(), {}
+        for o in copilot_doc_options:
+            if o.get('jurisdiction'):
+                jcount[o['jurisdiction']] += 1
+                jflag.setdefault(o['jurisdiction'], o.get('flag', '📄'))
+        copilot_jurisdictions = [
+            {'code': j, 'label': juris_label.get(j, j.title()),
+             'flag': jflag.get(j, '📄'), 'count': c}
+            for j, c in sorted(jcount.items())
+        ]
+
         return {**counts,
-                'scope_state':         scope_state,
-                'copilot_doc_options': copilot_doc_options}
+                'scope_state':          scope_state,
+                'copilot_doc_options':  copilot_doc_options,
+                'copilot_jurisdictions': copilot_jurisdictions}
     except Exception:
         return {
             'nav_pending_review':       0,
@@ -74,4 +93,5 @@ def nav_counts(request):
             'nav_quarantine_pending':   0,
             'scope_state':              None,
             'copilot_doc_options':      [],
+            'copilot_jurisdictions':    [],
         }

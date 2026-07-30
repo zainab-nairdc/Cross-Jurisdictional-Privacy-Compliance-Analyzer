@@ -105,6 +105,40 @@ def upsert_chunks(chunks: list[dict]) -> None:
         conn.executemany(_INSERT, rows)
 
 
+def delete_by_doc_title(doc_title: str) -> int:
+    """Remove every stored row for a document — leaves, parents, and tags.
+
+    Needed for deletes and re-ingests: upsert only overwrites by node_id, so a
+    document whose chunk boundaries shift (e.g. after a loader/chunker change)
+    leaves its old chunks behind as orphans, and a plain doc.delete() never
+    touches the search stores at all. Returns the number of leaf chunks removed.
+    Parent/tag cleanup is best-effort (those tables may not exist yet).
+    """
+    if not doc_title:
+        return 0
+    with _connect() as conn:
+        _init(conn)
+        node_ids = [
+            r[0] for r in conn.execute(
+                "SELECT node_id FROM bm25_index WHERE doc_title = ?", (doc_title,)
+            ).fetchall()
+        ]
+        removed = conn.execute(
+            "DELETE FROM bm25_index WHERE doc_title = ?", (doc_title,)
+        ).rowcount
+        try:
+            conn.execute("DELETE FROM parent_docstore WHERE doc_title = ?", (doc_title,))
+        except sqlite3.OperationalError:
+            pass
+        if node_ids:
+            try:
+                ph = ",".join("?" * len(node_ids))
+                conn.execute(f"DELETE FROM chunk_tags WHERE node_id IN ({ph})", node_ids)
+            except sqlite3.OperationalError:
+                pass
+    return removed
+
+
 # parent docstore
 # stores the full body of oversized chunks so retrieval can pull them back
 # by id for context expansion. plain table, no fts — we look these up by

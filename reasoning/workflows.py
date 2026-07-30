@@ -601,8 +601,12 @@ def compare_regulations(
         retrieved = {"regulation_a": nodes_a, "regulation_b": nodes_b}
         prompt_query = query
 
-    context_a = format_nodes(retrieved["regulation_a"], f"REGULATION A — {reg_a.upper()}", max_chars=2000)
-    context_b = format_nodes(retrieved["regulation_b"], f"REGULATION B — {reg_b.upper()}", max_chars=2000)
+    # max_chars bumped 2000 -> 6000: the 2000-char cap truncated most retrieved
+    # clauses, so the LLM only ever saw ~2 obligations' worth of text and
+    # produced sparse comparisons. 6000 fits comfortably in the 8192 num_ctx of
+    # the qwen2.5:7b fallback and lets the model extract a fuller obligation set.
+    context_a = format_nodes(retrieved["regulation_a"], f"REGULATION A — {reg_a.upper()}", max_chars=6000)
+    context_b = format_nodes(retrieved["regulation_b"], f"REGULATION B — {reg_b.upper()}", max_chars=6000)
 
     state = {
         "query":     prompt_query,

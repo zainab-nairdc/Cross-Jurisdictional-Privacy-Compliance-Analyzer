@@ -1,0 +1,32 @@
+{% comment %}Slim structure tree (counts bar + hierarchy) for embedding in the
+guided-upload wizard's Review step. No modal chrome.{% endcomment %}
+{% if summary %}
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:18px;padding:12px 15px;background:#F4F6FB;border:1px solid #E9EDF5;border-radius:12px;margin-bottom:14px;">
+ <div><span style="font-size:18px;font-weight:800;color:#002583;">{{ summary.parts }}</span> <span style="font-size:11px;color:#7B8499;">Parts</span></div>
+ <div><span style="font-size:18px;font-weight:800;color:#002583;">{{ summary.sections }}</span> <span style="font-size:11px;color:#7B8499;">Sections</span></div>
+ <div><span style="font-size:18px;font-weight:800;color:#002583;">{{ summary.articles }}</span> <span style="font-size:11px;color:#7B8499;">Articles</span></div>
+ <div><span style="font-size:18px;font-weight:800;color:#B07A00;">{{ summary.definitions }}</span> <span style="font-size:11px;color:#7B8499;">Definitions</span></div>
+</div>
+<div style="max-height:280px;overflow-y:auto;border:1px solid #F0F3F9;border-radius:10px;padding:10px 12px;">
+ {% for part, secmap in summary.tree.items %}
+ <div style="margin-bottom:10px;">
+  {% if part != 'Articles' %}<p dir="rtl" style="font-weight:800;color:#002583;font-size:12.5px;margin:0 0 5px;text-align:right;">▾ {{ part }}</p>{% endif %}
+  {% for sec, nodes in secmap.items %}
+  <div style="{% if part != 'Articles' %}padding-right:14px;border-right:2px solid #EEF2FB;margin-right:4px;{% endif %}margin-bottom:6px;">
+   {% if sec != '—' %}<p dir="rtl" style="font-weight:700;color:#3B6FE0;font-size:11.5px;margin:0 0 3px;text-align:right;">{{ sec }}</p>{% endif %}
+   {% for n in nodes %}
+   <div dir="rtl" style="display:flex;align-items:center;gap:8px;padding:4px 8px;border-bottom:1px solid #F5F7FB;">
+    <span style="flex-shrink:0;font-size:8.5px;font-weight:700;padding:1px 7px;border-radius:5px;{% if n.type == 'definition' %}background:#FFF1DC;color:#B07A00;{% else %}background:#EEF2FB;color:#002583;{% endif %}white-space:nowrap;">{% if n.type == 'definition' %}تعريف{% else %}{{ n.label }}{% endif %}</span>
+    <span style="flex:1;font-size:11.5px;color:#3A4560;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;">{% if n.type == 'definition' %}{{ n.label }}{% else %}{{ n.title|default:"—" }}{% endif %}</span>
+   </div>
+   {% endfor %}
+  </div>
+  {% endfor %}
+ </div>
+ {% endfor %}
+</div>
+{% else %}
+<div style="padding:24px;text-align:center;color:#7B8499;font-size:12px;background:#F8FAFD;border-radius:10px;">
+ No structured hierarchy was detected. The document will still be indexed — it just won't have an article/section tree (structure preview is currently for Arabic legal documents).
+</div>
+{% endif %}

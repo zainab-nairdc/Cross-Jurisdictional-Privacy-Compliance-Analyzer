@@ -7,4 +7,7 @@ from . import views
 # login / password_change / password_reset come from django.contrib.auth.urls.
 urlpatterns = [
     path('logout/', views.GetAwareLogoutView.as_view(), name='logout'),
+    # Admin operations dashboard (login-required). Its view existed but was
+    # never routed, so every template linking to it 500'd on NoReverseMatch.
+    path('monitoring/', views.SystemMonitoringView.as_view(), name='system-monitoring'),
 ]

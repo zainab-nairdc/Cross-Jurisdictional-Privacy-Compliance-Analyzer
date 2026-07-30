@@ -283,12 +283,23 @@ class RetrievalService:
         nodes = fusion.retrieve(effective_query)
 
         if rerank and nodes:
-            reranker = self._get_reranker()
             # rerank against the ORIGINAL query — the reranker measures
             # semantic relevance, and synonym noise hurts more than it
             # helps once we have candidate chunks in hand.
-            qb = QueryBundle(query_str=query)
-            nodes = reranker.postprocess_nodes(nodes, qb)
+            try:
+                reranker = self._get_reranker()
+                qb = QueryBundle(query_str=query)
+                nodes = reranker.postprocess_nodes(nodes, qb)
+            except Exception as exc:
+                # A reranker hiccup must not drop the whole result set — fall
+                # back to the fusion order (still relevant, just not precision-
+                # boosted) and log loudly, because losing the rerank silently
+                # is exactly what makes e.g. penalty articles rank below scope
+                # articles for a "penalties" query.
+                import logging
+                logging.getLogger(__name__).warning(
+                    "reranker failed, falling back to fusion order: %r", exc
+                )
 
         nodes = nodes[:top_k]
 

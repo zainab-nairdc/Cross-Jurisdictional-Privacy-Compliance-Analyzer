@@ -53,11 +53,17 @@ on submit so the message shows instantly with a typing indicator.
      <span>{{ citations|length }} citation{{ citations|length|pluralize }}</span>
      <svg class="cp-cite-caret" width="9" height="9" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" style="transition:transform .15s;"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg>
     </button>
-    <div style="margin-top:5px;display:none;flex-wrap:wrap;gap:4px;">
+    <div style="margin-top:5px;display:none;flex-direction:column;gap:4px;">
      {% for c in citations %}
-      <button type="button" class="cp-cite-chip {% if c.is_draft %}cp-cite-draft{% endif %}">
-       {% if c.is_draft %}⚠ {% endif %}{{ c.label }}
-      </button>
+      <div class="cp-cite-chip {% if c.is_draft %}cp-cite-draft{% endif %}"
+           style="display:block;text-align:left;padding:6px 8px;white-space:normal;">
+       <div style="font-weight:700;color:#002583;font-size:10px;margin-bottom:2px;">
+        {% if c.is_draft %}⚠ {% endif %}{{ c.reg_name|truncatechars:64 }}{% if c.article_ref %} · {{ c.article_ref }}{% endif %}
+       </div>
+       {% if c.excerpt %}
+        <div style="color:#4A5568;font-size:10px;line-height:1.45;">“{{ c.excerpt|truncatechars:200 }}”</div>
+       {% endif %}
+      </div>
      {% endfor %}
     </div>
    </div>

@@ -89,6 +89,10 @@ def _build_ollama_fallback():
         num_ctx         = cfg.llm.fallback_num_ctx,
         request_timeout = cfg.llm.timeout_sec,
         num_predict     = cfg.llm.max_tokens,
+        # Keep the model resident in GPU VRAM for 30 min between calls. Without
+        # this, Ollama unloads after ~5 min idle and the next request pays a
+        # 10-15s reload that can blow the request timeout mid-demo.
+        keep_alive      = "30m",
     )
 
 
@@ -118,19 +122,21 @@ def _build_llm():
 
 
 def _get_llm():
-    """Thread-safe lazy singleton. Build once, reuse forever. callers don't
-    see the provider chain underneath — they just get a langchain Runnable.
-    after this returns the chain is: openrouter (claude haiku 4.5) →
-    local ollama (llama3.2:1b) on any primary error.
+    """Build the provider chain fresh on every call — deliberately NOT cached.
 
-    Double-checked locking so the fast path after init is lock-free, but
-    concurrent first-callers don't both build an OpenRouter+Ollama chain."""
-    global _llm
-    if _llm is None:
-        with _llm_lock:
-            if _llm is None:
-                _llm = _build_llm()
-    return _llm
+    A cached ChatOllama binds its async httpx client to the FIRST asyncio event
+    loop it runs in. Each top-level LLM invocation here runs under its own
+    ``asyncio.run(...)`` (a comparison, then a mapping job, are separate loops),
+    so a process-wide singleton means the second flow reuses a client bound to
+    the first flow's now-closed loop and crashes with "Event loop is closed".
+    That's exactly what broke policy mapping when it ran after a comparison in
+    the same worker process.
+
+    Construction is network-free and microsecond-cheap (it just wires up a
+    langchain Runnable), so rebuilding per call is the simplest correct fix and
+    has no meaningful cost. With no OPENROUTER_API_KEY set the chain is a plain
+    local-Ollama client; with a key it's Ollama-primary + OpenRouter fallback."""
+    return _build_llm()
 
 
 def _format_chunks(chunks: list[dict], max_chars: int = 6000) -> str:

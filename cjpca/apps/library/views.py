@@ -235,6 +235,17 @@ class DocumentDeleteView(View):
             doc = Document.objects.get(pk=pk)
             doc_name = doc.name
             doc_type = doc.doc_type
+            # Purge the document's chunks from the search stores before removing
+            # the DB row — doc.delete() only drops the record, leaving searchable
+            # "ghost" chunks in bm25 + chroma that still surface as citations.
+            title = getattr(doc, 'chunk_doc_title', '') or doc.full_name or doc.name
+            try:
+                from retrieval.bm25_store import delete_by_doc_title
+                from ingestion.indexer    import delete_doc_chunks
+                delete_by_doc_title(title)
+                delete_doc_chunks(title)
+            except Exception:
+                pass
             doc.delete()
             from apps.history.audit import log_event, Actions
             log_event(
@@ -291,6 +302,7 @@ class DocumentUploadView(View):
             full_name=request.POST.get('full_name', '').strip(),
             doc_type=doc_type,
             jurisdiction=jurisdiction,
+            language=(request.POST.get('language') or 'en').strip(),
             version=request.POST.get('version', '').strip(),
             issuing_authority=request.POST.get('issuing_authority', '').strip(),
             effective_date=effective_date,
@@ -345,13 +357,35 @@ class DocumentViewerView(View):
 
     def get(self, request, pk):
         doc    = get_object_or_404(Document, pk=pk)
+
+        # Arabic documents are stored in the isolated Arabic collection, not in
+        # bm25_index — read their chunks from there and render the same viewer.
+        if doc.language == Document.ARABIC:
+            from arabic import store as ar_store
+            ar_chunks = ar_store.get_chunks(doc.chunk_doc_title)
+            rows = []
+            for i, c in enumerate(ar_chunks):
+                n = c.get('article_number')
+                ref = f"Article ({n})" if isinstance(n, int) else (c.get('term') or '')
+                rows.append({'idx': i, 'content': c.get('text', ''), 'ref': ref})
+            return render(request, 'partials/_doc_viewer_body.html', {
+                'doc':           doc,
+                'chunks':        [r['content'] for r in rows],
+                'chunk_rows':    rows,
+                'sections':      [{'index': r['idx'], 'heading': r['ref']} for r in rows if r['ref']],
+                'highlight_ref': '',
+                'highlight_idx': None,
+                'is_arabic':     True,
+            })
+
         # Pull chunks WITH their node_ids so we can highlight by chunk_id
         # (rock-solid) when the caller provides one, with the existing
         # substring-match path as a fallback for legacy callers.
         from apps.comparison.concepts import get_doc_chunks_with_ids
         chunks_with_ids = get_doc_chunks_with_ids(doc, limit=200)
-        chunks = [c for _, c in chunks_with_ids]
-        node_ids = [nid for nid, _ in chunks_with_ids]
+        chunks   = [c for _, c, _ in chunks_with_ids]
+        node_ids = [nid for nid, _, _ in chunks_with_ids]
+        refs     = [r for _, _, r in chunks_with_ids]
 
         highlight_ref = request.GET.get('highlight', '').strip()
         chunk_id      = request.GET.get('chunk_id', '').strip()
@@ -379,12 +413,19 @@ class DocumentViewerView(View):
         sq_needle    = norm_needle.replace(" ", "")
         alpha_needle = _re.sub(r'[^a-z0-9]+', '', norm_needle) if norm_needle else ""
 
-        # Extract section headings for the navigation sidebar.
+        # Build the navigation sidebar from the stored article_ref. The chunker
+        # strips headings out of the chunk body, so parsing the first line no
+        # longer finds them — article_ref is the reliable source of "Article (N)".
+        # Fall back to first-line heading detection only for chunks with no ref.
         sections = []
         for i, chunk in enumerate(chunks):
-            first_line = chunk.strip().split('\n')[0][:100].strip()
-            if _HEADING_RE.match(first_line):
-                sections.append({'index': i, 'heading': first_line})
+            ref = (refs[i] or '').strip()
+            if ref:
+                sections.append({'index': i, 'heading': ref})
+            else:
+                first_line = chunk.strip().split('\n')[0][:100].strip()
+                if _HEADING_RE.match(first_line):
+                    sections.append({'index': i, 'heading': first_line})
             # Substring-match path — only run if chunk_id didn't already pin
             # the highlight idx.
             if highlight_idx is None and norm_needle:
@@ -410,13 +451,144 @@ class DocumentViewerView(View):
                         if len(prefix) >= 40 and prefix in alpha_hay:
                             highlight_idx = i
 
+        # Pair each chunk with its article_ref so the viewer can print the
+        # "Article (N)" label above the body (headings were stripped at ingest).
+        chunk_rows = [
+            {'idx': i, 'content': chunks[i], 'ref': (refs[i] or '').strip()}
+            for i in range(len(chunks))
+        ]
+
         return render(request, 'partials/_doc_viewer_body.html', {
             'doc':           doc,
             'chunks':        chunks,
+            'chunk_rows':    chunk_rows,
             'sections':      sections,
             'highlight_ref': highlight_ref,
             'highlight_idx': highlight_idx,
         })
+
+
+class DocumentStructureView(View):
+    """GET /library/structure/<pk>/ — the Legal-Node structure preview.
+
+    Renders the detected part > section > article/definition hierarchy for a
+    document, from the analysis engine. Arabic docs read their nodes from the
+    isolated Arabic store; English structure analysis isn't wired yet."""
+
+    def get(self, request, pk):
+        doc = get_object_or_404(Document, pk=pk)
+        summary = None
+        if doc.language == Document.ARABIC:
+            try:
+                from arabic import store as ar_store
+                from arabic.analyze import structure_summary, suggest_type
+                chunks = ar_store.get_chunks(doc.chunk_doc_title)
+                if chunks:
+                    summary = structure_summary(chunks)
+                    summary['suggested_type'] = suggest_type(summary)
+            except Exception:
+                summary = None
+        return render(request, 'partials/_structure_preview.html',
+                      {'doc': doc, 'summary': summary})
+
+
+class AnalyzeView(View):
+    """POST /library/analyze/ — Phase 1 of the guided upload: create the doc,
+    extract/OCR + chunk it (NO embedding yet), cache the chunks, and return the
+    detected structure so the user can confirm before it's indexed."""
+
+    def post(self, request):
+        from django.http import JsonResponse
+        file = request.FILES.get('file')
+        if not file:
+            return HttpResponseBadRequest('No file provided.')
+        lang = (request.POST.get('language') or 'en').strip()
+        doc = Document.objects.create(
+            name=(request.POST.get('name') or file.name).strip(),
+            full_name=(request.POST.get('full_name') or '').strip(),
+            doc_type=(request.POST.get('doc_type') or Document.REGULATION),
+            jurisdiction=(request.POST.get('jurisdiction') or Document.OTHER),
+            language=lang,
+            issuing_authority=(request.POST.get('issuing_authority') or '').strip(),
+            version=(request.POST.get('version') or '').strip(),
+            notes=(request.POST.get('notes') or '').strip(),
+            status='review',
+            file=file,
+        )
+        # English (for now) has no structure engine — index straight through
+        # the normal pipeline on confirm.
+        if lang != Document.ARABIC:
+            return JsonResponse({'pk': doc.pk, 'language': lang, 'structured': False})
+
+        try:
+            from arabic.analyze import analyze
+            result = analyze(doc.file.path, declared_language=Document.ARABIC)
+        except Exception as exc:
+            doc.status = Document.FAILED
+            doc.save(update_fields=['status'])
+            return JsonResponse({'pk': doc.pk, 'error': f'Analysis failed: {exc}'}, status=500)
+
+        summary = result.get('structure')
+        from django.core.cache import cache
+        cache.set(f'analyze_{doc.pk}', result.get('chunks', []), 3600)
+        from django.template.loader import render_to_string
+        tree_html = render_to_string('partials/_structure_tree.html', {'summary': summary})
+        counts = {k: summary[k] for k in
+                  ('parts', 'sections', 'articles', 'definitions', 'total_nodes')} if summary else {}
+        return JsonResponse({
+            'pk': doc.pk, 'language': 'ar', 'structured': True,
+            'used_ocr': result.get('used_ocr', False),
+            'suggested_type': result.get('suggested_type', ''),
+            'counts': counts, 'tree_html': tree_html,
+        })
+
+
+class FinalizeView(View):
+    """POST /library/finalize/<pk>/ — Phase 2: apply the user's confirmed
+    metadata and index. Arabic docs embed the chunks cached during analysis;
+    everything else runs the normal ingestion pipeline."""
+
+    def post(self, request, pk):
+        from django.http import JsonResponse
+        from django.core.cache import cache
+        doc = get_object_or_404(Document, pk=pk)
+
+        fields = []
+        for f in ('doc_type', 'jurisdiction', 'chunk_strategy', 'citation_format',
+                  'citation_template', 'citation_abbr', 'doc_year', 'department',
+                  'confidentiality', 'document_id'):
+            v = request.POST.get(f)
+            if v:
+                setattr(doc, f, v); fields.append(f)
+
+        chunks = cache.get(f'analyze_{doc.pk}')
+        if doc.language == Document.ARABIC and chunks:
+            from arabic import store as ar_store
+            from arabic.chunk import embed_text, restrategize
+            from arabic.embed import embed_texts
+            chunks = restrategize(chunks, doc.chunk_strategy)
+            vecs = embed_texts([embed_text(c) for c in chunks])
+            ar_store.delete_source(doc.chunk_doc_title)
+            ar_store.add([f'{doc.chunk_doc_title}::{i}' for i in range(len(chunks))],
+                         vecs, [c['text'] for c in chunks], chunks)
+            doc.status = Document.INDEXED
+            doc.chunk_count = len(chunks)
+            fields += ['status', 'chunk_count']
+            doc.save(update_fields=list(dict.fromkeys(fields)))
+            cache.delete(f'analyze_{doc.pk}')
+            return JsonResponse({'ok': True, 'chunks': len(chunks)})
+
+        # English / cache miss → normal background pipeline
+        doc.status = Document.PROCESSING
+        fields.append('status')
+        doc.save(update_fields=list(dict.fromkeys(fields)))
+        from apps.ingestion.models import IngestionJob
+        from apps.ingestion.pipeline import run_job
+        job = IngestionJob.objects.create(
+            document=doc, status=IngestionJob.QUEUED, current_stage=1,
+            created_by=request.user if request.user.is_authenticated else None)
+        run_job(job.id)
+        return JsonResponse({'ok': True, 'processing': True})
 
 
 # ── Tag management ─────────────────────────────────────────────────────────────

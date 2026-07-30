@@ -7,6 +7,7 @@ with no text layer, the result comes back empty, and the orchestrator
 the one function you actually call from outside is load_document(path).
 """
 import os
+import re
 import hashlib
 from dataclasses import dataclass
 from pathlib import Path
@@ -58,6 +59,27 @@ def _get_converter():
     return _converter
 
 
+# docling emits page furniture that isn't part of the legal text: an
+# "<!-- image -->" placeholder wherever it sees a logo/emblem (these repeat on
+# every gazette page header), and long separator rules made of underscores or
+# dashes. Left in, they pollute chunk bodies, the doc viewer, and citations.
+_HTML_COMMENT_RE   = re.compile(r"<!--.*?-->", re.DOTALL)
+# whole-line runs of separator chars only. Requires the ENTIRE line to be
+# separators + whitespace, so markdown table rows like "| --- | --- |" (which
+# contain pipes) are preserved. Docling markdown-escapes underscores, so a
+# gazette rule comes through as "\_\_\_\_…" — the optional "\\?" catches both
+# the escaped and bare forms.
+_SEPARATOR_LINE_RE = re.compile(r"(?m)^[ \t]*(?:\\?[_\-=–—]){3,}[ \t]*$")
+
+
+def _clean_markdown(text: str) -> str:
+    """Strip docling page-furniture, then collapse the blank lines it leaves."""
+    text = _HTML_COMMENT_RE.sub("", text)
+    text = _SEPARATOR_LINE_RE.sub("", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)   # collapse gaps left behind
+    return text.strip()
+
+
 def load_document(path: Path) -> LoadedDocument:
     """take a file path, hand it to docling, get markdown back.
     no ocr fallback — if there's no text layer, you get an empty string."""
@@ -66,7 +88,7 @@ def load_document(path: Path) -> LoadedDocument:
 
     converter   = _get_converter()
     conv_result = converter.convert(str(path))
-    text        = conv_result.document.export_to_markdown()
+    text        = _clean_markdown(conv_result.document.export_to_markdown())
     page_count  = len(conv_result.document.pages) if hasattr(conv_result.document, "pages") else 0
 
     return LoadedDocument(

@@ -7,40 +7,84 @@
  <title>Sign in — CJPCA</title>
  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap" rel="stylesheet">
  <link rel="stylesheet" href="{% static 'css/output.css' %}">
- <style>*, *::before, *::after { font-family: 'Satoshi', sans-serif; }</style>
-</head>
-<body class="h-full" style="background:#F4F6FB;">
- <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;">
-  <div style="width:100%;max-width:380px;background:#fff;border:1px solid #E5E8EF;border-radius:14px;box-shadow:0 10px 40px rgba(0,37,131,.08);padding:32px;">
+ <style>
+  *, *::before, *::after { font-family: 'Satoshi', sans-serif; box-sizing: border-box; }
+  body { margin: 0; }
 
-   <div style="text-align:center;margin-bottom:24px;">
-    <img src="{% static 'img/logo.png' %}" alt="Logo"
-         style="height:56px;width:56px;object-fit:cover;border-radius:14px;border:1px solid #E5E8EF;margin:0 auto 14px;display:block;">
-    <h1 style="font-size:18px;font-weight:700;color:#002583;margin:0;">Cross-Jurisdictional</h1>
-    <p style="font-size:13px;color:#002583;opacity:.7;margin:2px 0 0;">Privacy Compliance Analyzer</p>
+  /* Full-bleed navy background with soft depth. */
+  .login-bg {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px;
+    background:
+      radial-gradient(1100px 620px at 18% 8%,  #0b3ec0 0%, rgba(11,62,192,0) 58%),
+      radial-gradient(1000px 560px at 88% 92%, #001341 0%, rgba(0,19,65,0) 55%),
+      #002583;
+  }
+
+  .login-card {
+    width: 100%; max-width: 430px; background: #fff; border-radius: 20px;
+    box-shadow: 0 30px 80px rgba(0,0,0,.38); padding: 40px 36px;
+  }
+
+  .login-title {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 27px; font-weight: 700; color: #14213D; margin: 0; letter-spacing: -.01em;
+  }
+
+  .login-label { display:block; font-size:12px; font-weight:700; color:#3A4560; margin-bottom:6px; }
+  .login-input {
+    width:100%; padding:12px 13px; border:1px solid #E5E8EF; border-radius:10px;
+    font-size:14px; color:#14213D; outline:none; transition:border-color .15s, box-shadow .15s;
+  }
+  .login-input::placeholder { color:#AAB2C5; }
+  .login-input:focus { border-color:#002583; box-shadow:0 0 0 3px rgba(0,37,131,.14); }
+
+  .login-btn {
+    width:100%; padding:13px; background:#002583; color:#fff; border:0; border-radius:10px;
+    font-size:14px; font-weight:700; cursor:pointer; box-shadow:0 6px 18px rgba(0,37,131,.28);
+    transition:background .15s, transform .05s;
+  }
+  .login-btn:hover  { background:#001a5e; }
+  .login-btn:active { transform:translateY(1px); }
+ </style>
+</head>
+<body class="h-full">
+ <div class="login-bg">
+  <div class="login-card">
+
+   {# ── Brand ── #}
+   <div style="text-align:center;margin-bottom:26px;">
+    <img src="{% static 'img/logo.png' %}" alt="CJPCA"
+         style="height:56px;width:56px;object-fit:cover;border-radius:14px;margin:0 auto 16px;display:block;box-shadow:0 6px 18px rgba(0,37,131,.20);">
+    <h1 class="login-title">Welcome to CJPCA</h1>
+    <p style="font-size:13px;color:#7B8499;margin:6px 0 0;">Cross-Jurisdictional Privacy Compliance Analyzer</p>
    </div>
 
    {% if form.errors %}
-   <div style="background:#FDECEC;border:1px solid #F5C2C2;color:#B42318;border-radius:8px;padding:9px 12px;font-size:12px;margin-bottom:16px;">
+   <div style="background:#FDECEC;border:1px solid #F5C2C2;color:#B42318;border-radius:10px;padding:10px 13px;font-size:12.5px;margin-bottom:18px;">
     Incorrect username or password. Please try again.
    </div>
    {% endif %}
 
    <form method="post" action="{% url 'login' %}">
     {% csrf_token %}
-    <label style="display:block;font-size:11px;font-weight:700;color:#002583;margin-bottom:4px;">Username</label>
-    <input type="text" name="username" autofocus required
-           style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #E5E8EF;border-radius:8px;font-size:14px;margin-bottom:14px;">
 
-    <label style="display:block;font-size:11px;font-weight:700;color:#002583;margin-bottom:4px;">Password</label>
-    <input type="password" name="password" required
-           style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #E5E8EF;border-radius:8px;font-size:14px;margin-bottom:20px;">
+    <label class="login-label">Username</label>
+    <input type="text" name="username" autofocus required placeholder="Enter your username"
+           class="login-input" style="margin-bottom:18px;">
+
+    <label class="login-label">Password</label>
+    <input type="password" name="password" required placeholder="Enter your password"
+           class="login-input" style="margin-bottom:16px;">
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;">
+     <label style="display:flex;align-items:center;gap:7px;font-size:12.5px;color:#7B8499;cursor:pointer;">
+      <input type="checkbox" name="remember" style="width:15px;height:15px;accent-color:#002583;"> Remember me
+     </label>
+     <a href="#" style="font-size:12.5px;color:#002583;font-weight:600;text-decoration:none;">Forgot Password?</a>
+    </div>
 
     <input type="hidden" name="next" value="{{ next }}">
-    <button type="submit"
-            style="width:100%;padding:11px;background:#002583;color:#fff;border:0;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;">
-     Sign in
-    </button>
+    <button type="submit" class="login-btn">Sign In</button>
    </form>
 
   </div>

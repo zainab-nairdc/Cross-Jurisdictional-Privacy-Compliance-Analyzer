@@ -40,9 +40,13 @@ class LLMConfig(BaseSettings):
     # local fallback. kicks in automatically if the primary openrouter call
     # raises any exception (network, auth, rate limit, timeout, parse error).
     fallback_enabled:  bool = True
-    fallback_model:    str  = "llama3.2:1b"
+    # llama3.2:1b was too weak for the structured ComparisonReport prompt — it
+    # echoed the schema's field descriptions verbatim instead of extracting.
+    # qwen2.5:7b-instruct follows the structured-extraction prompt reliably and
+    # fits an 8 GB GPU (Q4). Override with REASON_LLM__FALLBACK_MODEL if needed.
+    fallback_model:    str  = "qwen2.5:7b-instruct"
     fallback_base_url: str  = "http://localhost:11434"
-    fallback_num_ctx:  int  = 4096
+    fallback_num_ctx:  int  = 8192
 
     @field_validator("temperature")
     @classmethod

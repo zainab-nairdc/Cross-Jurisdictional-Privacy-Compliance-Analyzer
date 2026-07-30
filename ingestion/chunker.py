@@ -62,6 +62,20 @@ _PREAMBLE_RE = re.compile(
 )
 
 
+# docling sometimes fuses a chapter heading and its article heading into one
+# line, so the section label comes through as e.g. "Chapter Seven Penalties
+# Article (23)" instead of "Article (23)". When an "Article (N)" token is
+# present, that IS the canonical label — collapse to it. Headings with no
+# article token (preamble, definitions lead-ins) are left untouched.
+_ARTICLE_REF_RE = re.compile(r"\bArticle\s*\(?\s*(\d+)\s*\)?", re.IGNORECASE)
+
+
+def _canonical_ref(title: str) -> str:
+    """Reduce a chapter-prefixed heading to its bare 'Article (N)' label."""
+    m = _ARTICLE_REF_RE.search(title or "")
+    return f"Article ({m.group(1)})" if m else title
+
+
 def _node_id(doc_title: str, chunk_id: str, index: int) -> str:
     """build a stable id for a chunk by hashing its inputs.
     same inputs always give the same hash, so re-running ingestion just
@@ -98,11 +112,20 @@ def _make_chunk(text, meta, chunk_id, index, total, *,
     else:
         full_path = hierarchy_path
 
+    chunk_type = _classify(text, section_title)
+    # A preamble/enacting chunk whose "heading" is really page furniture (the
+    # repeating "N Law No. …" gazette header docling promoted to a heading)
+    # makes an ugly citation label. When the chunk is preamble and its heading
+    # carries no "Article (N)" token, show it as "Preamble" instead.
+    display_ref = section_title
+    if chunk_type == "preamble" and not _ARTICLE_REF_RE.search(section_title or ""):
+        display_ref = "Preamble"
+
     return {
         "content":           text,
         "node_id":           _node_id(doc_title, chunk_id, index),
-        "article_ref":       section_title,
-        "section_title":     section_title,
+        "article_ref":       display_ref,
+        "section_title":     display_ref,
         "hierarchy_path":    full_path,
         "chunk_id":          chunk_id,
         "section_level":     section_level,
@@ -111,7 +134,7 @@ def _make_chunk(text, meta, chunk_id, index, total, *,
         "parent_chunk_id":   parent_chunk_id,
         "embed_skip":        embed_skip,
         "is_obligation":     bool(_OBLIGATION_RE.search(text)),
-        "chunk_type":        _classify(text, section_title),
+        "chunk_type":        chunk_type,
         "jurisdiction":      str(meta.get("Jurisdiction", "")).strip(),
         "regulation_name":   regulation_name,
         "doc_title":         doc_title,
@@ -170,6 +193,7 @@ def _build(sections: list[tuple[str, str]], meta: dict) -> list[dict]:
         if not body or not _has_real_body(body):
             continue
         title = (hpath.rsplit(">", 1)[-1].strip() if ">" in hpath else hpath.strip()) or f"Section_{i+1}"
+        title = _canonical_ref(title)
         slug  = _slug(title, hpath or title)
 
         if len(_tokenizer.encode(body)) <= CHUNK_TOKENS:

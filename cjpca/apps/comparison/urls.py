@@ -29,7 +29,10 @@ urlpatterns = [
     path('analyst/',        views.AnalystComparisonView.as_view(), name='comparison-analyst'),
     path('custom/scope/',   RedirectView.as_view(pattern_name='comparison', permanent=False, query_string=True), name='comparison-custom-scope'),
     path('setup/',          RedirectView.as_view(pattern_name='comparison', permanent=False, query_string=True), name='comparison-setup'),
-    path('<str:pair_key>/scope/', RedirectView.as_view(pattern_name='comparison', permanent=False, query_string=True), name='comparison-scope'),
+    # Static url= (not pattern_name) — RedirectView would otherwise forward the
+    # captured `pair_key` into reverse('comparison'), which takes no args, and
+    # 500 with NoReverseMatch. Matches the v1/ redirects below.
+    path('<str:pair_key>/scope/', RedirectView.as_view(url='/comparison/', permanent=False, query_string=True), name='comparison-scope'),
     path('runs/<int:pk>/progress/', views.ComparisonWorkspaceView.as_view(), name='comparison-progress'),
 
     # ── API ─────────────────────────────────────────────────────────────────

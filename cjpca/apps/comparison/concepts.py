@@ -188,11 +188,13 @@ def get_doc_chunks(doc, limit: int = CHUNK_LIMIT) -> list:
 def get_doc_chunks_with_ids(doc, limit: int = CHUNK_LIMIT) -> list[tuple]:
     """Same as ``get_doc_chunks`` but also returns each chunk's node_id.
 
-    Returns list of ``(node_id, content)`` tuples in document order. Used
-    by the document viewer when we have the exact ``chunk_id`` to highlight
-    — substring-matching the verbatim quote can fail for OCR space artifacts
-    or when the LLM stored the chunk header instead of the body, but
-    matching by ``node_id`` always works.
+    Returns list of ``(node_id, content, article_ref)`` tuples in document
+    order. Used by the document viewer when we have the exact ``chunk_id`` to
+    highlight — substring-matching the verbatim quote can fail for OCR space
+    artifacts or when the LLM stored the chunk header instead of the body, but
+    matching by ``node_id`` always works. ``article_ref`` is carried because
+    the chunker strips headings out of the body, so it's the only place the
+    "Article (N)" label survives.
     """
     db_path = _bm25_db_path()
     if not db_path or not db_path.exists():
@@ -205,11 +207,11 @@ def get_doc_chunks_with_ids(doc, limit: int = CHUNK_LIMIT) -> list[tuple]:
     try:
         conn = sqlite3.connect(str(db_path))
         rows = conn.execute(
-            "SELECT node_id, content FROM bm25_index WHERE doc_title = ? LIMIT ?",
+            "SELECT node_id, content, article_ref FROM bm25_index WHERE doc_title = ? LIMIT ?",
             (title, limit),
         ).fetchall()
         conn.close()
-        return [(r[0], r[1]) for r in rows if r[1]]
+        return [(r[0], r[1], r[2] or '') for r in rows if r[1]]
     except sqlite3.OperationalError:
         return []
 

@@ -682,14 +682,22 @@ function closePolicyUploadModal() {
  </div>
 
  <div style="margin-bottom:10px;">
+ <label style="display:block;font-size:10px;font-weight:600;color:#002583;margin-bottom:4px;">Language</label>
+ <select x-model="fields.language" style="width:100%;border:1px solid #E5E8EF;border-radius:7px;padding:6px 8px;font-size:11px;color:#002583;outline:none;box-sizing:border-box;">
+  <option value="en">English</option>
+  <option value="ar">Arabic</option>
+ </select>
+ </div>
+
+ <div style="margin-bottom:10px;">
  <label style="display:block;font-size:10px;font-weight:600;color:#002583;margin-bottom:4px;">Owning department <span style="color:#002583;">*</span></label>
  <input type="text" x-model="fields.issuing_authority" placeholder="e.g. Compliance, Risk, IT"
  style="width:100%;border:1px solid #E5E8EF;border-radius:7px;padding:6px 8px;font-size:11px;color:#002583;outline:none;box-sizing:border-box;">
  </div>
 
  <div style="margin-bottom:10px;">
- <label style="display:block;font-size:10px;font-weight:600;color:#002583;margin-bottom:4px;">Scope / description <span style="color:#002583;">*</span></label>
- <textarea x-model="fields.full_name" rows="2" placeholder="Brief summary of what this policy covers…"
+ <label style="display:block;font-size:10px;font-weight:600;color:#002583;margin-bottom:4px;">Full / official name <span style="color:#002583;">*</span></label>
+ <textarea x-model="fields.full_name" rows="2" placeholder="e.g. BBK Data Retention & Disposal Policy (becomes the citation title — keep it short)"
  style="width:100%;border:1px solid #E5E8EF;border-radius:7px;padding:6px 8px;font-size:11px;color:#002583;outline:none;resize:none;box-sizing:border-box;"></textarea>
  </div>
 
@@ -725,6 +733,7 @@ function policyUploadModal() {
  errorMsg: '',
  fields: {
  name: '',
+ language: 'en',
  effective_date: '',
  version: '',
  issuing_authority: '',

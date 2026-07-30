@@ -8,7 +8,10 @@ urlpatterns = [
     # register removed — not part of the Step 1–4 feature spec.
     path('upload/',                views.DocumentUploadView.as_view(), name='library-upload'),
     path('upload/preview/',        views.UploadMetadataPreviewView.as_view(), name='library-upload-preview'),
+    path('analyze/',               views.AnalyzeView.as_view(),   name='library-analyze'),
+    path('finalize/<int:pk>/',     views.FinalizeView.as_view(),  name='library-finalize'),
     path('delete/<int:pk>/',       views.DocumentDeleteView.as_view(), name='library-delete'),
     path('view/<int:pk>/',         views.DocumentViewerView.as_view(), name='library-view'),
+    path('structure/<int:pk>/',    views.DocumentStructureView.as_view(), name='library-structure'),
     path('<int:pk>/tags/',         views.DocumentTagView.as_view(),    name='library-tags'),
 ]

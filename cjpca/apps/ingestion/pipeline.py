@@ -218,6 +218,44 @@ def _process_job(job_id: int) -> None:
     job.save(update_fields=['status', 'updated_at'])
 
     try:
+        # ── Language routing ──────────────────────────────────────────────────
+        # Arabic documents can't use the English pipeline: docling mangles Arabic
+        # and bge-small-en can't embed it. Auto-detect Arabic from the file and
+        # route to the isolated Arabic pipeline (text-extract OR kraken OCR when
+        # the font layer is broken -> bge-m3 -> the regulations_ar collection).
+        # Nothing below this branch runs for Arabic docs.
+        from arabic.detect import detect_language, needs_ocr
+        _doc_path = Path(doc.file.path)
+        # Route to the Arabic pipeline when the user DECLARED Arabic at upload
+        # (Language = Arabic) OR auto-detection recognises Arabic. The user's
+        # choice wins — it rescues broken-font/garbage-encoding PDFs whose text
+        # layer hides the Arabic from character-counting auto-detection (Oman).
+        _declared_ar = (doc.language == Document.ARABIC)
+        if _declared_ar or detect_language(_doc_path) == Document.ARABIC:
+            _set_stage(job, 2, 10)
+            from arabic.pipeline import ingest as _arabic_ingest
+            _use_ocr = needs_ocr(_doc_path)
+            _set_stage(job, 3, 30)
+            _res = _arabic_ingest(
+                _doc_path, source=doc.chunk_doc_title,
+                law_name=(doc.full_name or doc.name), use_ocr=_use_ocr,
+            )
+            if not _res.get('ok'):
+                _fail(job, f"Arabic ingest failed: {_res.get('error')}")
+                return
+            _set_stage(job, 6, 100)
+            from django.db import transaction
+            with transaction.atomic():
+                job.status = IngestionJob.COMPLETE
+                job.save(update_fields=['status', 'updated_at'])
+                doc.language    = Document.ARABIC
+                doc.status      = Document.INDEXED
+                doc.chunk_count = _res['chunks']
+                doc.save(update_fields=['language', 'status', 'chunk_count'])
+            logger.info('IngestionJob %s complete (Arabic, ocr=%s) — %d chunks for "%s"',
+                        job.pk, _use_ocr, _res['chunks'], doc.name)
+            return
+
         # ── Stage 2: Parse ────────────────────────────────────────────────────
         # ScannedPDFNoGPUError is not exposed by ingestion.loaders right now;
         # the loader returns empty text for scans rather than raising. Catch
@@ -290,9 +328,18 @@ def _process_job(job_id: int) -> None:
 
         # ── Stage 5: Index ChromaDB + BM25 (leaves), parent_docstore (parents) ─
         _set_stage(job, 5, 75)
-        from ingestion.indexer    import index_chunks
+        from ingestion.indexer    import index_chunks, delete_doc_chunks
         from retrieval.bm25_store import upsert_chunks as bm25_upsert
-        from retrieval.bm25_store import upsert_parents
+        from retrieval.bm25_store import upsert_parents, delete_by_doc_title
+        # Purge any prior chunks for this document before writing the new set.
+        # upsert only overwrites by node_id, so a re-ingest whose chunk
+        # boundaries shifted (e.g. after a loader/chunker change) would leave
+        # the old chunks behind as duplicates. Clearing first makes the index
+        # reflect exactly this run.
+        doc_title = str(meta.get('Document Title', '')).strip()
+        if doc_title:
+            delete_by_doc_title(doc_title)
+            delete_doc_chunks(doc_title)
         index_chunks(leaves, embeddings)
         bm25_upsert(leaves)
         if parents:

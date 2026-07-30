@@ -34,10 +34,51 @@ class Document(models.Model):
         (OTHER,   'Other'),
     ]
 
+    # language — decides which ingestion + retrieval pipeline a document uses.
+    # 'en' = the main pipeline (docling + bge-small-en, English collection);
+    # 'ar' = the Arabic pipeline (kraken/text extract + bge-m3, regulations_ar).
+    ENGLISH = 'en'
+    ARABIC  = 'ar'
+    LANGUAGE_CHOICES = [(ENGLISH, 'English'), (ARABIC, 'Arabic')]
+
+    # chunking strategy — how the document was split into legal nodes. Chosen in
+    # the guided-upload wizard (Screen 6). 'auto' == article-based, the detected
+    # default; 'section' merges each section's articles into one node; 'clause'
+    # splits each article on its numbered/lettered clause markers.
+    CHUNK_AUTO    = 'auto'
+    CHUNK_ARTICLE = 'article'
+    CHUNK_SECTION = 'section'
+    CHUNK_CLAUSE  = 'clause'
+    CHUNK_STRATEGY_CHOICES = [
+        (CHUNK_AUTO, 'Automatic'), (CHUNK_ARTICLE, 'Article-based'),
+        (CHUNK_SECTION, 'Section-based'), (CHUNK_CLAUSE, 'Clause-based'),
+    ]
+
+    # citation format — how a source is labelled when cited (Screen 7).
+    # 'short' → "PDPL, Article 12"; 'full' → "Law No. 30 of 2018, Article 12";
+    # 'custom' → user template with {doc}/{num}/{year}/{article} placeholders.
+    CITE_SHORT  = 'short'
+    CITE_FULL   = 'full'
+    CITE_CUSTOM = 'custom'
+    CITATION_FORMAT_CHOICES = [
+        (CITE_SHORT, 'Document + Article'), (CITE_FULL, 'Full legal citation'),
+        (CITE_CUSTOM, 'Custom'),
+    ]
+
+    # confidentiality (Screen 4)
+    CONF_PUBLIC       = 'public'
+    CONF_INTERNAL     = 'internal'
+    CONF_CONFIDENTIAL = 'confidential'
+    CONFIDENTIALITY_CHOICES = [
+        (CONF_PUBLIC, 'Public'), (CONF_INTERNAL, 'Internal'),
+        (CONF_CONFIDENTIAL, 'Confidential'),
+    ]
+
     name              = models.CharField(max_length=255)
     full_name         = models.CharField(max_length=500, blank=True)
     doc_type          = models.CharField(max_length=20, choices=DOC_TYPE_CHOICES)
     jurisdiction      = models.CharField(max_length=20, choices=JURISDICTION_CHOICES, blank=True)
+    language          = models.CharField(max_length=5, choices=LANGUAGE_CHOICES, default=ENGLISH)
     version           = models.CharField(max_length=50, blank=True)
     issuing_authority = models.CharField(max_length=255, blank=True)
     effective_date    = models.DateField(null=True, blank=True)
@@ -50,6 +91,15 @@ class Document(models.Model):
     file              = models.FileField(upload_to='documents/', blank=True)
     tags              = models.JSONField(default=list, blank=True)
     cached_topics     = models.JSONField(default=list, blank=True)
+
+    # ── Guided-upload wizard: confirmed config (Screens 4, 6, 7) ──
+    chunk_strategy    = models.CharField(max_length=10, choices=CHUNK_STRATEGY_CHOICES, default=CHUNK_AUTO)
+    citation_format   = models.CharField(max_length=10, choices=CITATION_FORMAT_CHOICES, default=CITE_SHORT)
+    citation_template = models.CharField(max_length=200, blank=True)   # used when citation_format == custom
+    citation_abbr     = models.CharField(max_length=40,  blank=True)   # short label, e.g. "PDPL"
+    doc_year          = models.CharField(max_length=8,   blank=True)   # "2018"
+    department        = models.CharField(max_length=40,  blank=True)   # Legal / Compliance / Risk / …
+    confidentiality   = models.CharField(max_length=20, choices=CONFIDENTIALITY_CHOICES, blank=True)
 
     # ── Hydrated from data/metadata.csv via `manage.py full_ingest` ──
     # These fields make the side-panel detail richer. Effective_date already
@@ -73,6 +123,29 @@ class Document(models.Model):
 
     def __str__(self):
         return self.name
+
+    def cited_as(self, article: str = '') -> str:
+        """Format a citation for this document using the configured format.
+
+        ``article`` is a label like "Article 12" (already localised by the
+        caller). Powers the Screen 7 live preview and the Copilot source labels.
+        """
+        abbr = (self.citation_abbr or self.name or '').strip()
+        art = (article or '').strip()
+        if self.citation_format == self.CITE_FULL:
+            num = (self.document_id or '').strip()
+            head = f"Law No. {num}" if num else (self.full_name or self.name)
+            if self.doc_year:
+                head = f"{head} of {self.doc_year}"
+            return f"{head}, {art}" if art else head
+        if self.citation_format == self.CITE_CUSTOM and self.citation_template:
+            return (self.citation_template
+                    .replace('{doc}', abbr)
+                    .replace('{num}', (self.document_id or '').strip())
+                    .replace('{year}', self.doc_year or '')
+                    .replace('{article}', art)).strip()
+        # short (default): "PDPL, Article 12"
+        return f"{abbr}, {art}" if art else abbr
 
     @property
     def chunk_doc_title(self) -> str:

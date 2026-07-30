@@ -101,3 +101,15 @@ def get_collection() -> Chroma:
     """old name for get_vectorstore(). kept around so nothing breaks if older
     code still calls it."""
     return get_vectorstore()
+
+
+def delete_doc_chunks(doc_title: str) -> None:
+    """Delete every Chroma row for a document title. Best-effort — a missing
+    collection or an unknown title is a harmless no-op. Used before deleting or
+    re-ingesting a document so stale vectors don't linger alongside the new set."""
+    if not doc_title:
+        return
+    try:
+        get_vectorstore()._collection.delete(where={"doc_title": doc_title})
+    except Exception as exc:
+        print(f"[indexer] delete_doc_chunks failed for {doc_title!r}: {exc}")
