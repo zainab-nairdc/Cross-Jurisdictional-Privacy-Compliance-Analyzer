@@ -46,6 +46,27 @@ def scoped_runs_qs(user):
     return qs
 
 
+def _last_delta(series):
+    """Month-over-month change from a numeric time-series (last vs previous).
+    Returns None when there isn't enough history — so the UI shows a delta ONLY
+    when it's real, never a fabricated one."""
+    vals = [v for v in (series or [])]
+    if len(vals) < 2:
+        return None
+    cur, prev = vals[-1], vals[-2]
+    # A month with no data (None) has no honest delta to show.
+    if cur is None or prev is None:
+        return None
+    diff = cur - prev
+    pct = (round(diff / prev * 100) if prev else None)
+    return {
+        'cur': cur, 'prev': prev, 'diff': diff, 'pct': pct,
+        'mag_diff': abs(diff),
+        'mag_pct': (abs(pct) if pct is not None else None),
+        'dir': 'up' if diff > 0 else ('down' if diff < 0 else 'flat'),
+    }
+
+
 def _month_window(year, month):
     start = timezone.make_aware(datetime(year, month, 1))
     last  = calendar.monthrange(year, month)[1]
@@ -325,6 +346,30 @@ class AnalyticsView(TemplateView):
         # ── AI accuracy feedback metrics ─────────────────────────────────────
         acc = accuracy_metrics(user=self.request.user)
 
+        # ── Honest header meta + month-over-month deltas ─────────────────────
+        # Everything here is derived from real data — no fabricated trend %.
+        from apps.library.models import Document as _Doc2
+        meta_jurisdictions = (
+            _Doc2.objects.exclude(jurisdiction='').values('jurisdiction').distinct().count()
+        )
+        meta_policies = _Doc2.objects.filter(doc_type=_Doc2.POLICY).count()
+        meta_regulations = _Doc2.objects.filter(doc_type=_Doc2.REGULATION).count()
+        meta_last_updated = (
+            crun_qs.order_by('-created_at').values_list('created_at', flat=True).first()
+        )
+        # Is the accuracy metric trustworthy enough to feature? A tiny review
+        # sample (e.g. 1 approval → "100%") reads as a hallucinated flex, so we
+        # only surface the score once there's a real sample behind it.
+        _acc_vals = acc['monthly_accuracy'].get('values') or []
+        accuracy_has_data = any(v is not None for v in _acc_vals)
+        accuracy_reliable = acc['total_reviewed'] >= 5
+
+        # real deltas (None when there isn't enough history)
+        accuracy_delta  = _last_delta(_acc_vals)
+        conflicts_delta = _last_delta(gap_trend_identified)   # new conflicts this month vs last
+        resolved_delta  = _last_delta(gap_trend_resolved)     # approvals this month vs last
+        activity_delta  = _last_delta(results_per_month)
+
         # ── Chart data JSON ───────────────────────────────────────────────────
         chart_data = {
             'relationshipBreakdown': {
@@ -455,6 +500,9 @@ class AnalyticsView(TemplateView):
             round((mc['covered'] + 0.5 * mc['partial']) / mapping_obligations * 100)
             if mapping_obligations else 0
         )
+        # coverage progress (covered obligations of total) — real, drives the KPI bar
+        coverage_done  = mc['covered']
+        coverage_total = mapping_obligations
 
         # AI quality: per-row citation_verified + hallucination_risk averages.
         verified_om = om_qs.filter(citation_verified=True).count()
@@ -492,6 +540,48 @@ class AnalyticsView(TemplateView):
             })
         jur_rows.sort(key=lambda r: -r['pct'])
 
+        # ── Auto-surfaced "Key Insights" for the Coverage tab ─────────────────
+        # Every insight is derived from real numbers — a deterministic anomaly
+        # surface, not an LLM narrative and not fabricated.
+        coverage_insights = []
+        if total_results and rel_breakdown:
+            top_group = max(rel_breakdown, key=lambda g: g['count'])
+            coverage_insights.append({
+                'tone': 'blue',
+                'title': f"{top_group['label']} is the most common outcome",
+                'detail': f"{top_group['count']} of {total_results} clause pairs ({top_group['pct']}%) are {top_group['label'].lower()}.",
+            })
+        _conf_pairs = [(pd['label'], pd['counts'].get(ComparisonResult.CONFLICTING, 0)) for pd in pair_data]
+        _conf_pairs = [p for p in _conf_pairs if p[1] > 0]
+        if _conf_pairs:
+            _hot = max(_conf_pairs, key=lambda p: p[1])
+            coverage_insights.append({
+                'tone': 'red',
+                'title': f"Most conflicts are in {_hot[0]}",
+                'detail': f"{_hot[1]} of {conflicting_count} conflicting pairs involve the {_hot[0]} jurisdictions.",
+            })
+        elif conflicting_count == 0 and total_results:
+            coverage_insights.append({
+                'tone': 'green',
+                'title': "No conflicts detected",
+                'detail': "Every compared clause is equivalent or stricter — nothing contradicts across jurisdictions.",
+            })
+        _low = sum(conf_buckets[:6])   # buckets 0–60%
+        if total_results and _low:
+            coverage_insights.append({
+                'tone': 'amber',
+                'title': f"{round(_low / total_results * 100)}% of pairs scored under 60% confidence",
+                'detail': f"{_low} clause pair{'s' if _low != 1 else ''} fall below 60% — worth a human spot-check.",
+            })
+        if jur_rows:
+            _weak = min(jur_rows, key=lambda r: r['pct'])
+            coverage_insights.append({
+                'tone': 'amber' if _weak['pct'] < 80 else 'green',
+                'title': f"{_weak['label']} has the {'lowest ' if len(jur_rows) > 1 else ''}coverage at {_weak['pct']}%",
+                'detail': f"{_weak['gaps']} of {_weak['total']} obligations in {_weak['label']} are uncovered.",
+            })
+        coverage_insights = coverage_insights[:5]
+
         # Per-policy roll-up. One row per BBK policy, showing total
         # obligations mapped, gap count, score, and last-run timestamp.
         policy_rows = []
@@ -520,6 +610,15 @@ class AnalyticsView(TemplateView):
             .select_related('obligation_mapping', 'obligation_mapping__regulation', 'mapping__policy_doc')
             .order_by('-mapping__completed_at')[:8]
         )
+
+        # ── Unified action register ──────────────────────────────────────────
+        # Merge open policy-mapping gaps and unresolved clause conflicts into
+        # one severity-ranked list that drives the dashboard.
+        from apps.analytics.actions import build_action_register
+        action_items = build_action_register(self.request.user)
+        action_critical = sum(1 for a in action_items if a['priority'] == 'critical')
+        action_high     = sum(1 for a in action_items if a['priority'] == 'high')
+        action_total    = len(action_items)
 
         mapping_chart_data = {
             'coverage': {
@@ -550,6 +649,24 @@ class AnalyticsView(TemplateView):
             'mapping_policy_rows':     policy_rows,
             'mapping_urgent_gaps':     urgent_gaps,
             'mapping_chart_data':      json.dumps(mapping_chart_data),
+            # Unified action register (gaps + conflicts, severity-ranked)
+            'action_items':            action_items,
+            'action_critical':         action_critical,
+            'action_high':             action_high,
+            'action_total':            action_total,
+            # Header meta + honest deltas
+            'meta_jurisdictions':      meta_jurisdictions,
+            'meta_policies':           meta_policies,
+            'meta_regulations':        meta_regulations,
+            'meta_last_updated':       meta_last_updated,
+            'accuracy_delta':          accuracy_delta,
+            'accuracy_has_data':       accuracy_has_data,
+            'accuracy_reliable':       accuracy_reliable,
+            'conflicts_delta':         conflicts_delta,
+            'resolved_delta':          resolved_delta,
+            'activity_delta':          activity_delta,
+            'coverage_done':           coverage_done,
+            'coverage_total':          coverage_total,
         })
 
         ctx.update({
@@ -557,6 +674,9 @@ class AnalyticsView(TemplateView):
             'equivalent_pct':      equivalent_pct,
             'conflicting_count':   conflicting_count,
             'avg_confidence_pct':  avg_confidence_pct,
+            'coverage_insights':   coverage_insights,
+            'spark_conflicts':     gap_trend_identified,
+            'spark_conflicts_max': max(gap_trend_identified) if gap_trend_identified else 0,
             'ai_accuracy':         ai_accuracy,
             'total_results':       total_results,
             'total_runs':          total_runs,

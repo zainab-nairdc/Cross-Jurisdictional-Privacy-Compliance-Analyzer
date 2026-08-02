@@ -1,0 +1,190 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Comparisons — CJPCA{% endblock %}
+
+{% block extra_head %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+ .gc { font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif; color:#0F172A; }
+ .gc *{ font-family:inherit; }
+ .gc-sel { width:100%; box-sizing:border-box; padding:11px 14px; border:1px solid #E5E7EB; border-radius:10px;
+           font-size:14px; font-weight:600; color:#0F172A; background:#fff; cursor:pointer; outline:none;
+           appearance:none; -webkit-appearance:none;
+           background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none' stroke='%2394A3B8' stroke-width='2.2' viewBox='0 0 24 24'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 8.25l-7.5 7.5-7.5-7.5'/%3E%3C/svg%3E");
+           background-repeat:no-repeat; background-position:right 12px center; }
+ .gc-sel:focus { border-color:#002583; box-shadow:0 0 0 3px rgba(0,37,131,.12); }
+ .gc-lbl { font-size:13px; font-weight:600; color:#475569; margin:0 0 8px; }
+ .gc-toc-item { display:block; padding:5px 0; font-size:13px; color:#475569; text-decoration:none; cursor:pointer; border:none; background:none; text-align:left; font-family:inherit; width:100%; }
+ .gc-toc-item:hover { color:#002583; }
+ .gc-toc-h { font-weight:700; color:#0F172A; }
+ .gc-toc-sub { padding-left:16px; font-size:12.5px; }
+ .gc-col-head { position:sticky; top:0; background:#FBFCFE; z-index:2; border-bottom:2px solid #002583 !important; }
+ .gc-sec-band { background:#F4F7FC; border-left:3px solid #002583; }
+ .gc-jflag { display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:7px; background:#EEF2FB; font-size:14px; }
+ .gc-q { font-size:14px; font-weight:700; color:#0F172A; margin:0 0 10px; line-height:1.4; }
+ .gc-body { font-size:13.5px; line-height:1.65; color:#334155; }
+ .gc-body ul { margin:8px 0; padding-left:4px; list-style:none; }
+ .gc-body li { position:relative; padding-left:18px; margin:7px 0; }
+ .gc-body li:before { content:''; position:absolute; left:2px; top:8px; width:5px; height:5px; border-radius:50%; background:#002583; }
+ .gc-meta-row { display:grid; grid-template-columns:130px 1fr; gap:2px 14px; border:1px solid #EEF1F7; border-radius:10px; overflow:hidden; margin-top:14px; }
+ .gc-meta-k { background:#F8FAFC; padding:9px 12px; font-size:12px; color:#64748B; }
+ .gc-meta-v { padding:9px 12px; font-size:12.5px; color:#0F172A; }
+ .gc-link { color:#002583; text-decoration:none; }
+ .gc-link:hover { text-decoration:underline; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="gc flex flex-col h-full overflow-hidden" style="background:#fff;"
+     x-data="{ topic: '{{ topic|escapejs }}', sel: {{ selected|safe }}, tocq: '',
+               submit() { const p = new URLSearchParams(); p.set('topic', this.topic); this.sel.forEach(j=>p.append('jur',j)); window.location.search = p.toString(); },
+               toggleJur(c) { const i=this.sel.indexOf(c); if(i>=0){ if(this.sel.length>1) this.sel.splice(i,1);} else if(this.sel.length<3) this.sel.push(c); this.submit(); } }">
+
+ {# Header + selectors #}
+ <div style="flex-shrink:0;overflow-y:auto;">
+  <div style="padding:26px 40px 0;">
+   <h1 style="font-size:30px;font-weight:800;letter-spacing:-.03em;color:#0F172A;margin:0 0 4px;">Comparisons</h1>
+   <p style="font-size:14px;color:#64748B;margin:0 0 24px;">Compare guidance across multiple jurisdictions.</p>
+
+   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;max-width:1200px;">
+    <div>
+     <p class="gc-lbl">Topic</p>
+     <select class="gc-sel" x-model="topic" @change="submit()">
+      {% for t in topics %}<option value="{{ t }}" {% if t == topic %}selected{% endif %}>{{ t }}</option>{% endfor %}
+     </select>
+    </div>
+    <div>
+     <p class="gc-lbl">Sub topic</p>
+     <select class="gc-sel"><option>{{ topic }} Comparison</option></select>
+    </div>
+    <div x-data="{ open:false }" style="position:relative;">
+     <p class="gc-lbl">Jurisdictions</p>
+     <button class="gc-sel" @click="open=!open" style="text-align:left;display:flex;align-items:center;gap:10px;">
+      <span style="font-size:11px;font-weight:700;color:#002583;background:#EEF2FB;padding:2px 8px;border-radius:6px;">{{ selected|length }}/10</span>
+      <span>{% for c in columns %}{{ c.label }}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
+     </button>
+     <div x-show="open" x-cloak @click.outside="open=false"
+          style="position:absolute;top:calc(100% + 6px);left:0;right:0;background:#fff;border:1px solid #E5E7EB;border-radius:10px;box-shadow:0 12px 32px rgba(16,24,40,.14);z-index:20;overflow:hidden;">
+      {% for a in available %}
+      <div @click="toggleJur('{{ a.code }}')" style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;border-bottom:1px solid #F4F6FB;"
+           onmouseover="this.style.background='#F8FAFC'" onmouseout="this.style.background='#fff'">
+       <span style="font-size:16px;">{{ a.flag }}</span>
+       <span style="flex:1;font-size:13px;font-weight:600;">{{ a.label }}</span>
+       <span x-show="sel.includes('{{ a.code }}')" style="color:#002583;">✓</span>
+      </div>
+      {% endfor %}
+     </div>
+    </div>
+   </div>
+  </div>
+  <div style="border-bottom:1px solid #E5E7EB;margin-top:26px;"></div>
+ </div>
+
+ {# Body: TOC + aligned columns #}
+ <div style="flex:1;min-height:0;display:flex;overflow:hidden;">
+
+  {# Table of contents #}
+  <div style="width:280px;flex-shrink:0;overflow-y:auto;padding:22px 20px 40px 40px;border-right:1px solid #F1F5F9;">
+   <p style="font-size:11px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.06em;margin:0 0 12px;">Table of Contents</p>
+   <div style="position:relative;margin-bottom:14px;">
+    <svg style="position:absolute;left:11px;top:50%;transform:translateY(-50%);" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#94A3B8" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/></svg>
+    <input x-model="tocq" placeholder="Search" style="width:100%;box-sizing:border-box;padding:8px 12px 8px 34px;border:1px solid #E5E7EB;border-radius:9px;font-size:13px;outline:none;font-family:inherit;">
+   </div>
+   {% for s in toc %}
+   <div style="margin-bottom:10px;" x-show="tocq==='' || '{{ s.title|lower }}'.includes(tocq.toLowerCase()) || {{ s.sub|length }} > 0">
+    <button class="gc-toc-item gc-toc-h" onclick="document.getElementById('sec-{{ s.n }}')?.scrollIntoView({behavior:'smooth',block:'start'})">
+     {{ s.n }}. {{ s.title }}
+    </button>
+    {% for sub in s.sub %}
+    <button class="gc-toc-item gc-toc-sub" x-show="tocq==='' || '{{ sub.title|lower }}'.includes(tocq.toLowerCase())"
+            onclick="document.getElementById('sec-{{ sub.n }}')?.scrollIntoView({behavior:'smooth',block:'start'})">
+     {{ sub.n }} {{ sub.title }}
+    </button>
+    {% endfor %}
+   </div>
+   {% endfor %}
+  </div>
+
+  {# Comparison card #}
+  <div style="flex:1;min-width:0;overflow:auto;padding:20px 40px 40px 28px;">
+   <div style="border:1px solid #E5E7EB;border-radius:14px;overflow:hidden;min-width:640px;">
+
+    {# Column headers #}
+    <div class="gc-col-head" style="display:grid;grid-template-columns:repeat({{ columns|length }},1fr);border-bottom:1px solid #E5E7EB;">
+     {% for c in columns %}
+     <div style="padding:16px 22px;{% if not forloop.last %}border-right:1px solid #F1F5F9;{% endif %}">
+      <p style="font-size:15px;font-weight:700;color:#002583;margin:0;display:flex;align-items:center;gap:9px;"><span class="gc-jflag">{{ c.flag }}</span> {{ c.label }}</p>
+      <p style="font-size:11.5px;color:#94A3B8;margin:6px 0 0 35px;">{{ c.reg_count }} indexed regulation{{ c.reg_count|pluralize }}</p>
+     </div>
+     {% endfor %}
+    </div>
+
+    {# 1. Laws band #}
+    <div class="gc-sec-band" id="sec-1" style="padding:14px 22px;border-bottom:1px solid #E5E7EB;">
+     <p style="font-size:15px;font-weight:700;color:#0F172A;margin:0;">1. Laws</p>
+     <p id="sec-1.1" style="font-size:13.5px;font-weight:600;color:#475569;margin:8px 0 0;">1.1. Laws and regulations</p>
+    </div>
+
+    {# 1.1.1 What laws apply — real regs per jurisdiction #}
+    <div style="display:grid;grid-template-columns:repeat({{ columns|length }},1fr);border-bottom:1px solid #E5E7EB;">
+     {% for c in columns %}
+     <div style="padding:20px 22px;{% if not forloop.last %}border-right:1px solid #F1F5F9;{% endif %}">
+      <p class="gc-q">1.1.1. What laws and/or regulations apply to personal data protection?</p>
+      <div class="gc-body">
+       {% if c.regs %}
+       <ul>
+        {% for r in c.regs %}
+        <li><strong style="color:#0F172A;font-weight:600;">{{ r.name }}</strong>{% if r.doc_id %} <span style="color:#94A3B8;">({{ r.doc_id }})</span>{% endif %}{% if r.scope %}<br><span style="color:#64748B;font-size:12.5px;">{{ r.scope|truncatechars:130 }}</span>{% endif %}</li>
+        {% endfor %}
+       </ul>
+       {% else %}<p style="color:#94A3B8;">No indexed regulations for this jurisdiction.</p>{% endif %}
+      </div>
+      <div class="gc-meta-row">
+       <div class="gc-meta-k">Primary law</div><div class="gc-meta-v">{{ c.primary|truncatechars:60 }}</div>
+      </div>
+     </div>
+     {% endfor %}
+    </div>
+
+    {# 1.2 Supervisory authority #}
+    <div class="gc-sec-band" id="sec-1.2" style="padding:12px 22px;border-bottom:1px solid #E5E7EB;">
+     <p style="font-size:13.5px;font-weight:600;color:#475569;margin:0;">1.2. Supervisory authority</p>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat({{ columns|length }},1fr);border-bottom:1px solid #E5E7EB;">
+     {% for c in columns %}
+     <div style="padding:20px 22px;{% if not forloop.last %}border-right:1px solid #F1F5F9;{% endif %}">
+      <p class="gc-q">1.2.1. Which authority oversees data protection?</p>
+      <div class="gc-body">
+       {% if c.authorities %}<ul>{% for a in c.authorities %}<li>{{ a }}</li>{% endfor %}</ul>
+       {% else %}<p style="color:#94A3B8;">Not specified in the indexed sources.</p>{% endif %}
+      </div>
+     </div>
+     {% endfor %}
+    </div>
+
+    {# 3. Breach notification band (topic-aligned placeholder answers) #}
+    <div class="gc-sec-band" id="sec-3" style="padding:14px 22px;border-bottom:1px solid #E5E7EB;">
+     <p style="font-size:15px;font-weight:700;color:#0F172A;margin:0;">3. {{ topic }}</p>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat({{ columns|length }},1fr);" id="sec-3.1">
+     {% for c in columns %}
+     <div style="padding:20px 22px;{% if not forloop.last %}border-right:1px solid #F1F5F9;{% endif %}">
+      <p class="gc-q">3.1.1. What are the {{ topic|lower }} requirements?</p>
+      <div class="gc-body">
+       <p style="color:#94A3B8;font-style:italic;">Answer generated from the indexed sources for {{ c.label }} — connect this section to the retrieval pipeline to populate live comparison text.</p>
+       <div class="gc-meta-row">
+        <div class="gc-meta-k">Based on</div><div class="gc-meta-v">{{ c.reg_count }} regulation{{ c.reg_count|pluralize }} · {{ c.primary|truncatechars:44 }}</div>
+       </div>
+      </div>
+     </div>
+     {% endfor %}
+    </div>
+
+   </div>
+  </div>
+ </div>
+</div>
+{% endblock %}

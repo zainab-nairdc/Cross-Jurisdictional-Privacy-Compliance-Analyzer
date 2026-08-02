@@ -24,21 +24,21 @@ hierarchy from the analysis engine. Loaded into the structure modal via HTMX.{% 
   </div>
  </div>
 
- {# Hierarchy tree #}
+ {# Hierarchy tree (RTL for Arabic, LTR for English) #}
  {% for part, secmap in summary.tree.items %}
  <div style="margin-bottom:12px;">
   {% if part != 'Articles' %}
-  <p dir="rtl" style="font-weight:800;color:#002583;font-size:13px;margin:0 0 6px;text-align:right;">▾ {{ part }}</p>
+  <p dir="{% if rtl %}rtl{% else %}ltr{% endif %}" style="font-weight:800;color:#002583;font-size:13px;margin:0 0 6px;text-align:{% if rtl %}right{% else %}left{% endif %};">▾ {{ part }}</p>
   {% endif %}
   {% for sec, nodes in secmap.items %}
-  <div style="{% if part != 'Articles' %}padding-right:16px;border-right:2px solid #EEF2FB;margin-right:4px;{% endif %}margin-bottom:8px;">
+  <div style="{% if part != 'Articles' %}{% if rtl %}padding-right:16px;border-right:2px solid #EEF2FB;margin-right:4px;{% else %}padding-left:16px;border-left:2px solid #EEF2FB;margin-left:4px;{% endif %}{% endif %}margin-bottom:8px;">
    {% if sec != '—' %}
-   <p dir="rtl" style="font-weight:700;color:#3B6FE0;font-size:12px;margin:0 0 4px;text-align:right;">{{ sec }}</p>
+   <p dir="{% if rtl %}rtl{% else %}ltr{% endif %}" style="font-weight:700;color:#3B6FE0;font-size:12px;margin:0 0 4px;text-align:{% if rtl %}right{% else %}left{% endif %};">{{ sec }}</p>
    {% endif %}
    {% for n in nodes %}
-   <div dir="rtl" style="display:flex;align-items:center;gap:9px;padding:5px 10px;border-bottom:1px solid #F0F3F9;">
-    <span style="flex-shrink:0;font-size:9px;font-weight:700;padding:1.5px 8px;border-radius:5px;{% if n.type == 'definition' %}background:#FFF1DC;color:#B07A00;{% else %}background:#EEF2FB;color:#002583;{% endif %}white-space:nowrap;">{% if n.type == 'definition' %}تعريف{% else %}{{ n.label }}{% endif %}</span>
-    <span style="flex:1;font-size:12px;color:#3A4560;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;">{% if n.type == 'definition' %}{{ n.label }}{% else %}{{ n.title|default:"—" }}{% endif %}</span>
+   <div dir="{% if rtl %}rtl{% else %}ltr{% endif %}" style="display:flex;align-items:center;gap:9px;padding:5px 10px;border-bottom:1px solid #F0F3F9;">
+    <span style="flex-shrink:0;font-size:9px;font-weight:700;padding:1.5px 8px;border-radius:5px;{% if n.type == 'definition' %}background:#FFF1DC;color:#B07A00;{% else %}background:#EEF2FB;color:#002583;{% endif %}white-space:nowrap;">{% if n.type == 'definition' %}{% if rtl %}تعريف{% else %}Definition{% endif %}{% else %}{{ n.label }}{% endif %}</span>
+    <span style="flex:1;font-size:12px;color:#3A4560;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:{% if rtl %}right{% else %}left{% endif %};">{% if n.type == 'definition' %}{{ n.label }}{% else %}{{ n.title|default:"—" }}{% endif %}</span>
    </div>
    {% endfor %}
   </div>
@@ -52,7 +52,7 @@ hierarchy from the analysis engine. Loaded into the structure modal via HTMX.{% 
  <div style="width:48px;height:48px;border-radius:13px;background:#F4F6FB;display:flex;align-items:center;justify-content:center;margin-bottom:14px;">
   <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg>
  </div>
- <p style="font-size:13px;font-weight:700;color:#002583;margin:0 0 5px;">No structure analysis yet</p>
- <p style="font-size:11px;color:#7B8499;margin:0;line-height:1.6;max-width:300px;">The Legal-Node structure preview is available for Arabic legal documents. This document hasn't been analysed into a part / section / article hierarchy.</p>
+ <p style="font-size:13px;font-weight:700;color:#002583;margin:0 0 5px;">No structure to show</p>
+ <p style="font-size:11px;color:#7B8499;margin:0;line-height:1.6;max-width:300px;">This document doesn't have indexed chunks yet, so there's no article structure to preview. Once it's processed, its sections will appear here.</p>
 </div>
 {% endif %}

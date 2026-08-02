@@ -172,6 +172,22 @@ class PolicyCoverageItem(BaseModel):
     remediation_suggestion: str = Field(default="")
     citation_verified:      bool  = Field(default=False)
     hallucination_risk:     float = Field(default=0.0, ge=0.0, le=1.0)
+    # the taxonomy topic this row was routed under (auto-route only). Lets the
+    # coverage rollup attribute each obligation to a topic without re-deriving.
+    topic:                  str = Field(default="")
+
+
+class SkippedTopic(BaseModel):
+    """A topic the policy legislates on but no in-scope regulation addresses.
+
+    Reported so the UI can show it as *skipped* — explicitly NOT a compliance
+    gap. Conflating "no law covers this" with "the policy fails a law" is the
+    single most damaging error this tool can make, so skipped topics are kept
+    structurally separate from gaps rather than folded into the not-covered
+    count."""
+    topic:         str = Field(default="")
+    label:         str = Field(default="")
+    policy_chunks: int = Field(default=0)
 
 
 class PolicyMappingReport(BaseModel):
@@ -182,6 +198,9 @@ class PolicyMappingReport(BaseModel):
     # single-topic mapping.
     query:        str | list[str] = Field(default="")
     jurisdiction: str = Field(default="")
+    # topics the policy covers but the in-scope regulations do not legislate
+    # on — skipped, never counted as gaps.
+    skipped_topics: list[SkippedTopic] = Field(default_factory=list)
     disclaimer:   str = Field(default=_DISCLAIMER)
 
 

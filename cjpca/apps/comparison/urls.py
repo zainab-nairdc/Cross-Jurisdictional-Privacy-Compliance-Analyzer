@@ -15,6 +15,7 @@ from .api import (
 
 urlpatterns = [
     path('', views.PairPickerView.as_view(), name='comparison'),
+    path('guidance/', views.GuidanceComparisonView.as_view(), name='comparison-guidance'),
     path('run/', views.RunComparisonView.as_view(), name='comparison-run'),
     path('runs/<int:pk>/', views.ComparisonWorkspaceView.as_view(), name='comparison-workspace'),
     path('runs/<int:pk>/submit-review/', views.SubmitForReviewView.as_view(), name='comparison-submit-review'),

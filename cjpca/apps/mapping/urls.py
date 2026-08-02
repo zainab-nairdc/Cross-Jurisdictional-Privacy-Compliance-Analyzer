@@ -14,6 +14,12 @@ urlpatterns = [
     path('<int:pk>/cancel/',             views.MappingCancelView.as_view(),      name='mapping-cancel'),
     path('<int:pk>/progress/',           views.MappingProgressAPIView.as_view(), name='mapping-progress'),
 
+    # Results-first coverage flow (separate from the setup→workspace flow)
+    path('coverage/<int:pk>/',           views.PolicyCoverageView.as_view(),     name='policy-coverage'),
+    path('coverage/<int:pk>/run/',       views.CoverageRunView.as_view(),        name='policy-coverage-run'),
+    path('coverage/<int:pk>/classify/',  views.CoverageClassifyView.as_view(),   name='policy-coverage-classify'),
+    path('coverage/<int:pk>/status/',    views.CoverageStatusAPIView.as_view(),  name='policy-coverage-status'),
+
     # Screen 4 — results workspace
     path('<int:pk>/',                    views.MappingWorkspaceView.as_view(),   name='mapping-workspace'),
 

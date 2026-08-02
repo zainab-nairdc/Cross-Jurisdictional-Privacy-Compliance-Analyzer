@@ -169,6 +169,10 @@ def _retrieve_regulatory(message: str, doc_title: str = '', jurisdiction: str = 
         except Exception:
             nodes = []
 
+    # Map chunk doc_title → Document pk so a citation click can open the viewer.
+    from apps.library.models import Document as _Doc
+    _title_to_pk = {d.chunk_doc_title: d.pk for d in _Doc.objects.only('id', 'file')}
+
     context_lines, citations, seen = [], [], set()
     for i, node in enumerate(nodes, 1):
         meta         = node.node.metadata
@@ -180,10 +184,17 @@ def _retrieve_regulatory(message: str, doc_title: str = '', jurisdiction: str = 
         label = f"{reg_name}{f', {article_ref}' if article_ref else ''}"
         if reg_name and label not in seen:
             seen.add(label)
+            doc_title = meta.get('doc_title', '')
             citations.append({
                 'reg_name': reg_name, 'article_ref': article_ref,
                 'jurisdiction': jurisdiction, 'label': label,
                 'excerpt': content[:150], 'is_draft': False,
+                # carry the source doc + chunk so a click can open the viewer,
+                # scroll to the cited paragraph and highlight it.
+                'doc_title': doc_title,
+                'doc_pk': _title_to_pk.get(doc_title, ''),
+                'node_id': node.node.node_id,
+                'quote': content[:220],
             })
     return ('\n\n'.join(context_lines) or '(No relevant regulatory context found.)'), citations
 
@@ -463,16 +474,25 @@ class CopilotMessageView(View):
             if _is_arabic:
                 from arabic.query import answer as _arabic_answer
                 _res = _arabic_answer(message, source=doc_title)
+                # resolve the Arabic doc's pk so the citation can open the viewer
+                from apps.library.models import Document as _Doc
+                _ar_pk = next((d.pk for d in _Doc.objects.only('id', 'file')
+                               if d.chunk_doc_title == doc_title), '')
                 _cits = []
                 for h in _res['hits']:
                     _art = h.get('article_number')
+                    _text = (h.get('text') or '')
                     _cits.append({
                         'reg_name':     h.get('law_name') or doc_title,
                         'article_ref':  f"Article ({_art})" if _art else '',
                         'jurisdiction': '',
                         'label':        f"Article ({_art})" if _art else doc_title,
-                        'excerpt':      (h.get('text') or '')[:220],
+                        'excerpt':      _text[:220],
                         'is_draft':     False,
+                        # click → open the Arabic source, highlight the cited article
+                        'doc_pk':       _ar_pk,
+                        'node_id':      '',
+                        'quote':        _text[:180],
                     })
                 history.append({'role': 'user',      'content': message})
                 history.append({'role': 'assistant', 'content': _res['answer']})
@@ -484,7 +504,7 @@ class CopilotMessageView(View):
                     'hallucination_risk': None,
                     'citations':          _cits,
                     'data_quality':       'regulatory',
-                    'fallback_msg':       'Answered from the Arabic source (bge-m3 + qwen2.5).',
+                    'fallback_msg':       None,
                 })
 
         if jurisdiction:

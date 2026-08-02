@@ -12,6 +12,22 @@ import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 
+# --- torchvision.io deadlock guard (must run before docling loads) ---------
+# docling's layout model does a *lazy* `from transformers import
+# RTDetrImageProcessor`, which in turn imports `torchvision.io`. When that lazy
+# import fires mid-request (especially from the ingestion worker thread), it
+# re-enters an import whose module lock is already held and Python raises
+# `_DeadlockError: deadlock detected by _ModuleLock('torchvision.io')` — surfaced
+# to the user as docling "No class found with the name 'docling_layout_default'"
+# and a document stuck forever at "Parse". Importing torchvision.io eagerly here,
+# at module-load time (before any docling conversion runs), fully populates
+# sys.modules so the later lazy import is a cache hit and never re-enters the
+# lock. Guarded so environments without torchvision still import loaders.py.
+try:
+    import torchvision.io  # noqa: F401
+except Exception:
+    pass
+
 # keep docling's onnx threads quiet so it doesn't fight the embedder for cpu.
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 os.environ.setdefault("MKL_NUM_THREADS", "1")

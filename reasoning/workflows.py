@@ -30,6 +30,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Optional, TypedDict
 
 from langgraph.graph             import END, StateGraph
@@ -41,7 +42,7 @@ from .generator        import _get_llm
 from .prompts.registry import load_prompt
 from .schemas import (
     ComparisonReport, ObligationComparison,
-    PolicyMappingReport, PolicyCoverageItem,
+    PolicyMappingReport, PolicyCoverageItem, SkippedTopic,
     GapAnalysisReport,  GapItem,
 )
 from .workflow_helpers import (
@@ -530,6 +531,47 @@ def _scoped_retrieve(
     return primary + extra[:top_k]
 
 
+# Strips a formatted context-header echo the local model sometimes copies
+# verbatim into a citation field, e.g. "[Chunk 2] (node_id=abc) CITATION: ...".
+_CHUNK_HEADER_ECHO_RE = re.compile(
+    r'^\s*\[chunk\s*\d+\]\s*(?:\(node_id=[^)]*\))?\s*(?:citation:|doc:|article:)?\s*',
+    re.IGNORECASE,
+)
+
+
+def _grounded_citation(raw: str, chunk_id: str) -> tuple[str, bool]:
+    """Return a display citation read from the STORED provision record, not
+    echoed from model output — the same anti-fabrication rule the coverage
+    flow uses. Falls back to a de-echoed version of the model's text if the
+    chunk can't be found. Returns (citation, grounded)."""
+    from retrieval.bm25_store import get_chunk_provision
+    prov = get_chunk_provision(chunk_id) if chunk_id else None
+    if prov:
+        article = (prov.get("article_ref") or "").strip()
+        regname = (prov.get("regulation_name") or prov.get("doc_title") or "").strip()
+        if article:
+            return (f"{regname} — {article}" if regname else article), True
+        if regname:
+            return regname, True
+    cleaned = _CHUNK_HEADER_ECHO_RE.sub("", raw or "").strip()
+    return cleaned, False
+
+
+def _clean_comparison_citations(report: "ComparisonReport") -> "ComparisonReport":
+    """Post-process every obligation so the citations shown are grounded in the
+    stored provision records and free of any context-header echo. A citation
+    that can't be grounded on either side downgrades citation_verified — a
+    model-echoed reference must never render as verified."""
+    for o in report.obligations:
+        a_cit, a_ok = _grounded_citation(o.reg_a_citation, o.reg_a_chunk_id)
+        b_cit, b_ok = _grounded_citation(o.reg_b_citation, o.reg_b_chunk_id)
+        o.reg_a_citation = a_cit
+        o.reg_b_citation = b_cit
+        if not (a_ok and b_ok):
+            o.citation_verified = False
+    return report
+
+
 def compare_regulations(
     query:       str | list[str],
     reg_a:       str,
@@ -626,6 +668,105 @@ def compare_regulations(
     report.query        = query
     report.regulation_a = reg_a
     report.regulation_b = reg_b
+    # Ground every citation in the stored provision records (strip any header
+    # echo the local model copied in). Must run before the caller persists.
+    _clean_comparison_citations(report)
+    return report
+
+
+def compare_regulations_auto(
+    reg_a:        str,
+    reg_b:        str,
+    doc_title_a:  str,
+    doc_title_b:  str,
+    top_k_per_topic: int  = 8,
+    rerank:       bool = True,
+    max_topics:   int  = 8,
+    min_chunks:   int  = 1,
+    progress_cb:  callable | None = None,
+) -> ComparisonReport:
+    """Topic-routed comparison of two specific regulation documents.
+
+    The generic "full scope" query retrieves a scattershot of unrelated
+    articles from each side, so the local model finds few genuine A↔B pairs
+    and returns a near-empty report. This routes instead: for each taxonomy
+    topic BOTH documents are classified on, retrieve each side filtered to
+    that topic (so the clauses actually align) and run one topic-scoped
+    comparison, then merge. That produces a fuller, better-aligned obligation
+    set on the local model — the same pattern map_policy_coverage_auto uses.
+
+    Requires both documents to be classified (chunk_tags). Topics only one
+    side legislates on are recorded as unique-to-A / unique-to-B in the
+    summary, never fabricated into comparisons."""
+    from retrieval.bm25_store import topics_for_docs
+    from reasoning.taxonomy   import TAXONOMY
+
+    norm_a = _normalise_jurisdiction(reg_a)
+    norm_b = _normalise_jurisdiction(reg_b)
+
+    topics_a = dict(topics_for_docs([doc_title_a], jurisdiction=norm_a))
+    topics_b = dict(topics_for_docs([doc_title_b], jurisdiction=norm_b))
+
+    shared = [t for t in topics_a if topics_b.get(t, 0) >= min_chunks
+              and topics_a.get(t, 0) >= min_chunks]
+    shared.sort(key=lambda t: topics_a[t] + topics_b[t], reverse=True)
+    shared = shared[:max_topics]
+
+    only_a = sorted(set(topics_a) - set(topics_b))
+    only_b = sorted(set(topics_b) - set(topics_a))
+
+    if not shared:
+        # No shared classified topics — fall back to the single generic pass
+        # so the caller still gets whatever the model can pair.
+        log.warning("compare_regulations_auto: no shared topics for %s vs %s; "
+                    "falling back to generic comparison", doc_title_a, doc_title_b)
+        return compare_regulations(
+            query="general privacy compliance obligations",
+            reg_a=reg_a, reg_b=reg_b,
+            doc_title_a=doc_title_a, doc_title_b=doc_title_b,
+            top_k=top_k_per_topic, rerank=rerank, scope_mode="strict",
+        )
+
+    all_obligations = []
+    summaries       = []
+    total = len(shared)
+    for idx, topic_tag in enumerate(shared, 1):
+        label = TAXONOMY.get(topic_tag, {}).get("label", topic_tag)
+        if progress_cb is not None:
+            try:
+                progress_cb(idx, total, label)
+            except Exception:
+                pass
+        try:
+            sub = compare_regulations(
+                query=label, reg_a=reg_a, reg_b=reg_b,
+                doc_title_a=doc_title_a, doc_title_b=doc_title_b,
+                top_k=top_k_per_topic, rerank=rerank, scope_mode="strict",
+                topic=topic_tag,
+            )
+        except Exception as e:
+            log.warning("topic-routed comparison failed for %s: %s", topic_tag, e)
+            continue
+        for o in sub.obligations:
+            if not (o.topic or "").strip():
+                o.topic = label
+        all_obligations.extend(sub.obligations)
+        summaries.append(f"[{label}] {sub.summary}".strip())
+
+    if only_a:
+        summaries.append("Topics only " + reg_a + " legislates on (not compared): "
+                         + ", ".join(TAXONOMY.get(t, {}).get("label", t) for t in only_a) + ".")
+    if only_b:
+        summaries.append("Topics only " + reg_b + " legislates on (not compared): "
+                         + ", ".join(TAXONOMY.get(t, {}).get("label", t) for t in only_b) + ".")
+
+    report = ComparisonReport(
+        obligations  = all_obligations,
+        summary      = "\n\n".join(summaries),
+        query        = [TAXONOMY.get(t, {}).get("label", t) for t in shared],
+        regulation_a = reg_a,
+        regulation_b = reg_b,
+    )
     return report
 
 
@@ -926,6 +1067,10 @@ def map_policy_coverage_auto(
             # one bad topic shouldn't kill the whole report — log and continue.
             log.warning("auto-routed mapping failed for topic %s: %s", topic_tag, e)
             continue
+        # Stamp the routing topic onto every item so the coverage rollup can
+        # attribute each obligation to its topic without re-deriving.
+        for _it in sub.items:
+            _it.topic = topic_tag
         all_items.extend(sub.items)
         summaries.append(f"[{label}] ({chunk_count} policy chunks) {sub.summary}".strip())
         topics_used.append(label)
@@ -946,6 +1091,15 @@ def map_policy_coverage_auto(
         )
         summaries.insert(0, skipped_note)
 
+    skipped_structured = [
+        SkippedTopic(
+            topic=t,
+            label=TAXONOMY.get(t, {}).get("label", t),
+            policy_chunks=c,
+        )
+        for t, c in skipped
+    ]
+
     return PolicyMappingReport(
         items        = all_items,
         summary      = "\n\n".join(summaries),
@@ -954,6 +1108,7 @@ def map_policy_coverage_auto(
         # the methodological point of this entry point.
         query        = topics_used,
         jurisdiction = jurisdiction,
+        skipped_topics = skipped_structured,
     )
 
 

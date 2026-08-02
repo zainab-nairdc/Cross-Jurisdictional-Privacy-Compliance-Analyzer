@@ -164,6 +164,7 @@ def _run_mapping_job(analysis_id: int) -> None:
 
     try:
         from reasoning.workflows import map_policy_coverage_auto
+        from retrieval.bm25_store import get_chunk_provision
 
         # one helper to write a reasoning-layer item → ObligationMapping +
         # Gap row. used by both the auto and the legacy paths so a future
@@ -193,14 +194,30 @@ def _run_mapping_job(analysis_id: int) -> None:
             # Unverified citations cap at 0.6; otherwise we scale by (1-risk).
             # Was hardcoded to 0.5 for every row, which made downstream AI-
             # quality and severity-by-confidence aggregations partly fake.
-            verified  = bool(getattr(item, 'citation_verified', True))
+            # ── Anti-fabrication guardrail ──────────────────────────────
+            # The article reference shown in the UI must be looked up from
+            # the STORED provision record, never echoed from model output.
+            # The mapper returns the chunk id it based its judgement on; we
+            # read THAT chunk's indexed article_ref and use it. If the chunk
+            # can't be found the citation is ungrounded — we refuse to render
+            # the model's free-text regulation_citation and fall back to the
+            # regulation's own name (a real document), flagging the row as
+            # unverified so it can never masquerade as a grounded citation.
+            reg_chunk_id = getattr(item, 'regulation_chunk_id', '') or ''
+            provision = get_chunk_provision(reg_chunk_id) if reg_chunk_id else None
+            grounded_ref = (provision or {}).get('article_ref', '').strip() if provision else ''
+            citation_grounded = bool(grounded_ref)
+            if not citation_grounded:
+                grounded_ref = (reg_doc.name or 'Regulation')
+
+            verified  = bool(getattr(item, 'citation_verified', True)) and citation_grounded
             hall_risk = float(getattr(item, 'hallucination_risk', 0.0) or 0.0)
             base      = 1.0 if verified else 0.6
             confidence = max(0.05, min(1.0, base * (1.0 - hall_risk)))
             confidence = round(confidence, 2)
             om = ObligationMapping.objects.create(
                 analysis=analysis,
-                article_ref=item.regulation_citation[:100],
+                article_ref=grounded_ref[:100],
                 obligation_title=title_short,
                 obligation_text=full_obligation,
                 regulation=reg_doc,
@@ -215,6 +232,7 @@ def _run_mapping_job(analysis_id: int) -> None:
                 policy_chunk_id=getattr(item, 'policy_chunk_id', '') or '',
                 citation_verified=verified,
                 hallucination_risk=hall_risk,
+                topics=[item.topic] if getattr(item, 'topic', '') else [],
                 # rationale doubles as the LLM's verbal explanation of the
                 # verdict. for non-Covered rows the LLM produces a
                 # gap_description; for Covered rows it's empty (the prompt
@@ -246,6 +264,10 @@ def _run_mapping_job(analysis_id: int) -> None:
         analysis.save(update_fields=['progress_total'])
 
         topics_used_overall = set()
+        # tag -> {topic,label,policy_chunks}. A topic skipped for one reg may be
+        # mapped by another, so we collect candidates here and subtract anything
+        # that ended up mapped before persisting (below).
+        skipped_candidates: dict = {}
         for step, reg_doc in enumerate(regs, 1):
             # Leave progress_current pointing at the LAST completed step
             # while we WORK on the current one — that way the bar doesn't
@@ -300,9 +322,26 @@ def _run_mapping_job(analysis_id: int) -> None:
             if isinstance(report.query, list):
                 topics_used_overall.update(report.query)
 
+            for st in getattr(report, 'skipped_topics', None) or []:
+                # SkippedTopic (pydantic) or dict, depending on caller.
+                tag   = getattr(st, 'topic', None) if not isinstance(st, dict) else st.get('topic')
+                label = getattr(st, 'label', None) if not isinstance(st, dict) else st.get('label')
+                pc    = getattr(st, 'policy_chunks', 0) if not isinstance(st, dict) else st.get('policy_chunks', 0)
+                if tag:
+                    skipped_candidates[tag] = {'topic': tag, 'label': label or tag,
+                                               'policy_chunks': pc}
+
+        # A candidate is genuinely skipped only if it was mapped against NO
+        # regulation. topics_used_overall holds human labels, so compare on the
+        # label we stored alongside each candidate.
+        mapped_labels = set(topics_used_overall)
+        skipped_final = [v for v in skipped_candidates.values()
+                         if v['label'] not in mapped_labels]
+
         analysis.scope_topics = sorted(topics_used_overall)
+        analysis.skipped_topics = skipped_final
         analysis.topic = ', '.join(sorted(topics_used_overall))[:255] or 'auto'
-        analysis.save(update_fields=['scope_topics', 'topic'])
+        analysis.save(update_fields=['scope_topics', 'skipped_topics', 'topic'])
 
         analysis.status = MappingAnalysis.COMPLETE
         analysis.obligation_count = obligation_count
@@ -1288,6 +1327,187 @@ class MappingProgressAPIView(View):
             'current':  analysis.progress_current,
             'total':    analysis.progress_total,
             'label':    analysis.current_obligation_label,
+        })
+
+
+# ── Results-first coverage flow ──────────────────────────────────────────────
+# A separate surface from the setup→running→workspace flow above. Instead of
+# hand-picking regulations, the analyst opens a policy's coverage page: scope
+# is auto-derived (whole corpus, topic-intersected), the pair count is shown
+# BEFORE any model runs, and results lead with gaps + a topic rollup. Skipped
+# topics (policy covers, no in-scope law legislates) are shown as skipped,
+# never as gaps.
+
+def _coverage_jurisdictions(request):
+    """Optional ?jur=bahrain&jur=india scope restriction. Empty → whole corpus."""
+    jl = [j.strip().lower() for j in request.GET.getlist('jur') if j.strip()]
+    return jl or None
+
+
+@method_decorator(role_required(*ALL_ROLES), name='dispatch')
+class PolicyCoverageView(View):
+    """GET /mapping/coverage/<pk>/ — results-first coverage for one policy."""
+
+    def get(self, request, pk):
+        policy = get_object_or_404(
+            Document, pk=pk, doc_type=Document.POLICY, status=Document.INDEXED,
+        )
+        jl = _coverage_jurisdictions(request)
+
+        from apps.mapping.scope import compute_scope
+        scope = compute_scope(policy, jurisdictions=jl)
+
+        # Latest run + any in-flight run for this policy.
+        latest = (
+            MappingAnalysis.objects
+            .filter(policy_doc=policy,
+                    status__in=[MappingAnalysis.COMPLETE, MappingAnalysis.REVIEW,
+                                MappingAnalysis.APPROVED])
+            .order_by('-completed_at', '-run_at')
+            .first()
+        )
+        running = (
+            MappingAnalysis.objects
+            .filter(policy_doc=policy,
+                    status__in=[MappingAnalysis.RUNNING, MappingAnalysis.QUEUED])
+            .order_by('-run_at')
+            .first()
+        )
+
+        coverage = None
+        if latest:
+            from apps.mapping.coverage import build_coverage
+            coverage = build_coverage(latest)
+
+        # Available jurisdictions for the adjust-scope drawer.
+        jur_available = sorted({
+            d.jurisdiction for d in Document.objects.filter(
+                doc_type=Document.REGULATION, status=Document.INDEXED)
+            if d.jurisdiction
+        })
+
+        return render(request, 'pages/mapping/coverage.html', {
+            'policy':        policy,
+            'scope':         scope,
+            'summary':       scope.summary,
+            'coverage':      coverage,
+            'latest':        latest,
+            'running':       running,
+            'selected_jurs': jl or [],
+            'jur_available': jur_available,
+            'coverage_labels': COVERAGE_LABELS,
+        })
+
+
+@method_decorator(role_required('analyst'), name='dispatch')
+class CoverageRunView(View):
+    """POST /mapping/coverage/<pk>/run/ — auto-scope run for the coverage page.
+
+    Scope is derived, not picked: every indexed regulation (optionally
+    jurisdiction-filtered) becomes a candidate, and the per-topic auto-router
+    drops everything the policy doesn't legislate on. No checkbox grid."""
+
+    def post(self, request, pk):
+        policy = get_object_or_404(
+            Document, pk=pk, doc_type=Document.POLICY, status=Document.INDEXED,
+        )
+        jl = [j.strip().lower() for j in request.POST.getlist('jur') if j.strip()] or None
+
+        reg_qs = Document.objects.filter(
+            doc_type=Document.REGULATION, status=Document.INDEXED)
+        if jl:
+            reg_qs = reg_qs.filter(jurisdiction__in=jl)
+        if not reg_qs.exists():
+            from django.contrib import messages
+            messages.warning(request, 'No indexed regulations in the selected scope.')
+            return redirect('policy-coverage', pk=pk)
+
+        if not _ollama_is_reachable():
+            from django.contrib import messages
+            messages.error(request, 'Ollama is not running. Start Ollama and try again.')
+            return redirect('policy-coverage', pk=pk)
+
+        # Reuse the same live-run guard as MappingRunView so two runs for the
+        # same policy don't stack.
+        existing = MappingAnalysis.objects.filter(
+            policy_doc=policy,
+            status__in=[MappingAnalysis.RUNNING, MappingAnalysis.QUEUED],
+        ).first()
+        if existing:
+            return redirect('policy-coverage', pk=pk)
+
+        analysis = MappingAnalysis.objects.create(
+            policy_doc=policy,
+            topic='auto',
+            scope_mode=MappingAnalysis.SCOPE_AUTO,
+            scope_topics=[],
+            status=MappingAnalysis.RUNNING,
+            created_by=request.user if request.user.is_authenticated else None,
+        )
+        analysis.regulations.set(list(reg_qs))
+
+        try:
+            from apps.history.audit import log_event, Actions
+            log_event(
+                request.user, Actions.MAPPING_RUN, request=request,
+                target_type='mapping.MappingAnalysis', target_id=analysis.pk,
+                description=f'{getattr(request.user, "username", "user")} ran coverage for {policy.name}',
+                metadata={'policy': policy.name, 'scope_mode': 'auto',
+                          'jurisdictions': jl or 'all'},
+            )
+        except Exception:
+            pass
+
+        import threading
+        from django.db import close_old_connections
+
+        def _thread_target(aid):
+            close_old_connections()
+            try:
+                _run_mapping_job(aid)
+            finally:
+                close_old_connections()
+
+        threading.Thread(target=_thread_target, args=(analysis.pk,), daemon=True).start()
+        return redirect('policy-coverage', pk=pk)
+
+
+@method_decorator(role_required(*ALL_ROLES), name='dispatch')
+class CoverageClassifyView(View):
+    """POST /mapping/coverage/<pk>/classify/ — classify this policy's sections
+    now so the scope preview is populated before a run."""
+
+    def post(self, request, pk):
+        policy = get_object_or_404(
+            Document, pk=pk, doc_type=Document.POLICY, status=Document.INDEXED,
+        )
+        try:
+            from apps.library.classification import classify_document_async
+            classify_document_async(policy.pk)
+        except Exception:
+            logger.exception('coverage classify launch failed for %s', pk)
+        return redirect('policy-coverage', pk=pk)
+
+
+@method_decorator(role_required(*ALL_ROLES), name='dispatch')
+class CoverageStatusAPIView(View):
+    """GET /mapping/coverage/<pk>/status/ — JSON for the coverage page poller.
+
+    Reports both the classification lifecycle and any in-flight run so the
+    page can move itself from classifying → ready → running → done without a
+    manual refresh."""
+
+    def get(self, request, pk):
+        policy = get_object_or_404(Document, pk=pk, doc_type=Document.POLICY)
+        run = (MappingAnalysis.objects
+               .filter(policy_doc=policy,
+                       status__in=[MappingAnalysis.RUNNING, MappingAnalysis.QUEUED])
+               .order_by('-run_at').first())
+        return JsonResponse({
+            'classification_state': policy.classification_state,
+            'run_status': run.status if run else None,
+            'run_pct':    run.progress_pct if run else None,
+            'run_label':  run.current_obligation_label if run else '',
         })
 
 

@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 
 from django.views.generic import TemplateView
@@ -14,6 +15,8 @@ from apps.ingestion.models import IngestionJob
 from apps.comparison.concepts import CONCEPT_SEEDS
 
 ALL_ROLES = ('analyst', 'reviewer', 'admin')
+
+logger = logging.getLogger(__name__)
 
 _JUR_LABELS = {
     Document.BAHRAIN: 'Bahrain',
@@ -368,13 +371,26 @@ class DocumentViewerView(View):
                 n = c.get('article_number')
                 ref = f"Article ({n})" if isinstance(n, int) else (c.get('term') or '')
                 rows.append({'idx': i, 'content': c.get('text', ''), 'ref': ref})
+            # Highlight the cited article: match the quote (from the citation) to
+            # its chunk by whitespace-insensitive substring — robust because the
+            # quote comes from the same stored Arabic chunk text.
+            import re as _re
+            highlight_ref = request.GET.get('highlight', '').strip()
+            highlight_idx = None
+            if highlight_ref:
+                _hn = _re.sub(r'\s+', '', highlight_ref)[:80]
+                if _hn:
+                    for r in rows:
+                        if _hn in _re.sub(r'\s+', '', r['content'] or ''):
+                            highlight_idx = r['idx']
+                            break
             return render(request, 'partials/_doc_viewer_body.html', {
                 'doc':           doc,
                 'chunks':        [r['content'] for r in rows],
                 'chunk_rows':    rows,
                 'sections':      [{'index': r['idx'], 'heading': r['ref']} for r in rows if r['ref']],
-                'highlight_ref': '',
-                'highlight_idx': None,
+                'highlight_ref': highlight_ref,
+                'highlight_idx': highlight_idx,
                 'is_arabic':     True,
             })
 
@@ -468,16 +484,39 @@ class DocumentViewerView(View):
         })
 
 
+def _english_structure_summary(doc):
+    """Build a Legal-Node summary for an English doc from its indexed chunks.
+    The English pipeline stores an ``article_ref`` per chunk (but no part /
+    section hierarchy), so this is a flat article list — still a real structure
+    preview, just one level deep."""
+    from collections import OrderedDict
+    from apps.comparison.concepts import get_doc_chunks_with_ids
+    rows = get_doc_chunks_with_ids(doc, limit=400)
+    if not rows:
+        return None
+    nodes = []
+    for _nid, content, ref in rows:
+        ref = (ref or '').strip().strip('()').strip()
+        first = (content or '').strip().split('\n', 1)[0][:70]
+        nodes.append({'type': 'article', 'number': None,
+                      'label': ref or 'Section', 'title': first})
+    tree = OrderedDict([('Articles', OrderedDict([('—', nodes)]))])
+    return {'parts': 0, 'sections': 0, 'articles': len(nodes),
+            'definitions': 0, 'total_nodes': len(nodes), 'tree': tree,
+            'suggested_type': 'regulation'}
+
+
 class DocumentStructureView(View):
     """GET /library/structure/<pk>/ — the Legal-Node structure preview.
 
-    Renders the detected part > section > article/definition hierarchy for a
-    document, from the analysis engine. Arabic docs read their nodes from the
-    isolated Arabic store; English structure analysis isn't wired yet."""
+    Renders the detected hierarchy for a document. Arabic docs read a full
+    part > section > article/definition tree from the isolated Arabic store;
+    English docs get a flat article list built from their indexed chunks."""
 
     def get(self, request, pk):
         doc = get_object_or_404(Document, pk=pk)
         summary = None
+        rtl = (doc.language == Document.ARABIC)
         if doc.language == Document.ARABIC:
             try:
                 from arabic import store as ar_store
@@ -488,8 +527,13 @@ class DocumentStructureView(View):
                     summary['suggested_type'] = suggest_type(summary)
             except Exception:
                 summary = None
+        else:
+            try:
+                summary = _english_structure_summary(doc)
+            except Exception:
+                summary = None
         return render(request, 'partials/_structure_preview.html',
-                      {'doc': doc, 'summary': summary})
+                      {'doc': doc, 'summary': summary, 'rtl': rtl})
 
 
 class AnalyzeView(View):
@@ -561,6 +605,21 @@ class FinalizeView(View):
             if v:
                 setattr(doc, f, v); fields.append(f)
 
+        # Opt-in classification: the uploader ticks "Classify topics now" in the
+        # wizard. When set, we tag this doc's sections into the taxonomy right
+        # after indexing so it's immediately usable in the coverage flow. When
+        # unticked, the doc still indexes — classification just happens later
+        # (on demand at first coverage run). Accept a few truthy spellings so
+        # the checkbox posts cleanly.
+        classify_now = (request.POST.get('classify') or '').strip().lower() in ('1', 'true', 'on', 'yes')
+
+        # content_hash: cache-invalidation key for tags + mapping results.
+        # The file is on disk by now, so hash it once at finalize.
+        ch = doc.compute_content_hash()
+        if ch:
+            doc.content_hash = ch
+            fields.append('content_hash')
+
         chunks = cache.get(f'analyze_{doc.pk}')
         if doc.language == Document.ARABIC and chunks:
             from arabic import store as ar_store
@@ -576,6 +635,9 @@ class FinalizeView(View):
             fields += ['status', 'chunk_count']
             doc.save(update_fields=list(dict.fromkeys(fields)))
             cache.delete(f'analyze_{doc.pk}')
+            # Arabic chunks live in the Arabic store, not the bm25 side-table the
+            # classifier reads; topic classification for Arabic is out of scope
+            # for the opt-in path for now.
             return JsonResponse({'ok': True, 'chunks': len(chunks)})
 
         # English / cache miss → normal background pipeline
@@ -588,7 +650,15 @@ class FinalizeView(View):
             document=doc, status=IngestionJob.QUEUED, current_stage=1,
             created_by=request.user if request.user.is_authenticated else None)
         run_job(job.id)
-        return JsonResponse({'ok': True, 'processing': True})
+        # Kick off classification if opted in — the worker waits for indexing
+        # to finish before tagging, so it's safe to launch now.
+        if classify_now:
+            try:
+                from apps.library.classification import classify_document_async
+                classify_document_async(doc.pk)
+            except Exception:
+                logger.exception('failed to launch classification for doc %s', doc.pk)
+        return JsonResponse({'ok': True, 'processing': True, 'classifying': classify_now})
 
 
 # ── Tag management ─────────────────────────────────────────────────────────────
@@ -1042,3 +1112,91 @@ class ObligationRegisterView(TemplateView):
                                    ('Kuwait', 'Kuwait'),
                                    ('BBK', 'BBK policies')]
         return ctx
+
+
+# ── Structure manager: admin-editable compliance taxonomy tree ─────────────────
+from apps.library.models import TaxonomyNode
+
+
+def _seed_taxonomy():
+    """Create a sensible starter tree the first time the page is opened, so the
+    admin has something to shape instead of a blank slate."""
+    if TaxonomyNode.objects.exists():
+        return
+    def mk(name, ntype, parent=None, order=0, code=''):
+        return TaxonomyNode.objects.create(name=name, node_type=ntype, parent=parent,
+                                           order=order, code=code)
+    jur = mk('Jurisdictions', TaxonomyNode.ROOT, order=0)
+    gcc = mk('GCC', TaxonomyNode.REGION, jur, 0)
+    mk('Bahrain', TaxonomyNode.COUNTRY, gcc, 0, 'bahrain')
+    mk('Kuwait',  TaxonomyNode.COUNTRY, gcc, 1, 'kuwait')
+    sa = mk('South Asia', TaxonomyNode.REGION, jur, 1)
+    mk('India', TaxonomyNode.COUNTRY, sa, 0, 'india')
+    internal = mk('Internal', TaxonomyNode.ROOT, order=1)
+    bbk = mk('BBK Policies', TaxonomyNode.GROUP, internal, 0)
+    mk('Data Protection', TaxonomyNode.SECTION, bbk, 0)
+    mk('Cyber Security',  TaxonomyNode.SECTION, bbk, 1)
+    topics = mk('Topics', TaxonomyNode.ROOT, order=2)
+    for i, t in enumerate(['Consent', 'Breach Notification', 'Cross-border Transfers', 'Data Retention']):
+        mk(t, TaxonomyNode.TOPIC, topics, i)
+
+
+@method_decorator(role_required('admin'), name='dispatch')
+class StructureView(View):
+    """GET /library/structure-manager/ — admin taxonomy tree editor.
+    POST — op = add | rename | delete | move."""
+
+    template_name = 'pages/structure.html'
+
+    def get(self, request):
+        _seed_taxonomy()
+        roots = TaxonomyNode.objects.filter(parent__isnull=True)
+        total = TaxonomyNode.objects.count()
+        return render(request, self.template_name, {
+            'roots': roots,
+            'total': total,
+            'type_choices': TaxonomyNode.TYPE_CHOICES,
+        })
+
+    def post(self, request):
+        op = request.POST.get('op')
+
+        if op == 'add':
+            parent = TaxonomyNode.objects.filter(pk=request.POST.get('parent')).first()
+            siblings = TaxonomyNode.objects.filter(parent=parent)
+            nxt = (siblings.count())
+            TaxonomyNode.objects.create(
+                name=(request.POST.get('name') or 'New node').strip(),
+                node_type=request.POST.get('node_type') or TaxonomyNode.OTHER,
+                code=(request.POST.get('code') or '').strip(),
+                description=(request.POST.get('description') or '').strip(),
+                parent=parent, order=nxt,
+            )
+        elif op == 'rename':
+            n = TaxonomyNode.objects.filter(pk=request.POST.get('pk')).first()
+            if n:
+                n.name = (request.POST.get('name') or n.name).strip()
+                if request.POST.get('node_type'):
+                    n.node_type = request.POST.get('node_type')
+                n.code = (request.POST.get('code') or '').strip()
+                n.description = (request.POST.get('description') or '').strip()
+                n.save()
+        elif op == 'delete':
+            TaxonomyNode.objects.filter(pk=request.POST.get('pk')).delete()
+        elif op == 'move':
+            n = TaxonomyNode.objects.filter(pk=request.POST.get('pk')).first()
+            if n:
+                sibs = list(TaxonomyNode.objects.filter(parent=n.parent))
+                idx = next((i for i, s in enumerate(sibs) if s.pk == n.pk), None)
+                swap = None
+                if idx is not None:
+                    if request.POST.get('dir') == 'up' and idx > 0:
+                        swap = sibs[idx - 1]
+                    elif request.POST.get('dir') == 'down' and idx < len(sibs) - 1:
+                        swap = sibs[idx + 1]
+                if swap:
+                    n.order, swap.order = swap.order, n.order
+                    n.save(update_fields=['order']); swap.save(update_fields=['order'])
+
+        from django.shortcuts import redirect as _redirect
+        return _redirect('library-structure-manager')

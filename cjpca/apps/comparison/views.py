@@ -466,42 +466,46 @@ class RunComparisonView(View):
             project_root = Path(__file__).resolve().parents[3]
             if str(project_root) not in sys.path:
                 sys.path.insert(0, str(project_root))
-            from reasoning.workflows import compare_regulations
+            from reasoning.workflows import compare_regulations, compare_regulations_auto
             from reasoning             import taxonomy as _tx
 
-            # Build the retrieval query from the chosen topics (if any).
-            # IMPORTANT — single-topic vs multi-topic routes through different
-            # retrieval paths in the reasoning layer:
-            #   • query as str   → _scoped_retrieve per side, accepts topic filter, uses top_k
-            #   • query as list  → _multi_query_retrieve, per-query retrieval, DROPS topic filter
-            # So we convert a single-topic pick to a string so the taxonomy
-            # filter actually fires. Multi-topic stays a list (each topic
-            # retrieves its own chunks; no single filter makes sense there).
             if not topics:
-                query = 'general privacy compliance obligations'
-            elif len(topics) == 1:
-                query = _tx.topic_label(topics[0]).replace('_', ' ')
+                # Full scope → topic-route across every taxonomy topic BOTH
+                # regulations are classified on, then merge. A single generic
+                # "compliance obligations" query retrieves misaligned clauses
+                # and the local model finds almost no genuine A↔B pairs; routing
+                # per shared topic makes each side's clauses align, producing a
+                # fuller, better-grounded obligation set.
+                report = compare_regulations_auto(
+                    reg_a        = reg_a.jurisdiction,
+                    reg_b        = reg_b.jurisdiction,
+                    doc_title_a  = reg_a.chunk_doc_title or reg_a.name,
+                    doc_title_b  = reg_b.chunk_doc_title or reg_b.name,
+                    top_k_per_topic = 8,
+                    rerank       = True,
+                )
             else:
-                query = [_tx.topic_label(t).replace('_', ' ') for t in topics]
-
-            topic_filter = topics[0] if topics and _tx.is_valid(topics[0]) else None
-
-            # Multi-topic: pass topics list so the reasoning layer applies a
-            # per-query taxonomy filter. Single-topic: 'topic' is set instead
-            # and the single-query path applies it. Either way the LLM only
-            # sees chunks classified into the topic(s) the user picked.
-            report = compare_regulations(
-                query        = query,
-                reg_a        = reg_a.jurisdiction,
-                reg_b        = reg_b.jurisdiction,
-                doc_title_a  = reg_a.chunk_doc_title or reg_a.name,
-                doc_title_b  = reg_b.chunk_doc_title or reg_b.name,
-                top_k        = 10,
-                rerank       = True,
-                scope_mode   = 'strict',
-                topic        = topic_filter,
-                topics       = topics if isinstance(query, list) else None,
-            )
+                # Explicit topic pick. single-topic vs multi-topic route through
+                # different retrieval paths:
+                #   • query as str  → _scoped_retrieve per side, accepts topic filter
+                #   • query as list → _multi_query_retrieve, per-query taxonomy filter
+                if len(topics) == 1:
+                    query = _tx.topic_label(topics[0]).replace('_', ' ')
+                else:
+                    query = [_tx.topic_label(t).replace('_', ' ') for t in topics]
+                topic_filter = topics[0] if _tx.is_valid(topics[0]) else None
+                report = compare_regulations(
+                    query        = query,
+                    reg_a        = reg_a.jurisdiction,
+                    reg_b        = reg_b.jurisdiction,
+                    doc_title_a  = reg_a.chunk_doc_title or reg_a.name,
+                    doc_title_b  = reg_b.chunk_doc_title or reg_b.name,
+                    top_k        = 10,
+                    rerank       = True,
+                    scope_mode   = 'strict',
+                    topic        = topic_filter,
+                    topics       = topics if isinstance(query, list) else None,
+                )
         except Exception as exc:
             import traceback; traceback.print_exc()
             run.status = ComparisonRun.FAILED
@@ -1479,3 +1483,79 @@ class ComparisonRegisterView(View):
         )
         response['Content-Disposition'] = f'attachment; filename="comparison-register_{slug}.xlsx"'
         return response
+
+
+# ── Guidance-style comparison (OneTrust DataGuidance layout) ───────────────────
+# A separate, clean comparison shell so the client can pick between this and the
+# existing clause-vs-clause workspace. Driven by real regulations per
+# jurisdiction from the library.
+
+_GC_JUR = {
+    'bahrain': ('Bahrain', '\U0001F1E7\U0001F1ED'),
+    'india':   ('India',   '\U0001F1EE\U0001F1F3'),
+    'kuwait':  ('Kuwait',  '\U0001F1F0\U0001F1FC'),
+    'saudi':   ('Saudi Arabia', '\U0001F1F8\U0001F1E6'),
+}
+
+_GC_TOPICS = [
+    'Breach Notification', 'Data Subject Rights', 'Consent',
+    'Cross-border Transfers', 'Data Retention', 'Security Measures',
+]
+
+_GC_TOC = [
+    {'n': '1', 'title': 'Laws', 'sub': [
+        {'n': '1.1', 'title': 'Laws and regulations'},
+        {'n': '1.2', 'title': 'Supervisory authority'},
+        {'n': '1.3', 'title': 'Guidelines'}]},
+    {'n': '2', 'title': 'Definitions', 'sub': [{'n': '2.1', 'title': 'Key terms'}]},
+    {'n': '3', 'title': 'Breach notification', 'sub': [
+        {'n': '3.1', 'title': 'Supervisory authority notification'},
+        {'n': '3.2', 'title': 'Notification to affected individuals'},
+        {'n': '3.3', 'title': 'Notification to third parties'}]},
+    {'n': '4', 'title': 'Enforcement', 'sub': [
+        {'n': '4.1', 'title': 'Civil liability'},
+        {'n': '4.2', 'title': 'Criminal liability'}]},
+]
+
+
+@method_decorator(role_required('analyst', 'reviewer', 'admin'), name='dispatch')
+class GuidanceComparisonView(View):
+    """GET /comparison/guidance/ — clean, aligned side-by-side comparison."""
+
+    def get(self, request):
+        regs = Document.objects.filter(doc_type=Document.REGULATION)
+        present = [c for c in _GC_JUR if regs.filter(jurisdiction=c).exists()]
+        sel = [j for j in request.GET.getlist('jur') if j in present] or present[:2]
+        topic = request.GET.get('topic') or _GC_TOPICS[0]
+
+        columns = []
+        for j in sel:
+            jr = list(regs.filter(jurisdiction=j).order_by('name'))
+            authorities = []
+            for r in jr:
+                a = (r.issuing_authority or '').strip()
+                if a and a not in authorities:
+                    authorities.append(a)
+            primary = next((r for r in jr if 'law' in (r.name or '').lower()
+                            or 'pdpl' in (r.document_id or '').lower()
+                            or 'act' in (r.name or '').lower()), jr[0] if jr else None)
+            columns.append({
+                'code': j, 'label': _GC_JUR[j][0], 'flag': _GC_JUR[j][1],
+                'reg_count': len(jr),
+                'primary': primary.name if primary else '—',
+                'authorities': authorities,
+                'regs': [{
+                    'name': r.name, 'doc_id': r.document_id, 'scope': r.full_name,
+                    'auth': r.issuing_authority,
+                    'date': r.publication_date or r.effective_date,
+                    'articles': r.section_identifiers,
+                } for r in jr],
+            })
+
+        return render(request, 'pages/comparison_guidance.html', {
+            'topics': _GC_TOPICS, 'topic': topic,
+            'toc': _GC_TOC,
+            'available': [{'code': c, 'label': _GC_JUR[c][0], 'flag': _GC_JUR[c][1]} for c in present],
+            'selected': sel,
+            'columns': columns,
+        })

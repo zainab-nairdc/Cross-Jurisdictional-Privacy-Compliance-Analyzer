@@ -1,0 +1,299 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Coverage — {{ policy.name }}{% endblock %}
+
+{% block extra_head %}
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+ .cv { font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif; color:#0F172A; }
+ .cv *{ font-family:inherit; box-sizing:border-box; }
+ .cv-card { background:#fff; border:1px solid #E5E7EB; border-radius:16px; box-shadow:0 1px 2px rgba(16,24,40,.04); }
+ .cv-kpi { padding:16px 18px; border-radius:14px; }
+ .cv-kpi .n { font-size:26px; font-weight:800; letter-spacing:-.02em; line-height:1; }
+ .cv-kpi .l { font-size:11px; font-weight:600; color:#64748B; margin-top:6px; }
+ .cv-chip { display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:600; padding:3px 10px; border-radius:20px; }
+ .cv-btn { display:inline-flex; align-items:center; gap:7px; padding:10px 18px; border-radius:10px; border:none; background:#002583; color:#fff; font-size:13px; font-weight:600; cursor:pointer; }
+ .cv-btn:hover { background:#001a5e; }
+ .cv-btn-ghost { background:#fff; color:#334155; border:1px solid #E5E7EB; }
+ .cv-btn-ghost:hover { background:#F8FAFC; }
+ .cv-bar { display:flex; height:12px; border-radius:8px; overflow:hidden; background:#EEF1F7; }
+ .cv-row { display:flex; align-items:flex-start; gap:14px; padding:15px 18px; border:1px solid #E5E7EB; border-radius:12px; background:#fff; }
+ .cv-tag { font-size:10px; font-weight:700; padding:2px 9px; border-radius:6px; text-transform:uppercase; letter-spacing:.3px; white-space:nowrap; }
+ [x-cloak]{ display:none !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cv flex flex-col h-full overflow-hidden" style="background:#F8FAFC;"
+     x-data="coveragePage({{ policy.pk }}, '{{ policy.classification_state }}', {% if running %}true{% else %}false{% endif %})">
+
+ {# Header #}
+ <div style="background:#fff;border-bottom:1px solid #E5E7EB;padding:20px 32px;flex-shrink:0;">
+  <a href="{% url 'library-policies' %}" style="font-size:12px;color:#64748B;text-decoration:none;">&larr; Policies</a>
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:6px;">
+   <div style="min-width:0;">
+    <h1 style="font-size:21px;font-weight:800;letter-spacing:-.02em;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ policy.name }}</h1>
+    <p style="font-size:12.5px;color:#64748B;margin:3px 0 0;">Coverage · auto-scoped against the regulation corpus{% if selected_jurs %} · {{ selected_jurs|join:", "|title }}{% endif %}</p>
+   </div>
+   <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
+    <button class="cv-btn cv-btn-ghost" @click="drawer=true">Adjust scope</button>
+    {% if not running %}
+    <form method="post" action="{% url 'policy-coverage-run' policy.pk %}">{% csrf_token %}
+     {% for j in selected_jurs %}<input type="hidden" name="jur" value="{{ j }}">{% endfor %}
+     <button class="cv-btn" type="submit"><span x-text="hasResults ? 'Re-run coverage' : 'Run coverage'"></span></button>
+    </form>
+    {% endif %}
+   </div>
+  </div>
+ </div>
+
+ <div style="flex:1;min-height:0;overflow-y:auto;padding:24px 32px 56px;">
+  <div style="max-width:1080px;margin:0 auto;">
+
+   {# ── Classification banner ── #}
+   <template x-if="classState !== 'done'">
+    <div class="cv-card" style="padding:16px 20px;margin-bottom:20px;display:flex;align-items:center;gap:16px;border-color:#FDE68A;background:#FFFBEB;">
+     <div style="flex:1;">
+      <p style="font-size:13.5px;font-weight:700;color:#92400E;margin:0;">
+       <span x-show="classState === 'running' || classState === 'pending'">Classifying policy sections…</span>
+       <span x-show="classState === 'none'" x-cloak>This policy isn't classified yet</span>
+      </p>
+      <p style="font-size:12px;color:#B45309;margin:3px 0 0;line-height:1.5;">
+       <span x-show="classState === 'running' || classState === 'pending'">Tagging each section against the taxonomy so scope can be derived. This updates automatically.</span>
+       <span x-show="classState === 'none'" x-cloak>Classify its sections into topics to see the derived scope and run coverage. Running coverage will also classify on the fly.</span>
+      </p>
+     </div>
+     <form x-show="classState === 'none'" x-cloak method="post" action="{% url 'policy-coverage-classify' policy.pk %}">{% csrf_token %}
+      <button class="cv-btn" type="submit" style="background:#B45309;">Classify now</button>
+     </form>
+     <div x-show="classState === 'running' || classState === 'pending'" style="width:20px;height:20px;border:2.5px solid #FCD34D;border-top-color:#B45309;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+    </div>
+   </template>
+
+   {# ── Scope strip ── #}
+   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px;">
+    <div class="cv-kpi" style="background:#EEF2FB;">
+     <div class="n" style="color:#002583;">{{ summary.instruments }}</div>
+     <div class="l">Instruments in scope</div>
+    </div>
+    <div class="cv-kpi" style="background:#F1F5F9;">
+     <div class="n" style="color:#334155;">{{ summary.provisions_total }}</div>
+     <div class="l">Provisions</div>
+    </div>
+    <div class="cv-kpi" style="background:#F1F5F9;">
+     <div class="n" style="color:#334155;">{{ summary.policy_sections_total }}</div>
+     <div class="l">Policy sections</div>
+    </div>
+    <div class="cv-kpi" style="background:#ECFDF5;">
+     <div class="n" style="color:#047857;">{{ summary.scoped_pairs }}</div>
+     <div class="l">Pairs to check</div>
+    </div>
+    <div class="cv-kpi" style="background:#ECFDF5;">
+     <div class="n" style="color:#047857;">{{ summary.reduction_pct }}%</div>
+     <div class="l">Fewer than brute force</div>
+    </div>
+   </div>
+   <p style="font-size:11.5px;color:#94A3B8;margin:0 0 24px;padding:0 4px;">
+    Brute force would check every section against every provision — {{ summary.bruteforce_pairs }} pairs.
+    Topic-scoped routing checks {{ summary.scoped_pairs }} ({{ summary.topics_in_scope }} shared topic{{ summary.topics_in_scope|pluralize }}),
+    {% if summary.topics_skipped %}and skips {{ summary.topics_skipped }} topic{{ summary.topics_skipped|pluralize }} no in-scope law legislates on.{% else %}with no skipped topics.{% endif %}
+   </p>
+
+   {# ── Running state ── #}
+   <div x-show="running" x-cloak class="cv-card" style="padding:22px;margin-bottom:24px;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+     <div style="width:18px;height:18px;border:2.5px solid #C7D2FE;border-top-color:#002583;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+     <p style="font-size:14px;font-weight:700;margin:0;">Running coverage…</p>
+    </div>
+    <div class="cv-bar" style="height:8px;"><div :style="`width:${runPct}%;background:#002583;transition:width .4s;`"></div></div>
+    <p style="font-size:12px;color:#64748B;margin:10px 0 0;" x-text="runLabel || 'Starting…'"></p>
+   </div>
+
+   {% if coverage %}
+   {# ── Results: coverage bar ── #}
+   <div x-show="!running" class="cv-card" style="padding:22px 24px;margin-bottom:20px;">
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:14px;">
+     <div>
+      <p style="font-size:12px;font-weight:600;color:#64748B;margin:0 0 3px;text-transform:uppercase;letter-spacing:.4px;">Coverage</p>
+      <p style="font-size:32px;font-weight:800;letter-spacing:-.02em;margin:0;line-height:1;">{{ coverage.coverage_pct }}%</p>
+     </div>
+     <div style="text-align:right;font-size:12px;color:#64748B;">
+      {{ coverage.total }} obligation{{ coverage.total|pluralize }} across {{ coverage.topic_rollups|length }} topic{{ coverage.topic_rollups|length|pluralize }}
+     </div>
+    </div>
+    <div class="cv-bar">
+     {% if coverage.counts.covered %}<div style="background:#1E7E48;flex:{{ coverage.counts.covered }};"></div>{% endif %}
+     {% if coverage.counts.partial %}<div style="background:#FFB800;flex:{{ coverage.counts.partial }};"></div>{% endif %}
+     {% if coverage.counts.review %}<div style="background:#002583;flex:{{ coverage.counts.review }};"></div>{% endif %}
+     {% if coverage.counts.none %}<div style="background:#C03A3A;flex:{{ coverage.counts.none }};"></div>{% endif %}
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:12px;">
+     <span class="cv-chip" style="background:#E7F3EC;color:#1E7E48;">● {{ coverage.counts.covered }} Covered</span>
+     <span class="cv-chip" style="background:#FEF6E0;color:#946A00;">● {{ coverage.counts.partial }} Partial</span>
+     <span class="cv-chip" style="background:#EEF2FB;color:#002583;">● {{ coverage.counts.review }} Review</span>
+     <span class="cv-chip" style="background:#FBECEC;color:#C03A3A;">● {{ coverage.counts.none }} Not covered</span>
+    </div>
+   </div>
+
+   <div x-show="!running" style="display:grid;grid-template-columns:1.15fr .85fr;gap:20px;align-items:start;">
+
+    {# Gaps first #}
+    <div>
+     <p style="font-size:13px;font-weight:700;margin:0 0 12px;">Findings — gaps first</p>
+     {% for m in coverage.gaps %}
+     <div class="cv-row" style="margin-bottom:10px;">
+      <span class="cv-tag" style="{% if m.coverage == 'none' %}background:#FBECEC;color:#C03A3A;{% elif m.coverage == 'partial' %}background:#FEF6E0;color:#946A00;{% else %}background:#EEF2FB;color:#002583;{% endif %}">{% if m.coverage == 'none' %}Not covered{% elif m.coverage == 'partial' %}Partial{% else %}Review{% endif %}</span>
+      <div style="flex:1;min-width:0;">
+       <p style="font-size:13px;font-weight:600;margin:0;line-height:1.4;">{{ m.obligation_title }}</p>
+       <p style="font-size:11.5px;color:#64748B;margin:4px 0 0;">
+        {{ m.regulation.name }} · <span style="font-weight:600;color:#334155;">{{ m.article_ref }}</span>
+        {% if not m.citation_verified %}<span class="cv-tag" style="background:#FFF7ED;color:#C2410C;margin-left:6px;">unverified</span>{% endif %}
+       </p>
+       {% if m.rationale %}<p style="font-size:11.5px;color:#475569;margin:7px 0 0;line-height:1.55;">{{ m.rationale|truncatewords:34 }}</p>{% endif %}
+      </div>
+     </div>
+     {% empty %}
+     <div class="cv-card" style="padding:26px;text-align:center;">
+      <p style="font-size:13px;font-weight:700;color:#1E7E48;margin:0 0 3px;">No gaps found</p>
+      <p style="font-size:12px;color:#64748B;margin:0;">Every mapped obligation is covered by this policy.</p>
+     </div>
+     {% endfor %}
+    </div>
+
+    {# Right rail: topic rollup + skipped #}
+    <div>
+     <p style="font-size:13px;font-weight:700;margin:0 0 12px;">By topic</p>
+     <div class="cv-card" style="padding:6px 8px;margin-bottom:18px;">
+      {% for t in coverage.topic_rollups %}
+      <div style="display:flex;align-items:center;gap:10px;padding:9px 10px;{% if not forloop.last %}border-bottom:1px solid #F1F5F9;{% endif %}">
+       <span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:{% if t.state == 'gap' %}#C03A3A{% elif t.state == 'partial' %}#FFB800{% else %}#1E7E48{% endif %};"></span>
+       <span style="flex:1;font-size:12.5px;font-weight:500;">{{ t.label }}</span>
+       <span style="font-size:11px;color:#94A3B8;">{% if t.gap_count %}{{ t.gap_count }} gap{{ t.gap_count|pluralize }}{% else %}covered{% endif %}</span>
+      </div>
+      {% endfor %}
+     </div>
+
+     {# Skipped — explicitly NOT gaps #}
+     {% if coverage.skipped %}
+     <div class="cv-card" style="padding:16px 18px;background:#F8FAFC;">
+      <p style="font-size:12px;font-weight:700;margin:0 0 4px;color:#475569;">Skipped — not gaps</p>
+      <p style="font-size:11px;color:#94A3B8;margin:0 0 10px;line-height:1.5;">The policy addresses these, but no in-scope regulation legislates on them — so they are not counted as compliance gaps.</p>
+      {% for s in coverage.skipped %}
+      <div style="display:flex;align-items:center;gap:8px;padding:5px 0;">
+       <span style="font-size:11px;color:#64748B;">◦</span>
+       <span style="font-size:12px;color:#475569;">{{ s.label }}</span>
+      </div>
+      {% endfor %}
+     </div>
+     {% endif %}
+    </div>
+   </div>
+
+   {% else %}
+   {# ── No run yet: scope preview ── #}
+   <div x-show="!running">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;">
+     <div>
+      <p style="font-size:13px;font-weight:700;margin:0 0 12px;">Topics in scope</p>
+      <div class="cv-card" style="padding:6px 8px;">
+       {% for ts in scope.topic_scopes %}
+       <div style="display:flex;align-items:center;gap:10px;padding:10px;{% if not forloop.last %}border-bottom:1px solid #F1F5F9;{% endif %}">
+        <span style="flex:1;font-size:12.5px;font-weight:500;">{{ ts.label }}</span>
+        <span style="font-size:11px;color:#94A3B8;">{{ ts.policy_sections|length }} × {{ ts.provisions|length }} = {{ ts.pair_count }} pair{{ ts.pair_count|pluralize }}</span>
+       </div>
+       {% empty %}
+       <div style="padding:22px;text-align:center;">
+        <p style="font-size:12.5px;color:#64748B;margin:0;">{% if summary.classified %}No shared topics between this policy and the corpus in scope.{% else %}Classify the policy to derive scope.{% endif %}</p>
+       </div>
+       {% endfor %}
+      </div>
+     </div>
+     <div>
+      <p style="font-size:13px;font-weight:700;margin:0 0 12px;">Skipped — not gaps</p>
+      {% if scope.skipped_topics %}
+      <div class="cv-card" style="padding:16px 18px;background:#F8FAFC;">
+       <p style="font-size:11px;color:#94A3B8;margin:0 0 10px;line-height:1.5;">The policy addresses these, but no in-scope regulation legislates on them.</p>
+       {% for tag, label in scope.skipped_topics %}
+       <div style="display:flex;align-items:center;gap:8px;padding:5px 0;">
+        <span style="font-size:11px;color:#64748B;">◦</span><span style="font-size:12px;color:#475569;">{{ label }}</span>
+       </div>
+       {% endfor %}
+      </div>
+      {% else %}
+      <div class="cv-card" style="padding:22px;text-align:center;"><p style="font-size:12.5px;color:#64748B;margin:0;">No skipped topics.</p></div>
+      {% endif %}
+     </div>
+    </div>
+    {% if summary.classified %}
+    <div class="cv-card" style="padding:22px;text-align:center;margin-top:20px;">
+     <p style="font-size:13.5px;font-weight:700;margin:0 0 4px;">Scope is ready</p>
+     <p style="font-size:12px;color:#64748B;margin:0 0 14px;">Run coverage to check the {{ summary.scoped_pairs }} scoped pair{{ summary.scoped_pairs|pluralize }} and surface gaps.</p>
+     <form method="post" action="{% url 'policy-coverage-run' policy.pk %}" style="display:inline;">{% csrf_token %}
+      {% for j in selected_jurs %}<input type="hidden" name="jur" value="{{ j }}">{% endfor %}
+      <button class="cv-btn" type="submit">Run coverage</button>
+     </form>
+    </div>
+    {% endif %}
+   </div>
+   {% endif %}
+
+  </div>
+ </div>
+
+ {# ── Adjust-scope drawer ── #}
+ <div x-show="drawer" x-cloak style="position:fixed;inset:0;z-index:60;" @keydown.escape.window="drawer=false">
+  <div style="position:absolute;inset:0;background:rgba(15,23,42,.4);" @click="drawer=false"></div>
+  <div style="position:absolute;top:0;right:0;bottom:0;width:340px;background:#fff;box-shadow:-8px 0 24px rgba(0,0,0,.12);padding:24px;overflow-y:auto;">
+   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+    <p style="font-size:15px;font-weight:800;margin:0;">Adjust scope</p>
+    <button @click="drawer=false" style="background:none;border:none;font-size:22px;line-height:1;color:#94A3B8;cursor:pointer;">&times;</button>
+   </div>
+   <p style="font-size:12px;color:#64748B;margin:0 0 18px;line-height:1.5;">Restrict the regulation corpus to specific jurisdictions. Leave all unchecked for the whole corpus.</p>
+   <form method="get">
+    {% for jur in jur_available %}
+    <label style="display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid #E5E7EB;border-radius:9px;margin-bottom:8px;cursor:pointer;">
+     <input type="checkbox" name="jur" value="{{ jur }}" {% if jur in selected_jurs %}checked{% endif %} style="width:15px;height:15px;accent-color:#002583;">
+     <span style="font-size:13px;font-weight:500;text-transform:capitalize;">{{ jur }}</span>
+    </label>
+    {% endfor %}
+    <button class="cv-btn" type="submit" style="width:100%;justify-content:center;margin-top:12px;">Apply scope</button>
+   </form>
+  </div>
+ </div>
+
+ <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+</div>
+
+<script>
+function coveragePage(pk, classState, running) {
+ return {
+  pk, classState, running,
+  hasResults: {% if coverage %}true{% else %}false{% endif %},
+  drawer:false, runPct:0, runLabel:'',
+  init() {
+   // Poll while classifying or running; stop once both are settled.
+   if (this.classState === 'running' || this.classState === 'pending' || this.running) {
+    this.timer = setInterval(() => this.poll(), 2500);
+   }
+  },
+  async poll() {
+   try {
+    const r = await fetch(`/mapping/coverage/${this.pk}/status/`);
+    const d = await r.json();
+    const prevClass = this.classState, prevRun = this.running;
+    this.classState = d.classification_state;
+    this.running = (d.run_status === 'running' || d.run_status === 'queued');
+    this.runPct = d.run_pct || 0;
+    this.runLabel = d.run_label || '';
+    // A finished run or a just-finished classification both warrant a reload
+    // so the server re-renders results / the derived scope.
+    if ((prevRun && !this.running) || (prevClass !== 'done' && this.classState === 'done' && !this.running)) {
+     clearInterval(this.timer); window.location.reload();
+    }
+   } catch (e) { /* transient — keep polling */ }
+  },
+ };
+}
+</script>
+{% endblock %}

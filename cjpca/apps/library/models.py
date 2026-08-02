@@ -74,6 +74,19 @@ class Document(models.Model):
         (CONF_CONFIDENTIAL, 'Confidential'),
     ]
 
+    # classification lifecycle (results-first coverage). Classifying a policy's
+    # sections into taxonomy topics is opt-in at upload; the coverage page reads
+    # this to show a "not classified / classifying / ready" state instead of
+    # silently running the model inside a page request.
+    CLASS_NONE    = 'none'      # never classified
+    CLASS_PENDING = 'pending'   # queued, worker not started
+    CLASS_RUNNING = 'running'   # classifier in progress
+    CLASS_DONE    = 'done'      # tags written at classification_version
+    CLASSIFICATION_CHOICES = [
+        (CLASS_NONE, 'Not classified'), (CLASS_PENDING, 'Queued'),
+        (CLASS_RUNNING, 'Classifying'), (CLASS_DONE, 'Ready'),
+    ]
+
     name              = models.CharField(max_length=255)
     full_name         = models.CharField(max_length=500, blank=True)
     doc_type          = models.CharField(max_length=20, choices=DOC_TYPE_CHOICES)
@@ -118,11 +131,42 @@ class Document(models.Model):
     cross_references    = models.TextField(blank=True)
     concept_tags_csv    = models.JSONField(default=list, blank=True)     # from the CSV column
 
+    # ── Coverage / caching ──
+    # sha256 of the source file bytes. Cache key for mapping results and the
+    # invalidation trigger for classification: if a doc is re-uploaded with
+    # changed content the hash changes and stale tags/results are ignored.
+    content_hash         = models.CharField(max_length=64, blank=True, db_index=True)
+    classification_state = models.CharField(max_length=12, choices=CLASSIFICATION_CHOICES,
+                                            default=CLASS_NONE)
+    classified_at        = models.DateTimeField(null=True, blank=True)
+    # taxonomy fingerprint the chunk tags were written under (staleness check).
+    classification_version = models.CharField(max_length=32, blank=True)
+
     class Meta:
         ordering = ['-upload_date']
 
     def __str__(self):
         return self.name
+
+    def compute_content_hash(self) -> str:
+        """sha256 of the stored file's bytes. Empty string if no file.
+        Streamed so large PDFs don't load fully into memory."""
+        import hashlib
+        if not self.file or not self.file.name:
+            return ''
+        h = hashlib.sha256()
+        try:
+            self.file.open('rb')
+            for block in iter(lambda: self.file.read(65536), b''):
+                h.update(block)
+        except (FileNotFoundError, ValueError):
+            return ''
+        finally:
+            try:
+                self.file.close()
+            except Exception:
+                pass
+        return h.hexdigest()
 
     def cited_as(self, article: str = '') -> str:
         """Format a citation for this document using the configured format.
@@ -164,3 +208,65 @@ class Document(models.Model):
             return ''
         from pathlib import Path
         return Path(self.file.name).stem
+
+
+class TaxonomyNode(models.Model):
+    """Admin-managed compliance hierarchy — jurisdictions → regions → countries →
+    sections, internal policy trees, topic taxonomies, etc.
+
+    A single self-referential tree so admins can model any structure they need
+    instead of relying on the hardcoded jurisdiction list. Deliberately generic:
+    ``node_type`` labels the role of a node, ``parent`` builds the hierarchy.
+    Nothing else in the app reads from this yet — it's a standalone manager.
+    """
+    ROOT     = 'root'
+    REGION   = 'region'
+    COUNTRY  = 'country'
+    SECTION  = 'section'
+    TOPIC    = 'topic'
+    GROUP    = 'group'
+    OTHER    = 'other'
+    TYPE_CHOICES = [
+        (ROOT, 'Category'), (REGION, 'Region'), (COUNTRY, 'Country'),
+        (SECTION, 'Section'), (TOPIC, 'Topic'), (GROUP, 'Group'), (OTHER, 'Other'),
+    ]
+    # A small colour/emoji hint per type for the tree UI
+    TYPE_META = {
+        ROOT:    ('#002583', 'Category'),
+        REGION:  ('#2563EB', 'Region'),
+        COUNTRY: ('#16A34A', 'Country'),
+        SECTION: ('#D97706', 'Section'),
+        TOPIC:   ('#7C3AED', 'Topic'),
+        GROUP:   ('#0891B2', 'Group'),
+        OTHER:   ('#64748B', 'Item'),
+    }
+
+    name        = models.CharField(max_length=120)
+    node_type   = models.CharField(max_length=12, choices=TYPE_CHOICES, default=OTHER)
+    code        = models.CharField(max_length=40, blank=True)   # e.g. "bahrain", "BH"
+    description = models.CharField(max_length=300, blank=True)
+    parent      = models.ForeignKey('self', null=True, blank=True, on_delete=models.CASCADE,
+                                    related_name='children')
+    order       = models.PositiveIntegerField(default=0)
+    is_active   = models.BooleanField(default=True)
+    created_at  = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['order', 'name']
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def type_color(self):
+        return self.TYPE_META.get(self.node_type, self.TYPE_META[self.OTHER])[0]
+
+    @property
+    def type_label(self):
+        return self.TYPE_META.get(self.node_type, self.TYPE_META[self.OTHER])[1]
+
+    def descendant_count(self):
+        n = 0
+        for c in self.children.all():
+            n += 1 + c.descendant_count()
+        return n

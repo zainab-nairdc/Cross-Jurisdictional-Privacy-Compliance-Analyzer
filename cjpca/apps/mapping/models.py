@@ -51,6 +51,11 @@ class MappingAnalysis(models.Model):
     scope_topics             = models.JSONField(default=list, blank=True)
     scope_article_ids        = models.JSONField(default=list, blank=True)
     include_asymmetric       = models.BooleanField(default=False)
+    # Topics the policy covers but NO in-scope regulation legislates on. Stored
+    # as [{topic, label, policy_chunks}] and rendered as "skipped" — explicitly
+    # NOT gaps. Kept separate from gap_count so a topic no law addresses can
+    # never be mistaken for a compliance failure.
+    skipped_topics           = models.JSONField(default=list, blank=True)
 
     status                   = models.CharField(max_length=20, choices=STATUS_CHOICES,
                                                 default=QUEUED, db_index=True)

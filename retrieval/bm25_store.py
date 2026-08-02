@@ -233,11 +233,14 @@ def parent_count() -> int:
 
 _CREATE_TAGS_TABLE = """
     CREATE TABLE IF NOT EXISTS chunk_tags (
-        node_id      TEXT PRIMARY KEY,
-        topic        TEXT NOT NULL,
-        subcategory  TEXT NOT NULL DEFAULT '',
-        confidence   REAL NOT NULL DEFAULT 0.0,
-        tagged_at    TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        node_id           TEXT PRIMARY KEY,
+        topic             TEXT NOT NULL,
+        subcategory       TEXT NOT NULL DEFAULT '',
+        confidence        REAL NOT NULL DEFAULT 0.0,
+        tagged_at         TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        taxonomy_version  TEXT NOT NULL DEFAULT '',
+        model_version     TEXT NOT NULL DEFAULT '',
+        prompt_version    TEXT NOT NULL DEFAULT ''
     )
 """
 
@@ -245,19 +248,55 @@ _CREATE_TAGS_TOPIC_INDEX = """
     CREATE INDEX IF NOT EXISTS idx_chunk_tags_topic ON chunk_tags(topic, subcategory)
 """
 
+# Columns added after the table's first release. On an existing db the table
+# already exists without these, and SQLite can't add them via CREATE — we
+# ALTER them in on first touch. Adding is idempotent thanks to the PRAGMA
+# guard, and cheap (metadata-only for TEXT DEFAULT '').
+_TAGS_VERSION_COLUMNS = ("taxonomy_version", "model_version", "prompt_version")
+
+
+def _ensure_tag_columns(conn: sqlite3.Connection) -> None:
+    """create chunk_tags if missing, then backfill any version columns an
+    older schema didn't have. Call before any read/write that references
+    taxonomy_version so old databases keep working without a migration step."""
+    conn.execute(_CREATE_TAGS_TABLE)
+    conn.execute(_CREATE_TAGS_TOPIC_INDEX)
+    have = {r[1] for r in conn.execute("PRAGMA table_info(chunk_tags)").fetchall()}
+    for col in _TAGS_VERSION_COLUMNS:
+        if col not in have:
+            conn.execute(
+                f"ALTER TABLE chunk_tags ADD COLUMN {col} TEXT NOT NULL DEFAULT ''"
+            )
+
+
+def _current_taxonomy_version() -> str:
+    """Lazy import to avoid a retrieval<->reasoning import cycle at module load."""
+    try:
+        from reasoning.taxonomy import TAXONOMY_VERSION
+        return TAXONOMY_VERSION
+    except Exception:
+        return ""
+
 
 def upsert_chunk_tags(rows: list[dict]) -> int:
     """write taxonomy tags for chunks. each row needs node_id + topic; subcategory
-    and confidence default to '' / 0.0. returns the number of rows written."""
+    and confidence default to '' / 0.0. Version columns default to the current
+    taxonomy fingerprint (so a re-classify under a new taxonomy is detectable)
+    plus any model/prompt version the caller passes. returns rows written."""
     if not rows:
         return 0
+    tax_v = _current_taxonomy_version()
     with _connect() as conn:
-        conn.execute(_CREATE_TAGS_TABLE)
-        conn.execute(_CREATE_TAGS_TOPIC_INDEX)
+        _ensure_tag_columns(conn)
         conn.executemany(
-            "INSERT OR REPLACE INTO chunk_tags (node_id, topic, subcategory, confidence) "
-            "VALUES (?, ?, ?, ?)",
-            [(r["node_id"], r["topic"], r.get("subcategory", ""), float(r.get("confidence", 0.0)))
+            "INSERT OR REPLACE INTO chunk_tags "
+            "(node_id, topic, subcategory, confidence, taxonomy_version, model_version, prompt_version) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            [(r["node_id"], r["topic"], r.get("subcategory", ""),
+              float(r.get("confidence", 0.0)),
+              r.get("taxonomy_version", tax_v),
+              r.get("model_version", ""),
+              r.get("prompt_version", ""))
              for r in rows],
         )
     return len(rows)
@@ -344,35 +383,116 @@ def topics_for_jurisdiction(jurisdiction: str) -> dict[str, int]:
 
 
 def untagged_chunks_for_docs(
-    doc_titles:   list[str],
-    jurisdiction: str | None = None,
+    doc_titles:       list[str],
+    jurisdiction:     str | None = None,
+    taxonomy_version: str | None = None,
 ) -> list[dict]:
-    """rows from bm25_index that match doc_titles but have no chunk_tags
-    entry yet. used by the on-demand classifier backfill in
-    map_policy_coverage_auto so we can tag a policy at first use rather
-    than requiring a separate ingest-time backfill pass."""
+    """rows from bm25_index that match doc_titles and are NOT tagged at the
+    given taxonomy_version (missing tag, or tagged under an older taxonomy).
+    used by the on-demand / opt-in classifier backfill so we can tag a policy
+    at first use — and re-tag it automatically after a taxonomy bump — rather
+    than requiring a separate ingest-time pass.
+
+    When taxonomy_version is None it defaults to the current fingerprint, so
+    callers get correct staleness handling for free."""
     if not doc_titles or not BM25_DB_PATH.exists():
         return []
+    tax_v = taxonomy_version if taxonomy_version is not None else _current_taxonomy_version()
     placeholders = ",".join("?" * len(doc_titles))
+    # "needs tagging" = no tag row, OR a tag row stamped with a different
+    # taxonomy_version. The join keeps the version predicate on the tag side.
     sql = f"""
         SELECT b.node_id, b.content, b.doc_title, b.jurisdiction
         FROM   bm25_index b
-        LEFT JOIN chunk_tags t ON t.node_id = b.node_id
+        LEFT JOIN chunk_tags t
+               ON t.node_id = b.node_id AND t.taxonomy_version = ?
         WHERE  b.doc_title IN ({placeholders})
         {"AND b.jurisdiction = ?" if jurisdiction else ""}
         AND    t.node_id IS NULL
     """
-    params: list = list(doc_titles)
+    params: list = [tax_v, *doc_titles]
     if jurisdiction:
         params.append(jurisdiction)
     try:
         with _connect() as conn:
-            conn.execute(_CREATE_TAGS_TABLE)
+            _ensure_tag_columns(conn)
             rows = conn.execute(sql, params).fetchall()
     except sqlite3.OperationalError:
         return []
     return [{"node_id": r[0], "content": r[1], "doc_title": r[2], "jurisdiction": r[3]}
             for r in rows]
+
+
+def get_chunk_provision(node_id: str) -> dict | None:
+    """Look up the STORED provision record for a chunk by node_id.
+
+    This is the anti-fabrication primitive: every article reference rendered
+    in the coverage UI must be read from here, never echoed from model output.
+    Returns the indexed metadata (article_ref, regulation_name, doc_title,
+    jurisdiction) for the chunk, or None if no such chunk exists — in which
+    case the caller must treat the model's citation as ungrounded and refuse
+    to render it as a verified reference."""
+    if not node_id or not BM25_DB_PATH.exists():
+        return None
+    try:
+        with _connect() as conn:
+            row = conn.execute(
+                "SELECT node_id, article_ref, regulation_name, doc_title, jurisdiction "
+                "FROM bm25_index WHERE node_id = ?",
+                (node_id,),
+            ).fetchone()
+    except sqlite3.OperationalError:
+        return None
+    return dict(row) if row else None
+
+
+def tagged_chunks_for_docs(
+    doc_titles:       list[str] | None = None,
+    doc_type:         str | None = None,
+    jurisdictions:    list[str] | None = None,
+    include_unclassified: bool = False,
+) -> list[dict]:
+    """Return every classified chunk (joined bm25_index + chunk_tags) matching
+    the filters, one row per chunk with its topic/subcategory. This is the
+    read primitive the scope service uses to intersect a policy's classified
+    sections against the regulation corpus's classified provisions.
+
+    Each row: node_id, doc_title, jurisdiction, doc_type, article_ref,
+    regulation_name, topic, subcategory, confidence, taxonomy_version.
+    UNCLASSIFIED chunks are excluded unless include_unclassified is set —
+    an unclassified chunk is not a legislated provision and must not create
+    scope pairs."""
+    if not BM25_DB_PATH.exists():
+        return []
+    conditions = ["t.node_id IS NOT NULL"]
+    params: list = []
+    if not include_unclassified:
+        conditions.append("t.topic != 'unclassified'")
+    if doc_titles:
+        conditions.append(f"b.doc_title IN ({','.join('?' * len(doc_titles))})")
+        params.extend(doc_titles)
+    if doc_type:
+        conditions.append("b.doc_type = ?")
+        params.append(doc_type)
+    if jurisdictions:
+        normalised = [JURISDICTION_NORM.get(j.lower(), j) for j in jurisdictions]
+        conditions.append(f"b.jurisdiction IN ({','.join('?' * len(normalised))})")
+        params.extend(normalised)
+    sql = f"""
+        SELECT b.node_id, b.doc_title, b.jurisdiction, b.doc_type,
+               b.article_ref, b.regulation_name,
+               t.topic, t.subcategory, t.confidence, t.taxonomy_version
+        FROM   bm25_index b
+        JOIN   chunk_tags t ON t.node_id = b.node_id
+        WHERE  {" AND ".join(conditions)}
+    """
+    try:
+        with _connect() as conn:
+            _ensure_tag_columns(conn)
+            rows = conn.execute(sql, params).fetchall()
+    except sqlite3.OperationalError:
+        return []
+    return [dict(r) for r in rows]
 
 
 def search_bm25(

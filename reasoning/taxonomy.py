@@ -234,3 +234,33 @@ def render_for_prompt() -> str:
             lines.append(f"  - {topic}/{sub_tag} — {sub_label}")
     lines.append(f"\n{UNCLASSIFIED} — none of the above (definitions, preambles, schedules)")
     return "\n".join(lines).strip()
+
+
+# --------------------------------------------------------------------------
+# Versioning
+# --------------------------------------------------------------------------
+#
+# Cached tags (chunk_tags) and cached mapping results are keyed on this
+# version. Whenever the SET of leaves changes, the fingerprint changes and
+# every consumer treats older tags as stale (must re-classify). The human
+# prefix is bumped manually when leaf *semantics* change without the set of
+# tags changing (e.g. a definition tweak); the hash suffix auto-invalidates
+# on any structural change even if someone forgets to bump the prefix.
+
+import hashlib as _hashlib
+
+_TAXONOMY_SCHEMA = "v1"
+
+
+def _taxonomy_fingerprint() -> str:
+    leaves: list[str] = []
+    for _topic, _body in TAXONOMY.items():
+        for _sub in _body["subcategories"]:
+            leaves.append(f"{_topic}/{_sub}")
+    leaves.append(UNCLASSIFIED)
+    leaves.sort()
+    digest = _hashlib.sha1("|".join(leaves).encode("utf-8")).hexdigest()[:8]
+    return f"{_TAXONOMY_SCHEMA}-{digest}"
+
+
+TAXONOMY_VERSION = _taxonomy_fingerprint()

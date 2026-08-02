@@ -4,830 +4,752 @@
 {% block title %}Analytics — CJPCA{% endblock %}
 
 {% block extra_head %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script>window.chartData = {{ chart_data|safe }};</script>
 <style>
- .an-card { background:#fff; border:1px solid #E5E8EF; border-radius:14px; overflow:hidden;
-            box-shadow:0 1px 3px rgba(27,48,104,0.06),0 1px 2px rgba(0,0,0,0.03); }
- .an-card-p { padding:16px 18px; }
- .an-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.09em; color:#002583; margin-bottom:4px; display:block; }
- .an-title { font-size:13px; font-weight:700; color:#002583; margin-bottom:0; display:block; line-height:1.3; }
- .an-sub { font-size:11px; color:#6B7280; margin-top:2px; display:block; }
- .an-track { height:6px; border-radius:4px; background:#F0F3F8; overflow:hidden; }
- .an-fill { height:100%; border-radius:4px; transition:width .6s cubic-bezier(.4,0,.2,1); }
- .conflict-row { transition:background .1s; }
- .conflict-row:hover { background:#F7F9FC; }
- .run-pill { display:inline-flex; align-items:center; gap:5px; padding:4px 11px; border-radius:20px; font-size:10px; font-weight:700; background:#E5E8EF; color:#002583; }
+ /* ── Design tokens ──────────────────────────────────────────────
+    canvas #F8FAFC · cards #fff · border #E5E7EB · ink #0F172A
+    green #16A34A · red #DC2626 · amber #D97706 · blue #2563EB · brand #002583 */
+ .anx { font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif; color:#0F172A; }
+ .anx *{ font-family:inherit; }
 
- /* Tab strip */
- .an-tab { display:inline-flex; align-items:center; gap:6px; padding:10px 18px; border-bottom:2px solid transparent; font-size:12px; font-weight:600; color:#6B7280; cursor:pointer; white-space:nowrap; transition:color .12s,border-color .12s; background:none; border-left:none; border-right:none; border-top:none; font-family:inherit; }
- .an-tab:hover { color:#002583; }
- .an-tab.active { color:#002583; border-bottom-color:#002583; font-weight:700; }
- .an-tab-badge { padding:2px 7px; border-radius:20px; font-size:9px; font-weight:700; background:#E5E8EF; color:#002583; }
+ .card { background:#fff; border:1px solid #E5E7EB; border-radius:18px; overflow:hidden;
+         box-shadow:0 1px 2px rgba(16,24,40,.04), 0 4px 12px rgba(16,24,40,.03); }
+ .card-pad { padding:22px 24px; }
+ .sec-eyebrow { font-size:11px; font-weight:600; letter-spacing:.02em; color:#64748B; margin:0 0 2px; }
+ .sec-title { font-size:15px; font-weight:700; color:#0F172A; margin:0; letter-spacing:-.01em; }
+ .sec-sub { font-size:12.5px; color:#64748B; margin:3px 0 0; line-height:1.5; }
 
- /* KPI cards — matches home dashboard tone */
- .kpi { background:#fff; border:1px solid #E5E8EF; border-radius:14px; padding:14px 16px; position:relative;
-        border-left:4px solid #002583;
-        box-shadow:0 1px 3px rgba(27,48,104,0.06),0 1px 2px rgba(0,0,0,0.03); }
- .kpi-icon { width:30px; height:30px; border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0; background:#E5E8EF; }
- .kpi-num { font-size:28px; font-weight:800; line-height:1; font-family:'Satoshi',sans-serif; margin:6px 0 2px; letter-spacing:-.03em; color:#002583; }
- .kpi-sub { font-size:10px; color:#6B7280; margin-top:6px; }
+ /* Tab segmented control */
+ .segwrap { display:inline-flex; gap:3px; background:#F1F5F9; padding:4px; border-radius:12px; }
+ .seg { display:inline-flex; align-items:center; gap:7px; padding:8px 16px; border-radius:9px;
+        font-size:13px; font-weight:600; color:#64748B; cursor:pointer; background:none; border:none;
+        font-family:inherit; white-space:nowrap; transition:all .15s; }
+ .seg:hover { color:#0F172A; }
+ .seg.on { background:#fff; color:#0F172A; box-shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.05); }
+ .seg-badge { font-size:11px; font-weight:700; padding:1px 8px; border-radius:20px; background:#E2E8F0; color:#475569; }
 
- /* Lifecycle funnel */
- .lc-box { border-radius:10px; padding:12px 14px; display:flex; flex-direction:column; align-items:center; gap:3px; flex:1; background:#F7F9FC; border:1px solid #E5E8EF; }
- .lc-arrow { color:#9CA3AF; font-size:16px; flex-shrink:0; padding:0 4px; }
+ /* KPI status cards */
+ .kpi { border-radius:18px; padding:18px 20px; border:1px solid; position:relative; overflow:hidden; }
+ .kpi-icon { width:38px; height:38px; border-radius:11px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+ .kpi-val { font-size:36px; font-weight:800; line-height:1; letter-spacing:-.03em; margin:14px 0 0; }
+ .kpi-lab { font-size:12.5px; font-weight:600; color:#334155; margin:8px 0 0; }
+ .kpi-sub { font-size:11.5px; color:#64748B; margin:3px 0 0; line-height:1.45; }
+ .kpi-tag { font-size:10.5px; font-weight:700; padding:3px 10px; border-radius:20px; letter-spacing:.01em; }
 
- /* Relationship tiles */
- .rel-tile { border-radius:12px; padding:14px; border:1px solid #E5E8EF; background:#fff; text-align:center; transition:transform .1s,box-shadow .1s; }
- .rel-tile:hover { transform:translateY(-1px); box-shadow:0 4px 16px rgba(0,0,0,.08); }
+ /* Severity + status chips */
+ .sev { display:inline-flex; align-items:center; gap:6px; padding:3px 10px; border-radius:8px;
+        font-size:10.5px; font-weight:700; letter-spacing:.02em; text-transform:capitalize; white-space:nowrap; }
+ .sev-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+ .stat-chip { padding:3px 10px; border-radius:20px; font-size:10.5px; font-weight:600; white-space:nowrap;
+              background:#F1F5F9; color:#475569; border:1px solid #E5E7EB; }
 
- /* Heatmap cells */
- .hm-cell { border-radius:8px; padding:10px 8px; transition:transform .1s; }
- .hm-cell:hover { transform:scale(1.04); }
+ /* Action rows */
+ .act-row { display:flex; align-items:center; gap:16px; padding:14px 22px; text-decoration:none;
+            border-top:1px solid #F1F5F9; transition:background .12s; }
+ .act-row:hover { background:#F8FAFC; }
+ .act-open { opacity:0; transform:translateX(-4px); transition:all .15s; color:#94A3B8; flex-shrink:0; }
+ .act-row:hover .act-open { opacity:1; transform:translateX(0); }
+ .conf-track { width:52px; height:5px; border-radius:3px; background:#E2E8F0; overflow:hidden; }
 
- /* Conflict table */
- .ct-row { border-bottom:1px solid #EEF1F6; cursor:pointer; transition:background .1s; }
- .ct-row:hover { background:#F7F9FC; }
+ /* Filter chips */
+ .fchip { padding:6px 14px; border-radius:9px; font-size:12px; font-weight:600; cursor:pointer;
+          border:1px solid #E5E7EB; background:#fff; color:#64748B; font-family:inherit; transition:all .12s; }
+ .fchip:hover { border-color:#CBD5E1; color:#334155; }
+ .fchip.on { background:#0F172A; color:#fff; border-color:#0F172A; }
+ .fsel { padding:7px 30px 7px 12px; border-radius:9px; border:1px solid #E5E7EB; background:#fff; color:#334155;
+         font-size:12.5px; font-weight:600; font-family:inherit; cursor:pointer; outline:none;
+         appearance:none; -webkit-appearance:none;
+         background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%2394A3B8' stroke-width='2.4' viewBox='0 0 24 24'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 8.25l-7.5 7.5-7.5-7.5'/%3E%3C/svg%3E");
+         background-repeat:no-repeat; background-position:right 10px center; }
+ .fsel:hover { border-color:#CBD5E1; }
+ .fsel:focus { border-color:#312E81; box-shadow:0 0 0 3px rgba(49,46,129,.1); }
+ .cbx { width:15px; height:15px; border-radius:4px; accent-color:#312E81; cursor:pointer; vertical-align:middle; }
 
- /* Reviewer avatars */
- .rv-avatar { width:28px; height:28px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:800; flex-shrink:0; }
+ /* Register table */
+ .rtbl { width:100%; border-collapse:collapse; }
+ .rtbl th { padding:11px 16px; text-align:left; font-size:10.5px; font-weight:600; color:#94A3B8;
+            text-transform:uppercase; letter-spacing:.04em; border-bottom:1px solid #E5E7EB; }
+ .rtbl td { padding:13px 16px; border-bottom:1px solid #F1F5F9; }
+ .rtbl tr:last-child td { border-bottom:none; }
+ .rtbl tbody tr { cursor:pointer; transition:background .1s; }
+ .rtbl tbody tr:hover { background:#F8FAFC; }
+
+ /* Heatmap */
+ .hm-cell { border-radius:10px; padding:11px 8px; transition:transform .12s; }
+ .hm-cell:hover { transform:scale(1.03); }
+
+ /* Tab panel — explicit spacing between sibling sections (robust vs flex gap
+    under Alpine x-show, which was collapsing to 0). */
+ .opanel { position:absolute; inset:0; overflow-y:auto; padding:32px 36px 52px; box-sizing:border-box; }
+ .opanel > * { margin-bottom:34px; }
+ .opanel > *:last-child { margin-bottom:0; }
+ .row-title { font-size:19px; font-weight:800; letter-spacing:-.02em; color:#0F172A; margin:0 0 3px; }
+ .row-sub { font-size:13px; color:#64748B; margin:0 0 16px; }
+
+ /* Key-insight cards */
+ .ins { border-radius:16px; padding:16px 18px; border:1px solid; display:flex; gap:12px; align-items:flex-start; }
+ .ins-ic { width:32px; height:32px; border-radius:9px; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+ .ins-t { font-size:13px; font-weight:700; color:#0F172A; margin:0; line-height:1.35; letter-spacing:-.01em; }
+ .ins-d { font-size:12px; color:#475569; margin:4px 0 0; line-height:1.5; }
+
+ /* Sparkline (real data, tiny bars) */
+ .spark { display:flex; align-items:flex-end; gap:2px; height:26px; }
+ .spark span { flex:1; border-radius:2px 2px 0 0; background:#CBD5E1; min-height:2px; }
+
+ /* Chart caption */
+ .ch-note { display:flex; align-items:flex-start; gap:8px; margin-top:16px; padding:11px 13px;
+            background:#F8FAFC; border-radius:11px; font-size:11.5px; color:#475569; line-height:1.5; }
+
+ /* Header meta toolbar */
+ .meta-bar { display:flex; align-items:center; gap:0; flex-wrap:wrap; }
+ .meta-item { display:flex; flex-direction:column; gap:1px; padding:0 18px; border-left:1px solid #E5E7EB; }
+ .meta-item:first-child { padding-left:0; border-left:none; }
+ .meta-k { font-size:10px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:#94A3B8; }
+ .meta-v { font-size:13.5px; font-weight:700; color:#0F172A; letter-spacing:-.01em; }
+ .tbtn { display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border-radius:10px;
+         font-size:12.5px; font-weight:600; font-family:inherit; cursor:pointer; transition:all .12s; }
+ .tbtn-ghost { background:#fff; border:1px solid #E5E7EB; color:#475569; }
+ .tbtn-ghost:hover { border-color:#CBD5E1; background:#F8FAFC; }
+
+ /* Delta badges */
+ .delta { display:inline-flex; align-items:center; gap:3px; font-size:11px; font-weight:700; letter-spacing:-.01em; }
+ .delta svg { width:12px; height:12px; }
+
+ /* Mini progress */
+ .mini-track { height:6px; border-radius:4px; background:#EEF2F6; overflow:hidden; }
+ .mini-fill { height:100%; border-radius:4px; }
+
+ /* Attention banner */
+ .banner { border-radius:18px; padding:18px 22px; display:flex; align-items:center; gap:18px; }
+
+ /* Action rows (richer) */
+ .arow { display:grid; grid-template-columns:auto 1fr auto auto; align-items:center; gap:20px;
+         padding:15px 22px; text-decoration:none; border-top:1px solid #F1F5F9; transition:background .12s; }
+ .arow:hover { background:#F8FAFC; }
+ .arow-field { display:flex; flex-direction:column; gap:2px; min-width:0; }
+ .arow-k { font-size:9.5px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:#94A3B8; }
+ .arow-v { font-size:12px; font-weight:600; color:#334155; white-space:nowrap; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="flex flex-col h-full overflow-hidden"
- style="background:#F7F9FC;"
+<div class="anx flex flex-col h-full overflow-hidden" style="background:#F8FAFC;"
  x-data="{
- tab: 'overview',
- inited: {},
- activate(t) {
- this.tab = t;
- if (!this.inited[t]) {
- this.inited[t] = true;
- setTimeout(() => window.initTabCharts && window.initTabCharts(t), 80);
- }
- }
+   tab: 'overview',
+   inited: {},
+   activate(t) {
+     this.tab = t;
+     if (!this.inited[t]) { this.inited[t] = true; setTimeout(() => window.initTabCharts && window.initTabCharts(t), 80); }
+   }
  }"
  x-init="setTimeout(() => { inited['overview'] = true; window.initTabCharts && window.initTabCharts('overview'); }, 80)">
 
- {# ── Top bar ── #}
- <div style="background:#fff;border-bottom:1px solid #E5E8EF;padding:18px 28px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;">
- <div>
- <h1 style="font-size:15px;font-weight:700;color:#002583;margin:0 0 2px;">Analytics</h1>
- <p style="font-size:11px;color:#002583;margin:0;">Compliance intelligence across all comparison runs and jurisdictions</p>
- </div>
- <div style="display:flex;align-items:center;gap:8px;">
- <span class="run-pill" style="background:#E5E8EF;color:#002583;">
- <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z"/></svg>
- {{ total_results }} clause pairs
- </span>
- <span class="run-pill" style="background:#E5E8EF;color:#002583;">
- <svg width="10" height="10" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"/></svg>
- {{ complete_runs }} runs complete
- </span>
- {% if failed_runs %}
- <span class="run-pill" style="background:#E5E8EF;color:#002583;">{{ failed_runs }} failed</span>
- {% endif %}
- </div>
- </div>
-
- {# ── Tab strip ── #}
- <div style="background:#fff;border-bottom:1px solid #E5E8EF;padding:0 28px;flex-shrink:0;display:flex;align-items:stretch;overflow-x:auto;">
- <button class="an-tab" :class="tab==='overview' ? 'active' : ''" @click="activate('overview')">
- <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
- Overview
- </button>
- <button class="an-tab" :class="tab==='clauses' ? 'active' : ''" @click="activate('clauses')">
- <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"/></svg>
- Clause Analysis
- <span class="an-tab-badge">{{ total_results }}</span>
- </button>
- <button class="an-tab" :class="tab==='gaps' ? 'active' : ''" @click="activate('gaps')">
- <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
- Gaps &amp; Conflicts
- <span class="an-tab-badge" style="{% if conflicting_count %}background:#E5E8EF;color:#002583;{% endif %}">{{ conflicting_count }}</span>
- </button>
- <button class="an-tab" :class="tab==='review' ? 'active' : ''" @click="activate('review')">
- <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
- Review Quality
- <span class="an-tab-badge">{{ acc_overall }}%</span>
- </button>
- <button class="an-tab" :class="tab==='mapping' ? 'active' : ''" @click="activate('mapping')">
- <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
- Policy Mapping
- <span class="an-tab-badge">{{ mapping_total }}</span>
- </button>
+ {# ── Header ── #}
+ <div style="background:#fff;border-bottom:1px solid #E5E7EB;padding:22px 32px 0;flex-shrink:0;">
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin-bottom:18px;flex-wrap:wrap;">
+   <div>
+    <h1 style="font-size:24px;font-weight:800;letter-spacing:-.025em;color:#0F172A;margin:0 0 4px;">Analytics</h1>
+    <p style="font-size:13px;color:#64748B;margin:0;">Compliance posture and remediation across all jurisdictions</p>
+   </div>
+   <div style="display:flex;align-items:center;gap:22px;">
+    <div class="meta-bar">
+     <div class="meta-item">
+      <span class="meta-k">Last updated</span>
+      <span class="meta-v">{% if meta_last_updated %}{{ meta_last_updated|date:"j M, H:i" }}{% else %}—{% endif %}</span>
+     </div>
+     <div class="meta-item">
+      <span class="meta-k">Jurisdictions</span>
+      <span class="meta-v">{{ meta_jurisdictions }}</span>
+     </div>
+     <div class="meta-item">
+      <span class="meta-k">Regulations</span>
+      <span class="meta-v">{{ meta_regulations }}</span>
+     </div>
+     <div class="meta-item">
+      <span class="meta-k">Policies</span>
+      <span class="meta-v">{{ meta_policies }}</span>
+     </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+     <button class="tbtn tbtn-ghost" onclick="exportActions()">
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+      Export
+     </button>
+     <button class="tbtn tbtn-ghost" onclick="window.location.reload()">
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992V4.356M20.015 9.348a8.25 8.25 0 10.007 5.652M3.985 14.652H-.007"/></svg>
+      Refresh
+     </button>
+    </div>
+   </div>
+  </div>
+  <div style="padding-bottom:18px;">
+   <div class="segwrap">
+    <button class="seg" :class="tab==='overview'?'on':''" @click="activate('overview')">
+     <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>
+     Overview
+    </button>
+    <button class="seg" :class="tab==='register'?'on':''" @click="activate('register')">
+     <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+     Action Register
+     <span class="seg-badge" :class="tab==='register'?'':''" style="{% if action_critical %}background:#FEE2E2;color:#B91C1C;{% endif %}">{{ action_total }}</span>
+    </button>
+    <button class="seg" :class="tab==='coverage'?'on':''" @click="activate('coverage')">
+     <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10h6m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/></svg>
+     Coverage
+    </button>
+   </div>
+  </div>
  </div>
 
  <div style="flex:1;overflow:hidden;position:relative;min-height:0;">
 
- {% comment %}TAB: OVERVIEW — combines comparison KPIs with policy-mapping KPIs at the top so the page is meaningful even when one of the two pipelines is empty.{% endcomment %}
- <div x-show="tab==='overview'" style="position:absolute;inset:0;overflow-y:auto;padding:22px 28px;display:flex;flex-direction:column;gap:18px;box-sizing:border-box;">
+ {# ═══════════ OVERVIEW ═══════════ #}
+ <div x-show="tab==='overview'" class="opanel">
 
- {% comment %}
- Policy-mapping summary band removed from the Overview tab — the dedicated
- Policy Mapping tab now carries that summary, so showing it here too was
- duplicate clutter. (Removed 2026-05-14 per user request.)
- {% endcomment %}
+  {# Action-first: what needs attention, before any statistic #}
+  {% if action_critical or conflicting_count %}
+  <div class="banner" style="{% if action_critical %}background:#FEF2F2;border:1px solid #FECACA;{% else %}background:#FFFBEB;border:1px solid #FDE68A;{% endif %}">
+   <div style="width:44px;height:44px;border-radius:13px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:{% if action_critical %}#FEE2E2{% else %}#FEF3C7{% endif %};">
+    <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="{% if action_critical %}#DC2626{% else %}#D97706{% endif %}" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+   </div>
+   <div style="flex:1;min-width:0;">
+    <p style="font-size:14.5px;font-weight:700;color:{% if action_critical %}#991B1B{% else %}#92400E{% endif %};margin:0;letter-spacing:-.01em;">
+     {% if action_critical %}{{ action_critical }} critical item{{ action_critical|pluralize }} need{{ action_critical|pluralize:"s," }} immediate attention{% else %}{{ conflicting_count }} open conflict{{ conflicting_count|pluralize }} to review{% endif %}
+    </p>
+    <p style="font-size:12.5px;color:{% if action_critical %}#B91C1C{% else %}#B45309{% endif %};margin:3px 0 0;">
+     {{ action_high }} high-priority · {{ conflicting_count }} clause conflict{{ conflicting_count|pluralize }} · {{ action_total }} open action{{ action_total|pluralize }} in total
+    </p>
+   </div>
+   <button @click="activate('register')" type="button" style="flex-shrink:0;padding:10px 18px;border-radius:11px;border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;color:#fff;background:{% if action_critical %}#DC2626{% else %}#D97706{% endif %};display:inline-flex;align-items:center;gap:6px;">
+    Review now
+    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+   </button>
+  </div>
+  {% endif %}
 
- {# Comparison KPI row #}
- <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;">
+  {# KPI cards — neutral by default; colour only signals a real problem #}
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;">
 
- <div class="kpi">
- <div class="kpi-icon">
- <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25z"/></svg>
- </div>
- <p class="an-label" style="margin-top:10px;">Clause Pairs</p>
- <p class="kpi-num" style="color:#002583;">{{ total_results }}</p>
- <p class="kpi-sub">across {{ total_runs }} runs</p>
- </div>
-
- <div class="kpi" style="border-left-color:#1B7F3A;">
- <div class="kpi-icon" style="background:#E1F4E5;">
- <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#1B7F3A" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
- </div>
- <p class="an-label" style="margin-top:10px;">Equivalent</p>
- <p class="kpi-num" style="color:#1B7F3A;">{{ equivalent_pct }}%</p>
- <p class="kpi-sub">of all clause pairs</p>
- </div>
-
- <div class="kpi" style="border-left-color:{% if conflicting_count %}#D93939{% else %}#1B7F3A{% endif %};">
- <div class="kpi-icon" style="background:{% if conflicting_count %}#FCE8E8{% else %}#E1F4E5{% endif %};">
- <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="{% if conflicting_count %}#D93939{% else %}#1B7F3A{% endif %}" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
- </div>
- <p class="an-label" style="margin-top:10px;">Conflicts</p>
- <p class="kpi-num" style="color:{% if conflicting_count %}#D93939{% else %}#1B7F3A{% endif %};">{{ conflicting_count }}</p>
- <p class="kpi-sub">need resolution</p>
- </div>
-
- <div class="kpi">
- <div class="kpi-icon">
- <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"/></svg>
- </div>
- <p class="an-label" style="margin-top:10px;">Complete Runs</p>
- <p class="kpi-num">{{ complete_runs }}</p>
- <p class="kpi-sub">of {{ total_runs }} total</p>
- </div>
-
- <div class="kpi" style="border-left-color:{% if acc_overall >= 80 %}#1B7F3A{% elif acc_overall >= 50 %}#FFB800{% else %}#D93939{% endif %};">
- <div class="kpi-icon" style="background:{% if acc_overall >= 80 %}#E1F4E5{% elif acc_overall >= 50 %}#FFF6E0{% else %}#FCE8E8{% endif %};">
- <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="{% if acc_overall >= 80 %}#1B7F3A{% elif acc_overall >= 50 %}#B07A00{% else %}#D93939{% endif %}" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg>
- </div>
- <p class="an-label" style="margin-top:10px;">AI Accuracy</p>
- <p class="kpi-num" style="color:{% if acc_overall >= 80 %}#1B7F3A{% elif acc_overall >= 50 %}#B07A00{% else %}#D93939{% endif %};">{{ acc_overall }}%</p>
- <p class="kpi-sub">{{ acc_total_reviewed }} reviewed</p>
- </div>
-
- </div>
-
- {# Relationship breakdown #}
- <div class="an-card an-card-p">
- <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;">
- <div>
- <span class="an-label">Clause Relationship Breakdown</span>
- <span class="an-title">How {{ total_results }} clause pairs are classified across all runs</span>
- </div>
- <span style="font-size:10px;font-weight:600;color:#002583;background:#E5E8EF;padding:3px 10px;border-radius:20px;">{{ total_runs }} runs</span>
- </div>
-
- {# Stacked bar with gap and rounded ends #}
- <div style="display:flex;height:20px;border-radius:10px;overflow:hidden;gap:2px;margin-bottom:18px;">
- {% for item in rel_breakdown %}{% if item.pct > 0 %}
- <div style="width:{{ item.pct }}%;background:{{ item.color }};flex-shrink:0;transition:width .6s;"
- title="{{ item.label }}: {{ item.count }} ({{ item.pct }}%)"></div>
- {% endif %}{% endfor %}
- </div>
-
- {# 4 tiles #}
- <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
- {% for item in rel_breakdown %}
- <div class="rel-tile" style="background:{{ item.color }}0D;border-color:{{ item.color }}30;">
- <div style="width:28px;height:4px;border-radius:2px;background:{{ item.color }};margin:0 auto 10px;"></div>
- <p style="font-size:8px;font-weight:800;color:{{ item.color }};text-transform:uppercase;letter-spacing:.08em;margin:0 0 6px;white-space:nowrap;">{{ item.label }}</p>
- <p style="font-size:26px;font-weight:800;color:#002583;margin:0;line-height:1;font-family:'Fredoka',sans-serif;">{{ item.count }}</p>
- <p style="font-size:12px;font-weight:700;margin:4px 0 0;color:{{ item.color }};">{{ item.pct }}%</p>
- </div>
- {% endfor %}
- </div>
- </div>
-
- {# Activity charts #}
- <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
- <div class="an-card an-card-p">
- <span class="an-label">Activity Over Time</span>
- <span class="an-title">Completed runs &amp; clause pairs — last 6 months</span>
- <div style="position:relative;width:100%;height:190px;margin-top:16px;">
- <canvas id="chart-runs-over-time"></canvas>
- </div>
- </div>
- <div class="an-card an-card-p">
- <span class="an-label">Equivalent % Per Run</span>
- <span class="an-title">How aligned each completed run is — most recent {{ complete_runs }}</span>
- <div style="position:relative;width:100%;height:190px;margin-top:16px;">
- <canvas id="chart-compliance-by-run"></canvas>
- </div>
- </div>
- </div>
-
- {# Lifecycle funnel #}
- <div class="an-card an-card-p">
- <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
- <div>
- <span class="an-label">Review Lifecycle</span>
- <span class="an-title">Workflow progress across all {{ total_results }} clause pairs</span>
- </div>
- <span style="font-size:11px;font-weight:700;color:#002583;background:#E5E8EF;padding:4px 12px;border-radius:20px;">
- {% if total_results %}{% widthratio reviewed_total total_results 100 %}{% else %}0{% endif %}% reviewed
- </span>
- </div>
-
- <div style="display:flex;align-items:stretch;gap:0;margin-bottom:16px;">
- {# Draft #}
- <div class="lc-box" style="background:#E5E8EF;">
- <p style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#002583;margin:0;">Draft</p>
- <p style="font-size:26px;font-weight:800;color:#002583;margin:4px 0 0;line-height:1;font-family:'Fredoka',sans-serif;">{{ lc_draft }}</p>
- <p style="font-size:9px;color:#002583;margin:2px 0 0;">{% if total_results %}{% widthratio lc_draft total_results 100 %}%{% else %}0%{% endif %}</p>
- </div>
- <div class="lc-arrow" style="display:flex;align-items:center;">›</div>
- {# Reviewed #}
- <div class="lc-box" style="background:#E5E8EF;">
- <p style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#002583;margin:0;">Reviewed</p>
- <p style="font-size:26px;font-weight:800;color:#002583;margin:4px 0 0;line-height:1;font-family:'Fredoka',sans-serif;">{{ lc_reviewed }}</p>
- <p style="font-size:9px;color:#002583;margin:2px 0 0;">{% if total_results %}{% widthratio lc_reviewed total_results 100 %}%{% else %}0%{% endif %}</p>
- </div>
- <div class="lc-arrow" style="display:flex;align-items:center;">›</div>
- {# Approved #}
- <div class="lc-box" style="background:#E5E8EF;">
- <p style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#002583;margin:0;">Approved</p>
- <p style="font-size:26px;font-weight:800;color:#002583;margin:4px 0 0;line-height:1;font-family:'Fredoka',sans-serif;">{{ approved_count }}</p>
- <p style="font-size:9px;color:#002583;margin:2px 0 0;">{% if total_results %}{% widthratio approved_count total_results 100 %}%{% else %}0%{% endif %}</p>
- </div>
- <div class="lc-arrow" style="display:flex;align-items:center;color:#9CA3AF;">·</div>
- {# Rejected #}
- <div class="lc-box" style="background:#E5E8EF;">
- <p style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#002583;margin:0;">Rejected</p>
- <p style="font-size:26px;font-weight:800;color:#002583;margin:4px 0 0;line-height:1;font-family:'Fredoka',sans-serif;">{{ rejected_count }}</p>
- <p style="font-size:9px;color:#002583;margin:2px 0 0;">{% if total_results %}{% widthratio rejected_count total_results 100 %}%{% else %}0%{% endif %}</p>
- </div>
- </div>
-
- {# Progress bar #}
- <div style="height:8px;background:#E5E8EF;border-radius:5px;overflow:hidden;">
- {% if total_results %}
- <div style="height:100%;width:{% widthratio reviewed_total total_results 100 %}%;background:#002583;border-radius:5px;transition:width .6s;"></div>
- {% endif %}
- </div>
- </div>
-
- </div>
-
- {# ════════════ TAB: CLAUSE ANALYSIS ════════════ #}
- <div x-show="tab==='clauses'" style="position:absolute;inset:0;overflow-y:auto;padding:22px 28px;display:flex;flex-direction:column;gap:18px;box-sizing:border-box;">
-
- {# Relationship by pair — wide chart #}
- <div class="an-card an-card-p">
- <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
- <div>
- <span class="an-label">Relationship by Jurisdiction Pair</span>
- <span class="an-title">How clauses compare across BH ↔ IN, BH ↔ KW, IN ↔ KW</span>
- </div>
- <div style="display:flex;gap:8px;">
- {% for pd in pair_data %}
- <div style="text-align:center;padding:8px 14px;background:#E5E8EF;border:1.5px solid #E5E8EF;border-radius:10px;min-width:72px;">
- <p style="font-size:9px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:.06em;margin:0 0 2px;">{{ pd.label }}</p>
- <p style="font-size:18px;font-weight:800;font-family:'Fredoka',sans-serif;color:#002583;margin:0;line-height:1;">{{ pd.total }}</p>
- </div>
- {% endfor %}
- </div>
- </div>
- <div style="position:relative;width:100%;height:220px;">
- <canvas id="chart-relationship-by-pair"></canvas>
- </div>
- </div>
-
- {# Three charts #}
- <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">
- <div class="an-card an-card-p">
- <span class="an-label">Confidence Distribution</span>
- <span class="an-title">Clause pairs by AI confidence score</span>
- <div style="position:relative;width:100%;height:185px;margin-top:14px;"><canvas id="chart-confidence-hist"></canvas></div>
- <div style="display:flex;gap:10px;margin-top:10px;">
- <div style="display:flex;align-items:center;gap:4px;"><div style="width:8px;height:8px;border-radius:2px;background:#1D9E75CC;"></div><span style="font-size:9px;color:#002583;">≥ 80%</span></div>
- <div style="display:flex;align-items:center;gap:4px;"><div style="width:8px;height:8px;border-radius:2px;background:#BA7517CC;"></div><span style="font-size:9px;color:#002583;">60–79%</span></div>
- <div style="display:flex;align-items:center;gap:4px;"><div style="width:8px;height:8px;border-radius:2px;background:#E24B4ACC;"></div><span style="font-size:9px;color:#002583;">< 60%</span></div>
- </div>
- </div>
- <div class="an-card an-card-p">
- <span class="an-label">Avg Confidence by Type</span>
- <span class="an-title">Mean AI confidence per relationship</span>
- <div style="position:relative;width:100%;height:185px;margin-top:14px;"><canvas id="chart-avg-confidence"></canvas></div>
- </div>
- <div class="an-card an-card-p">
- <span class="an-label">Top Privacy Principles</span>
- <span class="an-title">Most frequently tagged principle IDs</span>
- <div style="position:relative;width:100%;height:185px;margin-top:14px;"><canvas id="chart-top-principles"></canvas></div>
- </div>
- </div>
-
- {# Radar + Heatmap #}
- <div style="display:grid;grid-template-columns:1fr 2fr;gap:14px;">
- <div class="an-card an-card-p">
- <span class="an-label">Coverage by Principle</span>
- <span class="an-title">% equivalent clauses per privacy principle</span>
- <div style="position:relative;width:100%;height:260px;margin-top:14px;"><canvas id="chart-radar"></canvas></div>
- </div>
- <div class="an-card">
- <div style="padding:16px 20px 14px;border-bottom:1px solid #E5E8EF;display:flex;align-items:center;justify-content:space-between;gap:12px;">
- <div>
- <span class="an-label">Principle Coverage Heatmap</span>
- <span class="an-title">Equivalent clause rate per principle × jurisdiction pair</span>
- </div>
- <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
- <div style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:3px;background:#E5E8EF;border:1px solid #002583;display:inline-block;"></span><span style="font-size:9px;color:#002583;">≥ 70%</span></div>
- <div style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:3px;background:#E5E8EF;border:1px solid #002583;display:inline-block;"></span><span style="font-size:9px;color:#002583;">40–69%</span></div>
- <div style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:3px;background:#E5E8EF;border:1px solid #E5E8EF;display:inline-block;"></span><span style="font-size:9px;color:#002583;">< 40%</span></div>
- <div style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:3px;background:#E5E8EF;border:1px solid #E5E8EF;display:inline-block;"></span><span style="font-size:9px;color:#002583;">No data</span></div>
- </div>
- </div>
- <div style="padding:16px 20px;overflow-x:auto;">
- <table style="border-collapse:separate;border-spacing:6px;min-width:460px;width:100%;">
- <thead>
- <tr>
- <th style="text-align:left;padding:0 8px 10px 0;font-size:9px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:.07em;min-width:120px;">Principle</th>
- {% for pair_label in heatmap_pairs %}
- <th style="text-align:center;padding:0 0 10px;font-size:9px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:.06em;min-width:100px;">{{ pair_label }}</th>
- {% endfor %}
- </tr>
- </thead>
- <tbody>
- {% for row in heatmap_rows %}
- <tr>
- <td style="padding:3px 10px 3px 0;font-size:11px;font-weight:600;color:#002583;white-space:nowrap;">{{ row.label }}</td>
- {% for cell in row.cells %}
- <td style="padding:0;text-align:center;">
- <div class="hm-cell" title="{{ cell.pair_label }}: {{ cell.equiv }}/{{ cell.total }} equivalent{% if cell.pct %} ({{ cell.pct }}%){% endif %}"
- style="background:{{ cell.bg }};cursor:{% if cell.total %}pointer{% else %}default{% endif %};">
- {% if cell.pct is not None %}
- <p style="font-size:14px;font-weight:800;font-family:'Fredoka',sans-serif;color:{{ cell.fg }};margin:0;line-height:1;">{{ cell.pct }}%</p>
- <p style="font-size:9px;color:{{ cell.fg }};opacity:.7;margin:2px 0 0;">{{ cell.equiv }}/{{ cell.total }}</p>
- {% else %}
- <p style="font-size:12px;color:#9CA3AF;margin:0;line-height:2.4;">—</p>
- {% endif %}
- </div>
- </td>
- {% endfor %}
- </tr>
- {% endfor %}
- </tbody>
- </table>
- </div>
- </div>
- </div>
-
- {% comment %}
- "Jurisdiction Pair Breakdown" cards removed — they showed the same data
- (relationship counts per pair) that the "Relationship by Jurisdiction Pair"
- chart at the top of this tab already visualises. The per-pair total tiles
- above the chart cover the headline numbers. (Removed 2026-05-14 per user
- cleanup request.)
- {% endcomment %}
-
- </div>
-
- {% comment %}TAB: GAPS & CONFLICTS — combines comparison conflicts (regulation vs regulation) and policy-mapping gaps (regulation vs internal policy). Both are types of "things needing remediation" so they live together.{% endcomment %}
- <div x-show="tab==='gaps'" style="position:absolute;inset:0;overflow-y:auto;padding:22px 28px;display:flex;flex-direction:column;gap:18px;box-sizing:border-box;">
-
- {% if mapping_total %}
- {# Policy mapping gaps band — separate from clause conflicts because they're a different KIND of finding (policy missing/incomplete vs regulation A vs B clashing) #}
- <div class="an-card" style="overflow:hidden;">
-   <div style="padding:14px 20px;border-bottom:1px solid #E5E8EF;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg, #FCE8E8 0%, #FFF6F6 100%);">
-     <div style="display:flex;align-items:center;gap:12px;">
-       <div style="width:36px;height:36px;border-radius:10px;background:#fff;border:1px solid #FDD;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-         <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#C03A3A" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
-       </div>
-       <div>
-         <span class="an-label" style="color:#C03A3A;">Policy Mapping Gaps</span>
-         <p style="font-size:13px;font-weight:700;color:#1A2440;margin:0;line-height:1.2;">{{ mapping_gaps }} obligation{{ mapping_gaps|pluralize }} flagged across {{ mapping_total }} run{{ mapping_total|pluralize }}</p>
-       </div>
-     </div>
-     <button @click="activate('mapping')" type="button"
-             style="padding:7px 14px;border-radius:8px;background:#fff;border:1px solid #FDD;color:#C03A3A;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:5px;transition:background .12s;"
-             onmouseover="this.style.background='#FCE8E8';"
-             onmouseout="this.style.background='#fff';">
-       View all
-       <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
-     </button>
+   {# Compliance score #}
+   <div class="kpi" style="background:#fff;border-color:#E5E7EB;">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+     <div class="kpi-icon" style="background:#F1F5F9;"><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#475569" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
+     {% if coverage_total %}<span style="font-size:11px;font-weight:600;color:{% if mapping_compliance_pct < 50 %}#B91C1C{% else %}#94A3B8{% endif %};">{% if mapping_compliance_pct >= 80 %}On track{% elif mapping_compliance_pct >= 50 %}At risk{% else %}Below target{% endif %}</span>{% endif %}
+    </div>
+    {% if coverage_total %}
+    <p class="kpi-val" style="color:{% if mapping_compliance_pct < 50 %}#B91C1C{% else %}#0F172A{% endif %};">{{ mapping_compliance_pct }}%</p>
+    <p class="kpi-lab">Compliance score</p>
+    <div class="mini-track" style="margin-top:12px;background:#F1F5F9;"><div class="mini-fill" style="width:{% widthratio coverage_done coverage_total 100 %}%;background:#334155;"></div></div>
+    <p class="kpi-sub">{{ coverage_done }} of {{ coverage_total }} obligations covered</p>
+    {% else %}
+    <p class="kpi-val" style="color:#CBD5E1;">—</p>
+    <p class="kpi-lab">Compliance score</p>
+    <p class="kpi-sub" style="margin-top:12px;">No policy mappings yet</p>
+    {% endif %}
    </div>
 
-   {% if mapping_urgent_gaps %}
-   <div style="padding:14px 20px;display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">
-     {% for g in mapping_urgent_gaps|slice:":6" %}
-     <a href="{% url 'mapping-workspace' g.mapping.pk %}" style="text-decoration:none;display:block;padding:10px 12px;border:1px solid #E5E8EF;border-left:3px solid {% if g.priority == 'critical' %}#C03A3A{% else %}#E07A1F{% endif %};border-radius:8px;background:#fff;transition:background .12s,border-color .12s;"
-        onmouseover="this.style.background='#F4F6FB';"
-        onmouseout="this.style.background='#fff';">
-       <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap;">
-         <span style="padding:1px 7px;border-radius:5px;font-size:9px;font-weight:800;background:{% if g.priority == 'critical' %}#FCE8E8;color:#C03A3A;{% else %}#FFF1D6;color:#B86E00;{% endif %}">{{ g.priority|upper }}</span>
-         <span style="font-size:10px;color:#5A6685;">{{ g.obligation_mapping.regulation.jurisdiction|capfirst }} · {{ g.obligation_mapping.article_ref|truncatechars:30 }}</span>
-       </div>
-       <p style="font-size:11.5px;font-weight:600;color:#1A2440;margin:0;line-height:1.4;">{{ g.obligation_mapping.obligation_title|truncatechars:90 }}</p>
-       <p style="font-size:10px;color:#5A6685;margin:4px 0 0;">in {{ g.mapping.policy_doc.name|truncatechars:48 }}</p>
-     </a>
-     {% endfor %}
+   {# Critical actions — the one card allowed to go red #}
+   <div class="kpi" style="background:#fff;border-color:{% if action_critical %}#FECACA{% else %}#E5E7EB{% endif %};">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+     <div class="kpi-icon" style="background:{% if action_critical %}#FEE2E2{% else %}#F1F5F9{% endif %};">
+      <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="{% if action_critical %}#DC2626{% else %}#475569{% endif %}" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+     </div>
+     <span style="font-size:11px;font-weight:600;color:{% if action_critical %}#B91C1C{% else %}#94A3B8{% endif %};">{% if action_critical %}Needs action{% else %}Clear{% endif %}</span>
+    </div>
+    <p class="kpi-val" style="color:{% if action_critical %}#B91C1C{% else %}#0F172A{% endif %};">{{ action_critical }}</p>
+    <p class="kpi-lab">Critical actions</p>
+    <p class="kpi-sub" style="margin-top:12px;">{{ action_high }} high-priority · {{ action_total }} open in total</p>
+   </div>
+
+   {# Open conflicts #}
+   <div class="kpi" style="background:#fff;border-color:#E5E7EB;">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+     <div class="kpi-icon" style="background:#F1F5F9;"><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#475569" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/></svg></div>
+     {% if conflicts_delta and conflicts_delta.dir != 'flat' %}
+     <span class="delta" style="color:{% if conflicts_delta.dir == 'up' %}#B91C1C{% else %}#15803D{% endif %};">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4"><path stroke-linecap="round" stroke-linejoin="round" d="{% if conflicts_delta.dir == 'up' %}M4.5 15.75l7.5-7.5 7.5 7.5{% else %}M19.5 8.25l-7.5 7.5-7.5-7.5{% endif %}"/></svg>{{ conflicts_delta.mag_diff }}
+     </span>{% endif %}
+    </div>
+    <p class="kpi-val" style="color:#0F172A;">{{ conflicting_count }}</p>
+    <p class="kpi-lab">Open conflicts</p>
+    <p class="kpi-sub" style="margin-top:12px;">clause-level disagreements{% if conflicts_delta and conflicts_delta.dir != 'flat' %} · {{ conflicts_delta.mag_diff }} {% if conflicts_delta.dir == 'up' %}more{% else %}fewer{% endif %} vs last month{% endif %}</p>
+   </div>
+
+   {# AI accuracy — suppressed at small sample so we don't flex a fake 100% #}
+   <div class="kpi" style="background:#fff;border-color:#E5E7EB;">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+     <div class="kpi-icon" style="background:#F1F5F9;"><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#475569" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg></div>
+     {% if accuracy_reliable and accuracy_delta and accuracy_delta.dir != 'flat' and accuracy_delta.mag_pct is not None %}
+     <span class="delta" style="color:{% if accuracy_delta.dir == 'up' %}#15803D{% else %}#B91C1C{% endif %};">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4"><path stroke-linecap="round" stroke-linejoin="round" d="{% if accuracy_delta.dir == 'up' %}M4.5 15.75l7.5-7.5 7.5 7.5{% else %}M19.5 8.25l-7.5 7.5-7.5-7.5{% endif %}"/></svg>{{ accuracy_delta.mag_pct }}%
+     </span>{% endif %}
+    </div>
+    {% if accuracy_reliable %}
+    <p class="kpi-val" style="color:#0F172A;">{{ acc_overall }}%</p>
+    <p class="kpi-lab">Review agreement</p>
+    <p class="kpi-sub" style="margin-top:12px;">across {{ acc_total_reviewed }} reviewed finding{{ acc_total_reviewed|pluralize }}</p>
+    {% else %}
+    <p class="kpi-val" style="color:#CBD5E1;">—</p>
+    <p class="kpi-lab">Review agreement</p>
+    <p class="kpi-sub" style="margin-top:12px;">{{ acc_total_reviewed }} review{{ acc_total_reviewed|pluralize }} so far — too few to score</p>
+    {% endif %}
+   </div>
+  </div>
+
+  {# Priority actions #}
+  <div class="card">
+   <div class="card-pad" style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #F1F5F9;">
+    <div>
+     <p class="sec-eyebrow">What to fix first</p>
+     <p class="sec-title">Priority actions</p>
+     <p class="sec-sub">Open gaps &amp; conflicts, most severe on top</p>
+    </div>
+    <button @click="activate('register')" type="button" style="padding:9px 16px;border-radius:10px;background:#0F172A;border:none;color:#fff;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;">
+     View all {{ action_total }}
+     <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+    </button>
+   </div>
+   {% if action_items %}
+   <div>
+    {% for a in action_items|slice:":6" %}
+    <a href="{{ a.url }}" class="arow">
+     <span class="sev" style="{% if a.priority == 'critical' %}background:#FEF2F2;color:#B91C1C;{% elif a.priority == 'high' %}background:#FFFBEB;color:#B45309;{% elif a.priority == 'medium' %}background:#EFF6FF;color:#1D4ED8;{% else %}background:#F1F5F9;color:#64748B;{% endif %}">
+      <span class="sev-dot" style="background:{% if a.priority == 'critical' %}#DC2626{% elif a.priority == 'high' %}#D97706{% elif a.priority == 'medium' %}#2563EB{% else %}#94A3B8{% endif %};"></span>{{ a.priority }}
+     </span>
+     <div class="arow-field">
+      <p style="font-size:13px;font-weight:600;color:#0F172A;margin:0;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ a.title }}</p>
+      <p style="font-size:11.5px;color:#64748B;margin:2px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+       <span style="font-weight:600;color:{% if a.kind == 'conflict' %}#B45309{% else %}#475569{% endif %};">{{ a.kind_label }}</span><span style="color:#CBD5E1;"> · </span>{{ a.jurisdiction }}{% if a.context %}<span style="color:#CBD5E1;"> · </span>{{ a.context|truncatechars:40 }}{% endif %}
+      </p>
+     </div>
+     {% if a.confidence %}<span style="font-size:12px;color:#94A3B8;font-variant-numeric:tabular-nums;white-space:nowrap;">{{ a.confidence }}%</span>{% endif %}
+     <svg class="act-open" width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+    </a>
+    {% endfor %}
    </div>
    {% else %}
-   <div style="padding:24px;text-align:center;color:#5A6685;font-size:12px;">No urgent (high/critical) gaps right now.</div>
+   <div style="padding:52px;text-align:center;">
+    <div style="width:52px;height:52px;border-radius:14px;background:#F0FDF4;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;">
+     <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#16A34A" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+    </div>
+    <p style="font-size:14px;font-weight:700;color:#0F172A;margin:0 0 4px;">Nothing to remediate</p>
+    <p style="font-size:12px;color:#64748B;margin:0;">No open gaps or conflicts across your runs.</p>
+   </div>
    {% endif %}
- </div>
- {% endif %}
+  </div>
 
- {% comment %}Clause conflicts come from the comparison pipeline — they're regulation A vs regulation B disagreements, conceptually different from policy-side gaps.{% endcomment %}
- {# Summary strip — comparison-side review status #}
- <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
- {% for bar in ai_bars %}
- <div class="an-card an-card-p" style="border-left:4px solid {{ bar.color }};">
- <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
- <span style="font-size:11px;font-weight:700;color:{{ bar.color }};">{{ bar.label }}</span>
- <span style="font-size:18px;font-weight:800;font-family:'Fredoka',sans-serif;color:#002583;">{{ bar.count }}</span>
- </div>
- <div class="an-track"><div class="an-fill" style="width:{{ bar.pct }}%;background:{{ bar.color }};"></div></div>
- <p style="font-size:9px;color:#002583;margin-top:6px;">{{ bar.pct }}% of reviewed</p>
- </div>
- {% endfor %}
- </div>
-
- {# Charts row #}
- <div style="display:grid;grid-template-columns:3fr 2fr;gap:14px;">
- <div class="an-card an-card-p">
- <span class="an-label">Gap Resolution Trend</span>
- <span class="an-title">Conflicts identified vs clauses approved — last 6 months</span>
- <div style="position:relative;width:100%;height:190px;margin-top:16px;"><canvas id="chart-gap-trend"></canvas></div>
- </div>
- <div class="an-card an-card-p">
- <span class="an-label">Remediation Velocity</span>
- <span class="an-title">Clause approvals per week — last 8 weeks</span>
- <div style="position:relative;width:100%;height:190px;margin-top:16px;"><canvas id="chart-remediation-velocity"></canvas></div>
- </div>
- </div>
-
- {# Conflict hotspots #}
- <div class="an-card" style="overflow:hidden;">
- <div style="padding:16px 20px;border-bottom:1px solid #E5E8EF;display:flex;align-items:center;justify-content:space-between;">
- <div>
- <span class="an-label" style="margin-bottom:2px;">Conflict Hotspots</span>
- <p style="font-size:13px;font-weight:700;color:#002583;margin:0;">{{ conflicting_count }} conflicting clause pair{{ conflicting_count|pluralize }}</p>
- </div>
- <span style="padding:4px 10px;border-radius:20px;font-size:9px;font-weight:700;background:#E5E8EF;color:#002583;letter-spacing:.04em;">Needs review</span>
- </div>
- {% if conflicting_results %}
- <div style="overflow-y:auto;max-height:360px;">
- <table style="width:100%;border-collapse:collapse;">
- <thead>
- <tr style="background:#E5E8EF;border-bottom:1px solid #E5E8EF;position:sticky;top:0;">
- <th style="padding:9px 16px;text-align:left;font-size:9px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:.08em;">Clause A</th>
- <th style="padding:9px 12px;text-align:left;font-size:9px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:.08em;">Clause B</th>
- <th style="padding:9px 12px;text-align:left;font-size:9px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:.08em;">Key Difference</th>
- <th style="padding:9px 12px;text-align:center;font-size:9px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:.08em;">Pair</th>
- <th style="padding:9px 12px;text-align:right;font-size:9px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:.08em;">Conf.</th>
- <th style="padding:9px 12px;text-align:center;font-size:9px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:.08em;">Status</th>
- </tr>
- </thead>
- <tbody>
- {% for result in conflicting_results %}
- <tr class="ct-row" onclick="window.location='{% url 'comparison-workspace' result.run.pk %}'">
- <td style="padding:10px 16px;">
- <p style="font-size:11px;font-weight:700;color:#002583;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px;">{{ result.citation_a }}</p>
- <p style="font-size:9px;color:#002583;margin:2px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:130px;">{{ result.preview_a|truncatechars:40 }}</p>
- </td>
- <td style="padding:10px 12px;">
- <p style="font-size:11px;font-weight:700;color:#002583;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px;">{% if result.citation_b %}{{ result.citation_b }}{% else %}<span style="color:#9CA3AF;font-weight:400;font-style:italic;">—</span>{% endif %}</p>
- <p style="font-size:9px;color:#002583;margin:2px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:110px;">{{ result.preview_b|truncatechars:38 }}</p>
- </td>
- <td style="padding:10px 12px;max-width:180px;">
- <p style="font-size:10px;color:#002583;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ result.key_difference|truncatechars:55 }}</p>
- </td>
- <td style="padding:10px 12px;text-align:center;">
- <span style="padding:3px 8px;border-radius:6px;font-size:9px;font-weight:700;background:#E5E8EF;color:#002583;white-space:nowrap;">{{ result.run.pair_key|upper }}</span>
- </td>
- <td style="padding:10px 12px;text-align:right;">
- <span style="font-size:11px;font-family:'DM Mono',monospace;font-weight:700;color:{% if result.confidence_pct >= 75 %}#002583{% else %}#002583{% endif %};">{{ result.confidence_pct }}%</span>
- </td>
- <td style="padding:10px 12px;text-align:center;">
- <span style="padding:3px 8px;border-radius:6px;font-size:9px;font-weight:700;
- {% if result.lifecycle == 'approved' %}background:#E5E8EF;color:#002583;
- {% elif result.lifecycle == 'rejected' %}background:#E5E8EF;color:#002583;
- {% elif result.lifecycle == 'reviewed' %}background:#E5E8EF;color:#002583;
- {% else %}background:#E5E8EF;color:#002583;{% endif %}">
- {% if result.lifecycle == 'approved' %}Approved{% elif result.lifecycle == 'rejected' %}Rejected{% elif result.lifecycle == 'reviewed' %}Reviewed{% else %}Draft{% endif %}
- </span>
- </td>
- </tr>
- {% endfor %}
- </tbody>
- </table>
- </div>
- {% else %}
- <div style="padding:48px;text-align:center;">
- <div style="width:48px;height:48px;border-radius:50%;background:#E5E8EF;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;">
- <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
- </div>
- <p style="font-size:13px;font-weight:700;color:#002583;margin:0 0 4px;">No conflicts detected</p>
- <p style="font-size:11px;color:#002583;margin:0;">All compared clauses are equivalent or stricter.</p>
- </div>
- {% endif %}
- </div>
-
- </div>
-
- {# ════════════ TAB: REVIEW QUALITY ════════════ #}
- <div x-show="tab==='review'" style="position:absolute;inset:0;overflow-y:auto;padding:22px 28px;display:flex;flex-direction:column;gap:18px;box-sizing:border-box;">
-
- {# Top row: big accuracy + explanation cards #}
- <div style="display:grid;grid-template-columns:auto 1fr 1fr;gap:14px;">
-
- {# Big accuracy card #}
- <div class="an-card an-card-p" style="min-width:200px;border-top:3px solid #002583;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;">
- {# SVG ring #}
- <div style="position:relative;width:110px;height:110px;">
- <svg width="110" height="110" viewBox="0 0 110 110" style="transform:rotate(-90deg);">
- <circle cx="55" cy="55" r="46" fill="none" stroke="#ffffff" stroke-width="9"/>
- <circle cx="55" cy="55" r="46" fill="none" stroke="#002583" stroke-width="9"
- stroke-dasharray="{{ acc_overall|floatformat:0 }} {{ 100|add:0 }}"
- stroke-dasharray="{% widthratio acc_overall 100 289 %} 289"
- stroke-linecap="round"/>
- </svg>
- <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;">
- <span style="font-size:26px;font-weight:800;color:#002583;font-family:'Fredoka',sans-serif;line-height:1;">{{ acc_overall }}%</span>
- <span style="font-size:8px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:.06em;">accuracy</span>
- </div>
- </div>
- <span class="an-label" style="margin:0;">Overall AI Accuracy</span>
- <p style="font-size:10px;color:#002583;margin:0;">{{ acc_total_reviewed }} finding{{ acc_total_reviewed|pluralize }} reviewed</p>
- </div>
-
- <div class="an-card an-card-p" style="border-top:3px solid #002583;">
- <div style="width:36px;height:36px;border-radius:10px;background:#E5E8EF;display:flex;align-items:center;justify-content:center;margin-bottom:12px;">
- <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
- </div>
- <span class="an-label">Approved = AI was correct</span>
- <p style="font-size:12px;color:#002583;line-height:1.65;margin:0;">When a compliance officer clicks <strong>Approve</strong>, they confirm the AI classification was accurate.</p>
- </div>
-
- <div class="an-card an-card-p" style="border-top:3px solid #002583;">
- <div style="width:36px;height:36px;border-radius:10px;background:#E5E8EF;display:flex;align-items:center;justify-content:center;margin-bottom:12px;">
- <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
- </div>
- <span class="an-label">Rejected = AI was wrong</span>
- <p style="font-size:12px;color:#002583;line-height:1.65;margin:0;">When a reviewer clicks <strong>Reject</strong>, the AI got the relationship or confidence score wrong.</p>
- </div>
-
- </div>
-
- {# Charts #}
- <div style="display:grid;grid-template-columns:3fr 2fr;gap:14px;">
- <div class="an-card an-card-p">
- <span class="an-label">Confidence Calibration</span>
- <span class="an-title">Does AI confidence match human agreement rate?</span>
- <span class="an-sub">Grey = what AI claimed · Amber = what reviewers confirmed</span>
- <div style="position:relative;width:100%;height:210px;margin-top:14px;"><canvas id="chart-calibration"></canvas></div>
- </div>
- <div class="an-card an-card-p">
- <span class="an-label">Accuracy Trend</span>
- <span class="an-title">Human approval rate over 6 months</span>
- <span class="an-sub">% of AI findings approved per month</span>
- <div style="position:relative;width:100%;height:210px;margin-top:14px;"><canvas id="chart-accuracy-trend"></canvas></div>
- </div>
- </div>
-
- {# Reviewer table #}
- {% if reviewer_stats %}
- <div class="an-card" style="overflow:hidden;">
- <div style="padding:16px 20px;border-bottom:1px solid #E5E8EF;">
- <span class="an-label" style="margin-bottom:2px;">Reviewer Activity</span>
- <span class="an-title">Who reviewed what, and how often they agreed with the AI</span>
- </div>
- <div style="overflow-x:auto;">
- <table style="width:100%;border-collapse:collapse;">
- <thead>
- <tr style="background:#E5E8EF;border-bottom:1px solid #E5E8EF;">
- <th style="padding:9px 16px;text-align:left;font-size:9px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:.08em;">Reviewer</th>
- <th style="padding:9px 12px;text-align:center;font-size:9px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:.08em;">Approved</th>
- <th style="padding:9px 12px;text-align:center;font-size:9px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:.08em;">Rejected</th>
- <th style="padding:9px 12px;text-align:center;font-size:9px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:.08em;">Total</th>
- <th style="padding:9px 12px;text-align:left;font-size:9px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:.08em;">Agreement rate</th>
- <th style="padding:9px 12px;text-align:right;font-size:9px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:.08em;">Last active</th>
- </tr>
- </thead>
- <tbody>
- {% for rv in reviewer_stats %}
- {% with acc=rv.accuracy_pct %}
- <tr style="border-bottom:1px solid #E5E8EF;">
- <td style="padding:10px 16px;">
- <div style="display:flex;align-items:center;gap:9px;">
- <div class="rv-avatar" style="background:{% if forloop.counter == 1 %}#ffffff;color:#002583;{% elif forloop.counter == 2 %}#ffffff;color:#002583;{% elif forloop.counter == 3 %}#ffffff;color:#002583;{% elif forloop.counter == 4 %}#ffffff;color:#002583;{% else %}#ffffff;color:#002583;{% endif %}">{{ rv.actor|slice:":1"|upper }}</div>
- <span style="font-size:12px;font-weight:600;color:#002583;">{{ rv.actor }}</span>
- </div>
- </td>
- <td style="padding:10px 12px;text-align:center;"><span style="font-size:13px;font-family:'Fredoka',sans-serif;font-weight:700;color:#002583;">{{ rv.approved }}</span></td>
- <td style="padding:10px 12px;text-align:center;"><span style="font-size:13px;font-family:'Fredoka',sans-serif;font-weight:700;color:#002583;">{{ rv.rejected }}</span></td>
- <td style="padding:10px 12px;text-align:center;"><span style="font-size:13px;font-family:'Fredoka',sans-serif;font-weight:600;color:#002583;">{{ rv.total }}</span></td>
- <td style="padding:10px 12px;">
- <div style="display:flex;align-items:center;gap:10px;">
- <div style="flex:1;height:6px;background:#E5E8EF;border-radius:4px;overflow:hidden;max-width:90px;">
- <div style="height:100%;width:{{ acc }}%;background:{% if acc >= 80 %}#002583{% elif acc >= 60 %}#002583{% else %}#002583{% endif %};border-radius:4px;transition:width .5s;"></div>
- </div>
- <span style="font-size:12px;font-weight:700;font-family:'Fredoka',sans-serif;color:{% if acc >= 80 %}#002583{% elif acc >= 60 %}#002583{% else %}#002583{% endif %};">{{ acc }}%</span>
- </div>
- </td>
- <td style="padding:10px 12px;text-align:right;color:#002583;font-size:10px;">{{ rv.last_active }}</td>
- </tr>
- {% endwith %}
- {% endfor %}
- </tbody>
- </table>
- </div>
- </div>
- {% else %}
- <div class="an-card an-card-p" style="text-align:center;padding:48px;">
- <p style="font-size:13px;font-weight:700;color:#002583;margin:0 0 4px;">No reviewer activity yet</p>
- <p style="font-size:11px;color:#002583;margin:0;">Approve or reject findings in the <a href="{% url 'review' %}" style="color:#002583;font-weight:600;">Review queue</a>.</p>
- </div>
- {% endif %}
-
- </div>
-
- {% comment %}TAB: POLICY MAPPING — pulls MappingAnalysis data into the analytics dashboard. Mirrors the comparison tabs' visual language: KPI tiles + breakdown + per-policy table + per-jurisdiction roll-up + urgent gaps panel.{% endcomment %}
- <div x-show="tab==='mapping'" style="position:absolute;inset:0;overflow-y:auto;padding:22px 28px;display:flex;flex-direction:column;gap:18px;box-sizing:border-box;">
-
- {% if mapping_total %}
-
- {# ── KPI tiles row ── #}
- <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;">
-   {# Compliance score #}
-   <div class="kpi">
-     <span class="an-label">Compliance score</span>
-     <p class="kpi-num" style="color:{% if mapping_compliance_pct >= 80 %}#1E7E48{% elif mapping_compliance_pct >= 50 %}#FFB800{% else %}#C03A3A{% endif %};">{{ mapping_compliance_pct }}%</p>
-     <p class="kpi-sub">{{ mapping_counts.covered }} fully + ½×{{ mapping_counts.partial }} partial of {{ mapping_obligations }}</p>
-   </div>
-   {# AI quality #}
-   <div class="kpi">
-     <span class="an-label">AI quality</span>
-     <p class="kpi-num" style="color:{% if mapping_ai_quality_pct >= 85 %}#1E7E48{% elif mapping_ai_quality_pct >= 65 %}#FFB800{% else %}#C03A3A{% endif %};">{{ mapping_ai_quality_pct }}%</p>
-     <p class="kpi-sub">{{ mapping_verified_pct }}% citations verified · {{ mapping_avg_hall }} avg risk</p>
-   </div>
-   {# Gaps #}
-   <div class="kpi">
-     <span class="an-label">Open gaps</span>
-     <p class="kpi-num" style="color:{% if mapping_gaps == 0 %}#1E7E48{% else %}#C03A3A{% endif %};">{{ mapping_gaps }}</p>
-     <p class="kpi-sub">across {{ mapping_total }} mapping run{{ mapping_total|pluralize }}</p>
-   </div>
-   {# Coverage breakdown #}
-   <div class="kpi">
-     <span class="an-label">Coverage breakdown</span>
-     <div style="display:flex;gap:6px;align-items:center;margin-top:10px;flex-wrap:wrap;">
-       <span style="font-size:11px;color:#1E7E48;font-weight:700;">{{ mapping_counts.covered }} ✓</span>
-       <span style="font-size:11px;color:#FFB800;font-weight:700;">{{ mapping_counts.partial }} ◐</span>
-       <span style="font-size:11px;color:#002583;font-weight:700;">{{ mapping_counts.review }} ◇</span>
-       <span style="font-size:11px;color:#C03A3A;font-weight:700;">{{ mapping_counts.none }} ✕</span>
-     </div>
-     <p class="kpi-sub" style="margin-top:8px;">covered · partial · review · gap</p>
-   </div>
- </div>
-
- {# ── Per-jurisdiction coverage roll-up ── #}
- {% if mapping_jurisdictions %}
- <div class="an-card an-card-p">
-   <span class="an-label" style="margin-bottom:14px;">Coverage by jurisdiction</span>
-   <div style="display:flex;flex-direction:column;gap:10px;">
-     {% for j in mapping_jurisdictions %}
+  {# Trends — the accuracy chart only renders when there's real data to plot #}
+  <div style="display:grid;grid-template-columns:{% if accuracy_has_data %}1fr 1fr{% else %}1fr{% endif %};gap:16px;">
+   <div class="card card-pad">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
      <div>
-       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
-         <div style="display:flex;align-items:center;gap:10px;">
-           <span style="font-size:12px;font-weight:700;color:#1A2440;min-width:80px;">{{ j.label }}</span>
-           <span style="font-size:10.5px;color:#5A6685;">{{ j.total }} obligation{{ j.total|pluralize }}</span>
-         </div>
-         <div style="display:flex;align-items:center;gap:14px;">
-           <span style="font-size:10.5px;color:#1A2440;"><strong style="color:#1E7E48;">{{ j.covered }}</strong> covered</span>
-           <span style="font-size:10.5px;color:#1A2440;"><strong style="color:#FFB800;">{{ j.partial }}</strong> partial</span>
-           <span style="font-size:10.5px;color:#1A2440;"><strong style="color:#C03A3A;">{{ j.gaps }}</strong> gaps</span>
-           <span style="font-size:13px;font-weight:800;color:{% if j.pct >= 80 %}#1E7E48{% elif j.pct >= 50 %}#FFB800{% else %}#C03A3A{% endif %};font-variant-numeric:tabular-nums;">{{ j.pct }}%</span>
-         </div>
-       </div>
-       <div style="height:8px;border-radius:4px;background:#F4F6FB;overflow:hidden;display:flex;">
-         <span style="height:100%;background:#1E7E48;width:{% widthratio j.covered j.total 100 %}%;"></span>
-         <span style="height:100%;background:#FFB800;width:{% widthratio j.partial j.total 100 %}%;"></span>
-         <span style="height:100%;background:#C03A3A;width:{% widthratio j.gaps j.total 100 %}%;"></span>
-       </div>
+      <p class="sec-eyebrow">Trending — last 6 months</p>
+      <p class="sec-title">Gap resolution</p>
      </div>
-     {% endfor %}
-   </div>
- </div>
- {% endif %}
-
- {# ── Two-column: per-policy table + urgent gaps ── #}
- <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:14px;">
-
-   {# Per-policy table #}
-   <div class="an-card an-card-p">
-     <span class="an-label" style="margin-bottom:12px;">Most recent mapping runs</span>
-     <table style="width:100%;border-collapse:collapse;">
-       <thead>
-         <tr style="border-bottom:1px solid #E5E8EF;">
-           <th style="text-align:left;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#5A6685;padding:8px 6px;">Policy</th>
-           <th style="text-align:right;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#5A6685;padding:8px 6px;">Obligations</th>
-           <th style="text-align:right;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#5A6685;padding:8px 6px;">Gaps</th>
-           <th style="text-align:right;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#5A6685;padding:8px 6px;">Score</th>
-           <th style="text-align:right;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#5A6685;padding:8px 6px;">When</th>
-         </tr>
-       </thead>
-       <tbody>
-         {% for r in mapping_policy_rows %}
-         <tr style="border-bottom:1px solid #F4F6FB;cursor:pointer;transition:background .12s;"
-             onmouseover="this.style.background='#F4F6FB';"
-             onmouseout="this.style.background='transparent';"
-             onclick="window.location='{% url 'mapping-workspace' r.pk %}'">
-           <td style="font-size:11.5px;font-weight:600;color:#1A2440;padding:10px 6px;line-height:1.4;">{{ r.policy_name|truncatechars:60 }}</td>
-           <td style="text-align:right;font-size:11px;color:#5A6685;padding:10px 6px;font-variant-numeric:tabular-nums;">{{ r.obligation_count }}</td>
-           <td style="text-align:right;font-size:11px;padding:10px 6px;font-variant-numeric:tabular-nums;color:{% if r.gap_count == 0 %}#1E7E48{% else %}#C03A3A{% endif %};font-weight:700;">{{ r.gap_count }}</td>
-           <td style="text-align:right;font-size:11.5px;padding:10px 6px;font-variant-numeric:tabular-nums;color:{% if r.score >= 80 %}#1E7E48{% elif r.score >= 50 %}#FFB800{% else %}#C03A3A{% endif %};font-weight:800;">{{ r.score }}%</td>
-           <td style="text-align:right;font-size:10.5px;color:#5A6685;padding:10px 6px;">{{ r.completed_at|date:"d M" }}</td>
-         </tr>
-         {% endfor %}
-       </tbody>
-     </table>
-   </div>
-
-   {# Urgent gaps panel #}
-   <div class="an-card an-card-p">
-     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-       <span class="an-label" style="margin-bottom:0;">Urgent gaps</span>
-       <span style="font-size:9.5px;color:#5A6685;">High &amp; critical priority</span>
-     </div>
-     {% if mapping_urgent_gaps %}
-     <div style="display:flex;flex-direction:column;gap:8px;">
-       {% for g in mapping_urgent_gaps %}
-       <a href="{% url 'mapping-workspace' g.mapping.pk %}"
-          style="text-decoration:none;display:block;padding:10px 12px;border:1px solid #E5E8EF;border-left:3px solid {% if g.priority == 'critical' %}#C03A3A{% else %}#E07A1F{% endif %};border-radius:8px;background:#fff;transition:background .12s,border-color .12s;"
-          onmouseover="this.style.background='#F4F6FB';"
-          onmouseout="this.style.background='#fff';">
-         <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap;">
-           <span style="padding:1px 7px;border-radius:5px;font-size:9px;font-weight:800;background:{% if g.priority == 'critical' %}#FCE8E8;color:#C03A3A;{% else %}#FFF1D6;color:#B86E00;{% endif %}">{{ g.priority|upper }}</span>
-           <span style="font-size:10px;color:#5A6685;">{{ g.obligation_mapping.regulation.jurisdiction|capfirst }} · {{ g.obligation_mapping.article_ref|truncatechars:32 }}</span>
-         </div>
-         <p style="font-size:11.5px;font-weight:600;color:#1A2440;margin:0;line-height:1.4;">{{ g.obligation_mapping.obligation_title|truncatechars:120 }}</p>
-         <p style="font-size:10px;color:#5A6685;margin:4px 0 0;">in {{ g.mapping.policy_doc.name|truncatechars:50 }}</p>
-       </a>
-       {% endfor %}
-     </div>
-     {% else %}
-     <div style="text-align:center;padding:32px 16px;color:#5A6685;font-size:12px;">
-       No urgent gaps. Great work.
+     {% if conflicts_delta and conflicts_delta.dir != 'flat' %}
+     <div style="text-align:right;">
+      <span class="delta" style="font-size:18px;color:{% if conflicts_delta.dir == 'up' %}#B91C1C{% else %}#15803D{% endif %};">
+       <svg style="width:16px;height:16px;" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4"><path stroke-linecap="round" stroke-linejoin="round" d="{% if conflicts_delta.dir == 'up' %}M4.5 15.75l7.5-7.5 7.5 7.5{% else %}M19.5 8.25l-7.5 7.5-7.5-7.5{% endif %}"/></svg>{{ conflicts_delta.mag_diff }}
+      </span>
+      <p style="font-size:10.5px;color:#94A3B8;margin:1px 0 0;">new vs last month</p>
      </div>
      {% endif %}
+    </div>
+    <div style="position:relative;width:100%;height:190px;margin-top:16px;"><canvas id="chart-gap-trend"></canvas></div>
+    <div class="ch-note"><svg style="width:14px;height:14px;flex-shrink:0;margin-top:1px;" fill="none" viewBox="0 0 24 24" stroke="#64748B" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg><span><strong style="color:#334155;">How to read:</strong> a falling identified line with rising approvals means you're closing gaps faster than new ones appear.</span></div>
    </div>
- </div>
-
- {% else %}
- <div class="an-card an-card-p" style="text-align:center;padding:64px;">
-   <div style="width:48px;height:48px;border-radius:12px;background:#F4F6FB;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;">
-     <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#5A6685" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+   {% if accuracy_has_data %}
+   <div class="card card-pad">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+     <div>
+      <p class="sec-eyebrow">Trending — last 6 months</p>
+      <p class="sec-title">Review agreement</p>
+     </div>
+     {% if accuracy_reliable and accuracy_delta and accuracy_delta.dir != 'flat' and accuracy_delta.mag_pct is not None %}
+     <div style="text-align:right;">
+      <span class="delta" style="font-size:18px;color:{% if accuracy_delta.dir == 'up' %}#15803D{% else %}#B91C1C{% endif %};">
+       <svg style="width:16px;height:16px;" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4"><path stroke-linecap="round" stroke-linejoin="round" d="{% if accuracy_delta.dir == 'up' %}M4.5 15.75l7.5-7.5 7.5 7.5{% else %}M19.5 8.25l-7.5 7.5-7.5-7.5{% endif %}"/></svg>{{ accuracy_delta.mag_pct }}%
+      </span>
+      <p style="font-size:10.5px;color:#94A3B8;margin:1px 0 0;">vs last month</p>
+     </div>
+     {% endif %}
+    </div>
+    <div style="position:relative;width:100%;height:190px;margin-top:16px;"><canvas id="chart-accuracy-trend"></canvas></div>
+    <div class="ch-note"><svg style="width:14px;height:14px;flex-shrink:0;margin-top:1px;" fill="none" viewBox="0 0 24 24" stroke="#64748B" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg><span><strong style="color:#334155;">How to read:</strong> the share of AI findings your reviewers approved each month.</span></div>
    </div>
-   <p style="font-size:14px;font-weight:700;color:#1A2440;margin:0 0 5px;">No policy mapping runs yet</p>
-   <p style="font-size:11.5px;color:#5A6685;margin:0 0 18px;">Run a mapping analysis to populate this dashboard.</p>
-   <a href="{% url 'mapping' %}" style="display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border-radius:9px;font-size:12px;font-weight:700;background:#002583;color:#fff;text-decoration:none;">Go to Policy Mapping →</a>
- </div>
- {% endif %}
+   {% endif %}
+  </div>
 
- </div>{# tab=mapping #}
+ </div>{# overview #}
+
+ {# ═══════════ ACTION REGISTER ═══════════ #}
+ <div x-show="tab==='register'" x-data="registerView()" class="opanel">
+
+  {# Toolbar: filter dropdowns + bulk actions #}
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;">
+   <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+    <span style="font-size:11px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:.04em;">Filter</span>
+    <select class="fsel" x-model="pf"><option value="all">All priorities</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
+    <select class="fsel" x-model="kf"><option value="all">All types</option><option value="gap">Policy gaps</option><option value="conflict">Clause conflicts</option></select>
+    <select class="fsel" x-model="sf"><option value="all">All statuses</option><option value="Open">Open</option><option value="Draft">Draft</option><option value="Reviewed">Reviewed</option><option value="Rejected">Rejected</option></select>
+   </div>
+   <div style="display:flex;align-items:center;gap:10px;" x-show="selCount() > 0" x-cloak>
+    <span style="font-size:12px;font-weight:600;color:#334155;"><span x-text="selCount()"></span> selected</span>
+    <button class="tbtn tbtn-ghost" @click="exportSel()">
+     <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+     Export selected
+    </button>
+    <button class="tbtn tbtn-ghost" @click="clearSel()">Clear</button>
+   </div>
+  </div>
+
+  <div class="card" style="overflow:hidden;">
+   {% if action_items %}
+   <div style="overflow-x:auto;">
+    <table class="rtbl" style="min-width:820px;">
+     <thead>
+      <tr>
+       <th style="width:38px;text-align:center;"><input type="checkbox" class="cbx" :checked="allVisibleSelected()" @click="toggleAll()"></th>
+       <th>Priority</th><th>Action item</th><th>Type</th><th>Jurisdiction</th>
+       <th style="text-align:center;">Status</th><th style="text-align:right;">Action</th>
+      </tr>
+     </thead>
+     <tbody>
+      {% for a in action_items %}
+      <tr x-show="matches('{{ a.priority }}','{{ a.kind }}','{{ a.status }}')"
+          :style="sel[{{ forloop.counter0 }}] ? 'background:#F5F8FF;' : ''">
+       <td style="text-align:center;" @click.stop><input type="checkbox" class="cbx" x-model="sel[{{ forloop.counter0 }}]"></td>
+       <td>
+        {% if a.priority == 'critical' or a.priority == 'high' %}
+        <span class="sev" style="{% if a.priority == 'critical' %}background:#FEF2F2;color:#B91C1C;{% else %}background:#FFF7ED;color:#C2410C;{% endif %}">
+         <span class="sev-dot" style="background:{% if a.priority == 'critical' %}#DC2626{% else %}#EA580C{% endif %};"></span>{{ a.priority }}
+        </span>
+        {% else %}
+        <span style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:500;color:#64748B;text-transform:capitalize;"><span style="width:5px;height:5px;border-radius:50%;background:#CBD5E1;"></span>{{ a.priority }}</span>
+        {% endif %}
+       </td>
+       <td style="max-width:340px;{% if a.url %}cursor:pointer;{% endif %}" {% if a.url %}onclick="window.location='{{ a.url }}'"{% endif %}>
+        <p style="font-size:12.5px;font-weight:600;color:#0F172A;margin:0;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ a.title|truncatechars:90 }}</p>
+        <p style="font-size:11px;color:#94A3B8;margin:3px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ a.context|truncatechars:52 }}{% if a.confidence %} · {{ a.confidence }}% confidence{% endif %}{% if a.source %} · {{ a.source|truncatechars:32 }}{% endif %}</p>
+       </td>
+       <td><span style="font-size:11.5px;font-weight:500;color:{% if a.kind == 'conflict' %}#C2410C{% else %}#475569{% endif %};white-space:nowrap;">{{ a.kind_label }}</span></td>
+       <td><span style="font-size:12px;color:#334155;white-space:nowrap;">{{ a.jurisdiction }}</span></td>
+       <td style="text-align:center;"><span class="stat-chip">{{ a.status }}</span></td>
+       <td style="text-align:right;">
+        {% if a.url %}<a href="{{ a.url }}" @click.stop style="display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:#312E81;text-decoration:none;white-space:nowrap;">Review<svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg></a>{% else %}<span style="color:#CBD5E1;">—</span>{% endif %}
+       </td>
+      </tr>
+      {% endfor %}
+     </tbody>
+    </table>
+   </div>
+   {% else %}
+   <div style="padding:64px;text-align:center;">
+    <div style="width:54px;height:54px;border-radius:15px;background:#F0FDF4;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;">
+     <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#16A34A" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+    </div>
+    <p style="font-size:14px;font-weight:700;color:#0F172A;margin:0 0 4px;">No open action items</p>
+    <p style="font-size:12px;color:#64748B;margin:0;">Every gap and conflict has been resolved or approved.</p>
+   </div>
+   {% endif %}
+  </div>
+
+  <p style="font-size:11px;color:#94A3B8;margin:0;">Bulk assign &amp; resolve need the ownership workflow (removed) — I can add a lightweight version back if you want it.</p>
+
+ </div>{# register #}
+
+ {# ═══════════ COVERAGE ═══════════ #}
+ <div x-show="tab==='coverage'" class="opanel">
+
+  {# ── KPI row ── #}
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;">
+   {# Coverage #}
+   <div class="kpi" style="background:#fff;border-color:#E5E7EB;">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+     <div class="kpi-icon" style="background:#F1F5F9;"><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#475569" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
+     {% if coverage_total %}<span style="font-size:11px;font-weight:600;color:{% if mapping_compliance_pct < 50 %}#B91C1C{% else %}#94A3B8{% endif %};">{% if mapping_compliance_pct >= 80 %}On track{% elif mapping_compliance_pct >= 50 %}At risk{% else %}Below target{% endif %}</span>{% endif %}
+    </div>
+    <p class="kpi-val" style="color:{% if coverage_total and mapping_compliance_pct < 50 %}#B91C1C{% else %}#0F172A{% endif %};">{% if coverage_total %}{{ mapping_compliance_pct }}%{% else %}—{% endif %}</p>
+    <p class="kpi-lab">Coverage</p>
+    {% if coverage_total %}<div class="mini-track" style="margin-top:12px;background:#F1F5F9;"><div class="mini-fill" style="width:{% widthratio coverage_done coverage_total 100 %}%;background:#334155;"></div></div><p class="kpi-sub">{{ coverage_done }} of {{ coverage_total }} obligations</p>{% else %}<p class="kpi-sub" style="margin-top:12px;">No policy mappings yet</p>{% endif %}
+   </div>
+   {# Conflicts — with real sparkline #}
+   <div class="kpi" style="background:#fff;border-color:#E5E7EB;">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+     <div class="kpi-icon" style="background:#F1F5F9;"><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#475569" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/></svg></div>
+     {% if conflicts_delta and conflicts_delta.dir != 'flat' %}<span class="delta" style="color:{% if conflicts_delta.dir == 'up' %}#B91C1C{% else %}#15803D{% endif %};"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4"><path stroke-linecap="round" stroke-linejoin="round" d="{% if conflicts_delta.dir == 'up' %}M4.5 15.75l7.5-7.5 7.5 7.5{% else %}M19.5 8.25l-7.5 7.5-7.5-7.5{% endif %}"/></svg>{{ conflicts_delta.mag_diff }}</span>{% endif %}
+    </div>
+    <p class="kpi-val" style="color:#0F172A;">{{ conflicting_count }}</p>
+    <p class="kpi-lab">Open conflicts</p>
+    <div class="spark" style="margin-top:12px;">{% for v in spark_conflicts %}<span style="height:{% if spark_conflicts_max %}{% widthratio v spark_conflicts_max 100 %}{% else %}0{% endif %}%;background:{% if v %}#C7D2FE{% else %}#EEF2F6{% endif %};"></span>{% endfor %}</div>
+   </div>
+   {# Equivalent #}
+   <div class="kpi" style="background:#fff;border-color:#E5E7EB;">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+     <div class="kpi-icon" style="background:#F1F5F9;"><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#475569" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9"/></svg></div>
+    </div>
+    <p class="kpi-val" style="color:#0F172A;">{% if total_results %}{{ equivalent_pct }}%{% else %}—{% endif %}</p>
+    <p class="kpi-lab">Equivalent clauses</p>
+    <p class="kpi-sub" style="margin-top:12px;">aligned across jurisdictions</p>
+   </div>
+   {# Avg confidence #}
+   <div class="kpi" style="background:#fff;border-color:#E5E7EB;">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+     <div class="kpi-icon" style="background:#F1F5F9;"><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#475569" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg></div>
+    </div>
+    <p class="kpi-val" style="color:#0F172A;">{% if total_results %}{{ avg_confidence_pct }}%{% else %}—{% endif %}</p>
+    <p class="kpi-lab">Avg confidence</p>
+    <p class="kpi-sub" style="margin-top:12px;">across {{ total_results }} clause pair{{ total_results|pluralize }}</p>
+   </div>
+  </div>
+
+  {# ── Key insights ── #}
+  {% if coverage_insights %}
+  <div>
+   <p class="row-title">Key insights</p>
+   <p class="row-sub">What the numbers are telling you right now.</p>
+   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;">
+    {% for ins in coverage_insights %}
+    <div class="ins" style="{% if ins.tone == 'red' %}background:#FEF2F2;border-color:#FECACA;{% elif ins.tone == 'amber' %}background:#FFFBEB;border-color:#FDE68A;{% elif ins.tone == 'green' %}background:#F0FDF4;border-color:#BBF7D0;{% elif ins.tone == 'blue' %}background:#EFF6FF;border-color:#BFDBFE;{% else %}background:#F8FAFC;border-color:#E5E7EB;{% endif %}">
+     <div class="ins-ic" style="{% if ins.tone == 'red' %}background:#FEE2E2;{% elif ins.tone == 'amber' %}background:#FEF3C7;{% elif ins.tone == 'green' %}background:#DCFCE7;{% elif ins.tone == 'blue' %}background:#DBEAFE;{% else %}background:#F1F5F9;{% endif %}">
+      <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="{% if ins.tone == 'red' %}#DC2626{% elif ins.tone == 'amber' %}#D97706{% elif ins.tone == 'green' %}#16A34A{% elif ins.tone == 'blue' %}#2563EB{% else %}#475569{% endif %}" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.383a14.406 14.406 0 01-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 10-7.517 0c.85.493 1.509 1.333 1.509 2.316V18"/></svg>
+     </div>
+     <div style="min-width:0;">
+      <p class="ins-t">{{ ins.title }}</p>
+      <p class="ins-d">{{ ins.detail }}</p>
+     </div>
+    </div>
+    {% endfor %}
+   </div>
+  </div>
+  {% endif %}
+
+  {# ── Coverage analysis ── #}
+  {% if mapping_jurisdictions %}
+  <div>
+   <p class="row-title">Coverage analysis</p>
+   <p class="row-sub">Where obligations are covered, partial, or still open — by jurisdiction.</p>
+   <div class="card card-pad">
+   <div style="display:flex;flex-direction:column;gap:14px;">
+    {% for j in mapping_jurisdictions %}
+    <div>
+     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+       <span style="font-size:13px;font-weight:700;color:#0F172A;min-width:82px;">{{ j.label }}</span>
+       <span style="font-size:11.5px;color:#94A3B8;">{{ j.total }} obligation{{ j.total|pluralize }}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px;">
+       <span style="font-size:11px;color:#475569;"><strong style="color:#16A34A;">{{ j.covered }}</strong> covered</span>
+       <span style="font-size:11px;color:#475569;"><strong style="color:#D97706;">{{ j.partial }}</strong> partial</span>
+       <span style="font-size:11px;color:#475569;"><strong style="color:#DC2626;">{{ j.gaps }}</strong> gaps</span>
+       <span style="font-size:14px;font-weight:800;color:{% if j.pct >= 80 %}#15803D{% elif j.pct >= 50 %}#B45309{% else %}#B91C1C{% endif %};font-variant-numeric:tabular-nums;">{{ j.pct }}%</span>
+      </div>
+     </div>
+     <div style="height:9px;border-radius:5px;background:#F1F5F9;overflow:hidden;display:flex;">
+      <span style="height:100%;background:#16A34A;width:{% widthratio j.covered j.total 100 %}%;"></span>
+      <span style="height:100%;background:#F59E0B;width:{% widthratio j.partial j.total 100 %}%;"></span>
+      <span style="height:100%;background:#EF4444;width:{% widthratio j.gaps j.total 100 %}%;"></span>
+     </div>
+    </div>
+    {% endfor %}
+   </div>
+   </div>
+  </div>
+  {% endif %}
+
+  {# ── Relationship analysis ── #}
+  <div>
+   <p class="row-title">Relationship analysis</p>
+   <p class="row-sub">How the {{ total_results }} compared clause pair{{ total_results|pluralize }} break down — overall and by jurisdiction pair.</p>
+
+   <div class="card card-pad" style="margin-bottom:16px;">
+    <p class="sec-eyebrow">Classification</p>
+    <p class="sec-title" style="margin-bottom:16px;">Overall breakdown</p>
+    <div style="display:flex;height:12px;border-radius:8px;overflow:hidden;gap:3px;margin-bottom:20px;background:#F1F5F9;">
+     {% for item in rel_breakdown %}{% if item.pct > 0 %}
+     <div style="width:{{ item.pct }}%;background:{{ item.color }};flex-shrink:0;" title="{{ item.label }}: {{ item.count }} ({{ item.pct }}%)"></div>
+     {% endif %}{% endfor %}
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;">
+     {% for item in rel_breakdown %}
+     <div style="border-radius:14px;padding:16px;background:{{ item.color }}0A;border:1px solid {{ item.color }}26;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+       <span style="width:8px;height:8px;border-radius:3px;background:{{ item.color }};"></span>
+       <p style="font-size:11px;font-weight:600;color:#475569;margin:0;">{{ item.label }}</p>
+      </div>
+      <p style="font-size:28px;font-weight:800;color:#0F172A;margin:0;line-height:1;letter-spacing:-.02em;">{{ item.count }}</p>
+      <p style="font-size:12px;font-weight:600;margin:6px 0 0;color:{{ item.color }};">{{ item.pct }}% of pairs</p>
+     </div>
+     {% endfor %}
+    </div>
+   </div>
+
+   <div class="card card-pad">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;">
+     <div>
+      <p class="sec-eyebrow">By jurisdiction pair</p>
+      <p class="sec-title">Distribution across pairs</p>
+     </div>
+     <div style="display:flex;gap:10px;">
+      {% for pd in pair_data %}
+      <div style="text-align:center;padding:9px 15px;background:#F8FAFC;border:1px solid #E5E7EB;border-radius:12px;min-width:74px;">
+       <p style="font-size:10px;font-weight:600;color:#64748B;margin:0 0 3px;">{{ pd.label }}</p>
+       <p style="font-size:18px;font-weight:800;color:#0F172A;margin:0;line-height:1;">{{ pd.total }}</p>
+      </div>
+      {% endfor %}
+     </div>
+    </div>
+    <div style="position:relative;width:100%;height:220px;"><canvas id="chart-relationship-by-pair"></canvas></div>
+   </div>
+  </div>
+
+  {# ── Confidence analysis ── #}
+  <div>
+   <p class="row-title">Confidence analysis</p>
+   <p class="row-sub">How certain the AI is about the classifications above.</p>
+   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+    <div class="card card-pad">
+     <p class="sec-eyebrow">Model certainty</p>
+     <p class="sec-title">Confidence distribution</p>
+     <p class="sec-sub">Clause pairs bucketed by AI confidence score</p>
+     <div style="position:relative;width:100%;height:185px;margin-top:16px;"><canvas id="chart-confidence-hist"></canvas></div>
+     <div class="ch-note"><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#94A3B8" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>Clusters below 60% are worth a human spot-check.</div>
+    </div>
+    <div class="card card-pad">
+     <p class="sec-eyebrow">By relationship</p>
+     <p class="sec-title">Average confidence</p>
+     <p class="sec-sub">Mean AI confidence per relationship type</p>
+     <div style="position:relative;width:100%;height:185px;margin-top:16px;"><canvas id="chart-avg-confidence"></canvas></div>
+     <div class="ch-note"><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#94A3B8" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75z"/></svg>Conflicting pairs with high confidence are the most reliable to act on.</div>
+    </div>
+   </div>
+  </div>
+
+  {# ── Heatmap ── #}
+  <div>
+   <p class="row-title">Principle coverage</p>
+   <p class="row-sub">Equivalent-clause rate for each privacy principle across jurisdiction pairs.</p>
+   {# Heatmap #}
+  <div class="card">
+   <div class="card-pad" style="border-bottom:1px solid #F1F5F9;">
+    <p class="sec-eyebrow">Principle × jurisdiction</p>
+    <p class="sec-title">Coverage heatmap</p>
+    <p class="sec-sub">Equivalent clause rate per privacy principle and jurisdiction pair</p>
+   </div>
+   <div style="padding:18px 24px;overflow-x:auto;">
+    <table style="border-collapse:separate;border-spacing:7px;min-width:460px;width:100%;">
+     <thead>
+      <tr>
+       <th style="text-align:left;padding:0 8px 10px 0;font-size:10px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:.04em;min-width:120px;">Principle</th>
+       {% for pair_label in heatmap_pairs %}
+       <th style="text-align:center;padding:0 0 10px;font-size:10px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:.04em;min-width:100px;">{{ pair_label }}</th>
+       {% endfor %}
+      </tr>
+     </thead>
+     <tbody>
+      {% for row in heatmap_rows %}
+      <tr>
+       <td style="padding:3px 10px 3px 0;font-size:12px;font-weight:600;color:#334155;white-space:nowrap;">{{ row.label }}</td>
+       {% for cell in row.cells %}
+       <td style="padding:0;text-align:center;">
+        <div class="hm-cell" title="{{ cell.pair_label }}: {{ cell.equiv }}/{{ cell.total }} equivalent{% if cell.pct %} ({{ cell.pct }}%){% endif %}"
+             style="background:{% if cell.pct is None %}#F8FAFC{% elif cell.pct >= 70 %}#F0FDF4{% elif cell.pct >= 40 %}#FFFBEB{% else %}#FEF2F2{% endif %};cursor:{% if cell.total %}pointer{% else %}default{% endif %};">
+         {% if cell.pct is not None %}
+         <p style="font-size:15px;font-weight:800;color:{% if cell.pct >= 70 %}#15803D{% elif cell.pct >= 40 %}#B45309{% else %}#B91C1C{% endif %};margin:0;line-height:1;">{{ cell.pct }}%</p>
+         <p style="font-size:10px;color:#94A3B8;margin:3px 0 0;">{{ cell.equiv }}/{{ cell.total }}</p>
+         {% else %}
+         <p style="font-size:13px;color:#CBD5E1;margin:0;line-height:2.2;">—</p>
+         {% endif %}
+        </div>
+       </td>
+       {% endfor %}
+      </tr>
+      {% endfor %}
+     </tbody>
+    </table>
+   </div>
+  </div>
+  </div>
+
+ </div>{# coverage #}
 
  </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
+{{ action_items|json_script:"action-data" }}
 <script src="{% static 'js/charts.js' %}"></script>
 <script>
- window.initTabCharts = function(tab) {
- if (!window.chartData || typeof Chart === 'undefined') return;
- const d = window.chartData;
- Chart.defaults.font.family = "'Satoshi', sans-serif";
- Chart.defaults.font.size = 11;
- Chart.defaults.color = '#002583';
- if (tab === 'overview') {
- tryInit('chart-runs-over-time', () => initRunsOverTime(d.runsOverTime));
- tryInit('chart-compliance-by-run', () => initComplianceByRun(d.complianceByRun));
- } else if (tab === 'clauses') {
- tryInit('chart-relationship-by-pair', () => initRelationshipByPair(d.relationshipByPair));
- tryInit('chart-confidence-hist', () => initConfidenceHistogram(d.confidenceDistribution));
- tryInit('chart-avg-confidence', () => initAvgConfidenceByRel(d.avgConfidenceByRel));
- tryInit('chart-top-principles', () => initTopPrinciples(d.topPrinciples));
- tryInit('chart-radar', () => initRadar(d.radar));
- } else if (tab === 'gaps') {
- tryInit('chart-gap-trend', () => initGapTrend(d.gapTrend));
- tryInit('chart-remediation-velocity', () => initRemediationVelocity(d.remediationVelocity));
- } else if (tab === 'review') {
- tryInit('chart-calibration', () => initCalibration(d.calibration));
- tryInit('chart-accuracy-trend', () => initAccuracyTrend(d.accuracyTrend));
+ // Export the action register to CSV — real data, no server round-trip.
+ window.exportActions = function() {
+   let rows = [];
+   try { rows = JSON.parse(document.getElementById('action-data').textContent) || []; } catch (e) {}
+   const cols = ['priority','kind_label','title','jurisdiction','source','context','status','confidence'];
+   const esc = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+   const csv = [cols.join(',')].concat(
+     rows.map(r => cols.map(c => esc(r[c])).join(','))
+   ).join('\n');
+   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+   const a = document.createElement('a');
+   a.href = URL.createObjectURL(blob);
+   a.download = 'cjpca-action-register.csv';
+   document.body.appendChild(a); a.click(); a.remove();
+ };
+
+ // Action Register workspace: filters + bulk selection + export-selected.
+ function registerView() {
+   return {
+     pf: 'all', kf: 'all', sf: 'all',
+     sel: {},
+     _data() { try { return JSON.parse(document.getElementById('action-data').textContent) || []; } catch (e) { return []; } },
+     matches(p, k, s) {
+       return (this.pf === 'all' || this.pf === p)
+           && (this.kf === 'all' || this.kf === k)
+           && (this.sf === 'all' || this.sf === s);
+     },
+     _visibleIdx() {
+       const d = this._data();
+       return d.map((r, i) => i).filter(i => this.matches(d[i].priority, d[i].kind, d[i].status));
+     },
+     selCount() { return Object.keys(this.sel).filter(k => this.sel[k]).length; },
+     allVisibleSelected() { const idx = this._visibleIdx(); return idx.length > 0 && idx.every(i => this.sel[i]); },
+     toggleAll() { const idx = this._visibleIdx(); const t = !this.allVisibleSelected(); idx.forEach(i => this.sel[i] = t); },
+     clearSel() { this.sel = {}; },
+     exportSel() {
+       const d = this._data();
+       const rows = d.filter((r, i) => this.sel[i]);
+       if (!rows.length) return;
+       const cols = ['priority', 'kind_label', 'title', 'jurisdiction', 'source', 'context', 'status', 'confidence'];
+       const esc = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+       const csv = [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n');
+       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+       const a = document.createElement('a');
+       a.href = URL.createObjectURL(blob);
+       a.download = 'cjpca-action-register-selected.csv';
+       document.body.appendChild(a); a.click(); a.remove();
+     },
+   };
  }
+
+ window.initTabCharts = function(tab) {
+   if (!window.chartData || typeof Chart === 'undefined') return;
+   const d = window.chartData;
+   Chart.defaults.font.family = "'Inter', sans-serif";
+   Chart.defaults.font.size = 11;
+   Chart.defaults.color = '#64748B';
+   if (tab === 'overview') {
+     tryInit('chart-gap-trend', () => initGapTrend(d.gapTrend));
+     tryInit('chart-accuracy-trend', () => initAccuracyTrend(d.accuracyTrend));
+   } else if (tab === 'coverage') {
+     tryInit('chart-relationship-by-pair', () => initRelationshipByPair(d.relationshipByPair));
+     tryInit('chart-confidence-hist', () => initConfidenceHistogram(d.confidenceDistribution));
+     tryInit('chart-avg-confidence', () => initAvgConfidenceByRel(d.avgConfidenceByRel));
+   }
  };
 </script>
 {% endblock %}

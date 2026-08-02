@@ -2,13 +2,10 @@
 # the llm-call layer. takes a query + retrieved chunks + a prompt template,
 # returns a structured pydantic object.
 #
-# providers:
-#   - primary:  openrouter (openai-compatible api at openrouter.ai) —
-#               claude haiku 4.5 by default, swappable via REASON_LLM__MODEL.
-#   - fallback: local ollama (llama3.2:1b by default). engages automatically
-#               when openrouter raises any exception (network, auth, rate
-#               limit, timeout, parse error). disable with
-#               REASON_LLM__FALLBACK_ENABLED=false.
+# provider: LOCAL ONLY. CJPCA runs fully on-premise for the bank — regulation
+# and policy text must never leave the environment — so the sole LLM provider
+# is local Ollama (qwen2.5:7b by default, cfg.llm.fallback_model). There is no
+# cloud/OpenRouter path; any OPENROUTER_API_KEY in the env is ignored.
 #
 # parsing: PydanticOutputParser wrapped in OutputFixingParser. on a
 # malformed response the wrapper makes the model fix its own json
@@ -40,46 +37,13 @@ _llm = None
 _llm_lock = threading.Lock()
 
 
-def _build_openrouter_llm():
-    """build the primary openrouter-backed langchain client. openrouter is
-    openai-compatible — same wire format, different base_url. one api key +
-    one billing page gets you any model openrouter exposes (claude, gpt-4,
-    llama, gemini, etc.) by changing cfg.llm.model.
+def _build_ollama_llm():
+    """Build the local Ollama client. This is the ONLY LLM provider.
 
-    reads OPENROUTER_API_KEY from env."""
-    from langchain_openai import ChatOpenAI  # lazy — only needed if a key is set
-    api_key = os.environ.get("OPENROUTER_API_KEY")
-    if not api_key:
-        raise RuntimeError(
-            "OPENROUTER_API_KEY not set. Get a key at "
-            "https://openrouter.ai/keys and run:\n"
-            "  $env:OPENROUTER_API_KEY = 'sk-or-...'"
-        )
-    return ChatOpenAI(
-        model       = cfg.llm.model,
-        temperature = cfg.llm.temperature,
-        max_tokens  = cfg.llm.max_tokens,
-        timeout     = cfg.llm.timeout_sec,
-        api_key     = api_key,
-        base_url    = "https://openrouter.ai/api/v1",
-        # response_format constrains the model to return a json object.
-        # most modern openrouter providers support this; ones that
-        # don't ignore it gracefully. without this, some models
-        # routinely return prose or empty strings that crash the parser.
-        response_format = {"type": "json_object"},
-        # openrouter wants attribution headers so site owners can see
-        # which app is calling them. nice-to-have, not required.
-        default_headers = {
-            "HTTP-Referer": "https://github.com/cjpca",
-            "X-Title":      "Cross-Jurisdictional Privacy Compliance Analyzer",
-        },
-    )
-
-
-def _build_ollama_fallback():
-    """build the local-ollama fallback. format='json' constrains output to
-    a json object, which makes PydanticOutputParser more robust on small
-    models like llama3.2:1b."""
+    CJPCA runs fully on-premise: regulation and policy text must never leave
+    the bank's environment, so there is no cloud/OpenRouter path by design.
+    format='json' constrains output to a json object, which makes
+    PydanticOutputParser robust on the local qwen2.5 model."""
     from langchain_ollama import ChatOllama
     return ChatOllama(
         model           = cfg.llm.fallback_model,
@@ -96,33 +60,20 @@ def _build_ollama_fallback():
     )
 
 
+# Back-compat alias — some call sites import _build_ollama_fallback.
+_build_ollama_fallback = _build_ollama_llm
+
+
 def _build_llm():
-    """PoC: local Ollama is the PRIMARY provider (no API key required).
-
-    If an OPENROUTER_API_KEY happens to be set in the environment, OpenRouter
-    is added as a *fallback* (the reverse of the original design) so the app
-    still degrades gracefully. With no key set — the default here — the app
-    runs fully local against Ollama.
-    """
-    primary = _build_ollama_fallback()  # local Ollama is now the primary
-
-    if not os.environ.get("OPENROUTER_API_KEY"):
-        return primary
-
-    try:
-        cloud_fallback = _build_openrouter_llm()
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning(
-            "OpenRouter fallback unavailable, running Ollama-only: %s", e
-        )
-        return primary
-
-    return primary.with_fallbacks([cloud_fallback])
+    """CJPCA is fully local. Ollama is the sole provider — no OpenRouter, no
+    cloud fallback, so no document text can leave the environment. Any
+    OPENROUTER_API_KEY in the environment is deliberately ignored."""
+    return _build_ollama_llm()
 
 
 def _get_llm():
-    """Build the provider chain fresh on every call — deliberately NOT cached.
+    """Build the local Ollama client fresh on every call — deliberately NOT
+    cached.
 
     A cached ChatOllama binds its async httpx client to the FIRST asyncio event
     loop it runs in. Each top-level LLM invocation here runs under its own
@@ -134,8 +85,7 @@ def _get_llm():
 
     Construction is network-free and microsecond-cheap (it just wires up a
     langchain Runnable), so rebuilding per call is the simplest correct fix and
-    has no meaningful cost. With no OPENROUTER_API_KEY set the chain is a plain
-    local-Ollama client; with a key it's Ollama-primary + OpenRouter fallback."""
+    has no meaningful cost."""
     return _build_llm()
 
 

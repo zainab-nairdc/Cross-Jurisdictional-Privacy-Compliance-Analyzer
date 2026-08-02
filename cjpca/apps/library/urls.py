@@ -13,5 +13,6 @@ urlpatterns = [
     path('delete/<int:pk>/',       views.DocumentDeleteView.as_view(), name='library-delete'),
     path('view/<int:pk>/',         views.DocumentViewerView.as_view(), name='library-view'),
     path('structure/<int:pk>/',    views.DocumentStructureView.as_view(), name='library-structure'),
+    path('structure-manager/',     views.StructureView.as_view(),      name='library-structure-manager'),
     path('<int:pk>/tags/',         views.DocumentTagView.as_view(),    name='library-tags'),
 ]

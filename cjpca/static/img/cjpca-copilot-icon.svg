@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" role="img" aria-labelledby="cjpcaTitle cjpcaDesc">
+  <title id="cjpcaTitle">CJPCA Compliance Copilot</title>
+  <desc id="cjpcaDesc">A navy rounded square containing a white shield with an orange verification check and three small petal markers.</desc>
+  <rect x="0" y="0" width="200" height="200" rx="44" fill="#002583"/>
+  <path d="M100 42 L147 57 V116 C147 140 126 154 100 160 C74 154 53 140 53 116 V57 Z" fill="#FFFFFF"/>
+  <path d="M76 99 L94 118 L128 75" fill="none" stroke="#E27A12" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="#002583" opacity="0.32">
+    <path d="M87 133 C92 137 92 142 87 145 C82 142 82 137 87 133 Z"/>
+    <path d="M100 133 C105 137 105 142 100 145 C95 142 95 137 100 133 Z"/>
+    <path d="M113 133 C118 137 118 142 113 145 C108 142 108 137 113 133 Z"/>
+  </g>
+</svg>

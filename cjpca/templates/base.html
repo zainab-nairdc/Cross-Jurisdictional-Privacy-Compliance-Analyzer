@@ -46,8 +46,8 @@
  {# Fixed 192px sidebar — always visible #}
  {% include 'partials/_sidebar.html' %}
 
- {# Main scrollable content area #}
- <main class="flex-1 overflow-y-auto">
+ {# Main scrollable content area (min-w-0 lets it shrink so wide page content can't widen the whole app) #}
+ <main class="flex-1 min-w-0 overflow-y-auto">
 
  {# Contextual wizard banner (dismissible, per-page colour) #}
  {% include 'partials/_wizard_banner.html' %}
