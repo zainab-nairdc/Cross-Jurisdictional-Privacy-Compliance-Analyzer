@@ -4,7 +4,9 @@
 {% block title %}Mapping Setup — {{ policy.name }} — CJPCA{% endblock %}
 
 {% block extra_head %}
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
+ .msetup, .msetup * { font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif; }
  /* ── Design tokens ─────────────────────────────────────────── */
  :root {
    --c-navy:        #002583;
@@ -169,21 +171,21 @@
 {% endblock %}
 
 {% block content %}
-<div class="flex flex-col h-full overflow-hidden" style="background:#fff;">
+<div class="msetup flex flex-col h-full overflow-hidden" style="background:#F8FAFC;">
 
  {# ── Header ── #}
- <div style="background:#fff;border-bottom:1px solid var(--c-line);padding:14px 28px;flex-shrink:0;display:flex;align-items:center;gap:12px;">
+ <div style="background:#fff;border-bottom:1px solid var(--c-line);padding:18px 28px;flex-shrink:0;display:flex;align-items:center;gap:14px;">
    <a href="{% url 'mapping' %}"
-      style="width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--c-navy);flex-shrink:0;border:1px solid var(--c-line);background:#fff;transition:background .12s;"
+      style="width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--c-navy);flex-shrink:0;border:1px solid var(--c-line);background:#fff;transition:background .12s;"
       onmouseover="this.style.background='var(--c-bg-soft)';"
       onmouseout="this.style.background='#fff';">
-     <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+     <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"/>
      </svg>
    </a>
    <div style="flex:1;min-width:0;">
-     <h1 style="font-size:14px;font-weight:700;color:var(--c-navy);margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ policy.name }}</h1>
-     <p style="font-size:10px;color:var(--c-text-muted);margin:0;">Pick regulations and how the policy should be mapped against them.</p>
+     <h1 style="font-size:18px;font-weight:800;letter-spacing:-.02em;color:#0F172A;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ policy.name }}</h1>
+     <p style="font-size:12px;color:var(--c-text-muted);margin:2px 0 0;">Pick regulations and how the policy should be mapped against them.</p>
    </div>
  </div>
 
@@ -194,7 +196,7 @@
    <input type="hidden" name="scope_mode" id="scope-mode-input" value="auto">
    <input type="hidden" name="topic" id="topic-input" value="">
 
-   <div style="flex:1;overflow:hidden;display:grid;grid-template-columns:240px 1fr 1.15fr;gap:0;">
+   <div style="flex:1;overflow:hidden;display:grid;grid-template-columns:250px 1fr 1.15fr;gap:0;background:#fff;">
 
      {# ════════════════════════════════════════════════════════ #}
      {# Col 1: Policy preview                                      #}

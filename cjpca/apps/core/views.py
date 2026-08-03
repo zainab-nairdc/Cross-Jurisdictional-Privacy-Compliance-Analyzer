@@ -424,6 +424,91 @@ def _approved_retrieve(message: str, include_drafts: bool = False, doc_title: st
             'chunks': comp_chunks + map_chunks}
 
 
+_COPILOT_CAPABILITIES = (
+    "I'm the compliance copilot for this workspace. I answer **only** from your "
+    "indexed regulations and internal policies, and I cite the exact articles I "
+    "use — I don't guess or answer from general knowledge.\n\n"
+    "Here's how I can help:\n\n"
+    "- **Ask about one document** — pick it from the **Scope** chip, then ask e.g. "
+    "*\"What does this say about data retention?\"* or *\"Summarise the breach-notification rules.\"*\n"
+    "- **Ask across a country** — toggle a jurisdiction in **Sources** to search all "
+    "its regulations at once.\n"
+    "- **Use reviewed analysis** — in **Approved** mode I draw on the comparison and "
+    "mapping results your team has validated.\n"
+    "- **Trace everything** — each answer links back to the source article so you can verify it.\n\n"
+    "Pick a document or country scope above, then ask your question."
+)
+
+_GREETINGS = {"hi", "hello", "hey", "yo", "hiya", "heya", "sup", "hii", "helloo",
+              "good morning", "good afternoon", "good evening", "thanks", "thank you"}
+
+_META_TRIGGERS = (
+    "what can you do", "what can you help", "what do you do", "how can you help",
+    "how do you help", "who are you", "what are you", "how do you work",
+    "what sort of thing", "what kind of thing", "what can this do", "help me do",
+    "things you can do", "what you can do", "what can you help me", "what else can you",
+    "capabilit", "how to use you", "how do i use you",
+)
+
+_CORPUS_TRIGGERS = (
+    "what document", "which document", "what sources", "what laws", "what regulation",
+    "list document", "documents exist", "documents are", "documents do you",
+    "what files", "what do you have", "what's in this source", "what is in this source",
+    "what docs", "which laws", "what's indexed",
+)
+
+
+def _meta_reply(message: str):
+    """Direct answer for greetings + capability/meta questions so they never get
+    forced through the compliance RAG (which returns 'Insufficient information to
+    determine compliance'). Returns a string, or None if not a meta question."""
+    raw = message.strip().lower()
+    bare = raw.strip("!?.,; ")
+    if bare in _GREETINGS:
+        return "Hi! " + _COPILOT_CAPABILITIES
+    # normalise txt-speak ("what can u do" -> "what can you do")
+    m = " " + re.sub(r"[^a-z0-9 ]", " ", raw) + " "
+    m = re.sub(r"\bu\b", "you", m)
+    m = re.sub(r"\bur\b", "your", m)
+    m = re.sub(r"\s+", " ", m)
+    if any(t in m for t in _META_TRIGGERS):
+        return _COPILOT_CAPABILITIES
+    return None
+
+
+def _corpus_reply(message: str, doc_title: str = "", jurisdiction: str = ""):
+    """Answer 'what documents / laws exist?' by listing the actual indexed corpus,
+    respecting the current scope. Returns a markdown string, or None."""
+    m = " " + re.sub(r"[^a-z0-9 ]", " ", message.lower()) + " "
+    if not any(t in m for t in _CORPUS_TRIGGERS):
+        return None
+    from apps.library.models import Document
+    qs = Document.objects.filter(status=Document.INDEXED)
+    if jurisdiction:
+        codes = [c.strip().lower() for c in jurisdiction.split(",") if c.strip()]
+        qs = qs.filter(jurisdiction__in=codes)
+    regs = list(qs.filter(doc_type=Document.REGULATION).order_by("jurisdiction", "name"))
+    pols = list(qs.filter(doc_type=Document.POLICY).order_by("name"))
+    if not regs and not pols:
+        return ("There are no indexed documents in the current scope yet. Upload "
+                "documents from the **Regulations** or **Internal Policies** pages first.")
+    lines = [f"Here are the **{len(regs) + len(pols)} documents** currently indexed"
+             + (f" for {jurisdiction.title()}" if jurisdiction else "") + ":\n"]
+    if regs:
+        lines.append(f"**Regulations ({len(regs)})**")
+        for d in regs[:40]:
+            jur = d.get_jurisdiction_display() or ""
+            lines.append(f"- {d.name}" + (f" · {jur}" if jur else ""))
+        if len(regs) > 40:
+            lines.append(f"- …and {len(regs) - 40} more")
+    if pols:
+        lines.append(f"\n**Internal policies ({len(pols)})**")
+        for d in pols[:40]:
+            lines.append(f"- {d.name}")
+    lines.append("\nPick one from the **Scope** chip to ask about it specifically.")
+    return "\n".join(lines)
+
+
 @method_decorator(role_required(*COPILOT_ROLES), name='dispatch')
 class CopilotMessageView(View):
     """POST /copilot/message/ — HTMX: send message, get AI response fragment.
@@ -458,6 +543,27 @@ class CopilotMessageView(View):
         # Mode toggle — 'approved' = only reviewed comparison + mapping rows;
         # 'document' = pure document Q&A against the picked scope (doc or country).
         mode: str            = (request.POST.get('copilot_mode') or 'approved').strip()
+
+        # ── Intent gate ───────────────────────────────────────────────────────
+        # Greetings, capability questions ("what can you do?") and "what
+        # documents exist?" get a direct, helpful answer. Without this they were
+        # forced through the compliance RAG and came back as "Insufficient
+        # information to determine compliance" with 0% confidence.
+        _direct = (_meta_reply(message)
+                   or _corpus_reply(message, doc_title=doc_title, jurisdiction=jurisdiction))
+        if _direct is not None:
+            history.append({'role': 'user',      'content': message})
+            history.append({'role': 'assistant', 'content': _direct})
+            request.session['copilot_history'] = history[-20:]
+            return render(request, 'partials/_copilot_fragment.html', {
+                'user_message':       message,
+                'ai_response':        _direct,
+                'confidence':         None,
+                'hallucination_risk': None,
+                'citations':          [],
+                'data_quality':       'guidance',
+                'fallback_msg':       None,
+            })
 
         # ── Arabic documents ──────────────────────────────────────────────────
         # Arabic docs live in the isolated bge-m3 collection (regulations_ar) and

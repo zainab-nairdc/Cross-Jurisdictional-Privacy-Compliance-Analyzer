@@ -61,7 +61,18 @@
     };
   };
 </script>
-<div x-data="analystResults()"
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+ .cmp, .cmp * { font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif; box-sizing:border-box; }
+ .cmp-card { background:#fff; border:1px solid #E9EDF3; border-radius:16px; box-shadow:0 1px 2px rgba(16,24,40,.04); }
+ .cmp-lbl { font-size:10px; font-weight:700; color:#64748B; text-transform:uppercase; letter-spacing:.07em; }
+ .cmp-kpi { border-radius:14px; padding:15px 16px; }
+ .cmp-kpi .n { font-size:26px; font-weight:800; letter-spacing:-.02em; line-height:1; }
+ .cmp-kpi .l { font-size:10.5px; font-weight:600; color:#64748B; margin-top:6px; }
+ .cmp-body { font-size:12.5px; color:#334155; line-height:1.65; }
+ .cmp-chip { display:inline-flex; align-items:center; gap:5px; font-size:10.5px; font-weight:700; padding:3px 9px; border-radius:7px; white-space:nowrap; }
+</style>
+<div x-data="analystResults()" class="cmp"
      @open-doc-viewer.window="openDocViewer($event.detail.src)">
 
  {# Document viewer modal (Alpine event-driven, 80vh, ESC/outside-click dismiss). #}

@@ -253,7 +253,7 @@
        <span class="sep">·</span>
        {% endif %}
        {% if p.version %}
-       <span>v{{ p.version }}</span>
+       <span>{% if p.version|slice:":1"|lower == "v" %}{{ p.version }}{% else %}v{{ p.version }}{% endif %}</span>
        <span class="sep">·</span>
        {% endif %}
        <span>{{ p.chunk_count }} section{{ p.chunk_count|pluralize }}</span>

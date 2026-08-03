@@ -139,8 +139,14 @@ async def correct_node(state: ReasoningState) -> dict:
         if draft is not None:
             h_risk    = state.get("hallucination_risk") or 0.0
             base_conf = max(0.4, draft.confidence or 0.0)
+            # Cap the NLI penalty (a local 7B model paraphrases enough that NLI
+            # often reports ~0.99 "unsupported" even on a correct, chunk-grounded
+            # answer) and floor the result. A grounded answer must never show a
+            # near-zero "1% confident" badge — that reads as broken. The separate
+            # low-trust banner still warns when verification is genuinely weak.
+            conf = base_conf * 0.75 * (1.0 - min(h_risk, 0.4))
             penalised = draft.model_copy(update={
-                "confidence": round(base_conf * 0.75 * (1.0 - h_risk), 2),
+                "confidence": round(max(0.4, conf), 2),
             })
             return {"error": "verification uncertain", "final_output": penalised}
         # No draft at all — genuinely nothing to show; fall back safely.
@@ -188,7 +194,10 @@ async def finalize_node(state: ReasoningState) -> dict:
     # confidence (v_score can be 0.0 when ungrounded) would blank a usable
     # answer, so we treat unverified-but-present as "moderate confidence".
     v_eff        = max(v_score, 0.7)
-    adjusted     = (draft.confidence or 0.7) * v_eff * (1.0 - min(h_risk, 0.4))
+    # Floor at 0.4: a synthesised, chunk-grounded answer should never render as
+    # "1% confident" (the NLI over-penalises the local model's paraphrasing).
+    # The low-trust banner handles the genuine "verify this" warning separately.
+    adjusted     = max(0.4, (draft.confidence or 0.7) * v_eff * (1.0 - min(h_risk, 0.4)))
     final        = draft.model_copy(update={"confidence": round(adjusted, 2)})
     return {"final_output": final}
 

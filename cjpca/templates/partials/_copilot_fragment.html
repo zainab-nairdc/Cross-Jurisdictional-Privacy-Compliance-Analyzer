@@ -28,7 +28,7 @@ on submit so the message shows instantly with a typing indicator.
     {% elif data_quality == 'draft_fallback' %}<span style="width:6px;height:6px;border-radius:50%;background:#D97706;"></span>Includes draft
     {% elif data_quality == 'none' %}<span style="width:6px;height:6px;border-radius:50%;background:#CBD5E1;"></span>No approved data
     {% endif %}
-    {% if confidence is not None %}<span style="color:#CBD5E1;">·</span><span title="Confidence: citation verification + NLI grounding">{{ confidence|floatformat:0 }}% confident</span>{% endif %}
+    {% if confidence is not None %}<span style="color:#CBD5E1;">·</span><span title="Confidence: citation verification + NLI grounding">{% widthratio confidence 1 100 %}% confident</span>{% endif %}
     {% if hallucination_risk and hallucination_risk > 0.4 %}<span style="color:#CBD5E1;">·</span><span style="color:{% if hallucination_risk > 0.7 %}#DC2626{% else %}#D97706{% endif %};font-weight:600;">verify claims</span>{% endif %}
    </span>
   </div>

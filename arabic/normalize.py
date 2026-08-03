@@ -37,7 +37,14 @@ def normalize(text: str) -> str:
     """Return cleaned Arabic text suitable for chunking + embedding."""
     if not text:
         return ""
-    text = unicodedata.normalize("NFC", text)
+    # NFKC (not NFC): many Arabic PDFs store their text as *presentation forms*
+    # (isolated/initial/medial/final glyph codepoints, U+FB50-FDFF / U+FE70-FEFF)
+    # rather than the standard letters. NFC leaves those as-is, so the stored /
+    # displayed / searched text is glyph-form gibberish (e.g. Saudi PDPL came out
+    # as "اﻟﺒﻴﺎﻧﺎت" instead of "البيانات"). NFKC folds presentation forms and
+    # ligatures back to canonical Arabic without touching diacritics, which is
+    # exactly what we want for search + faithful display.
+    text = unicodedata.normalize("NFKC", text)
     # OCR recognition models sometimes emit the Persian yeh/kaf for the Arabic
     # ones (فی -> في). Fold them to the Arabic forms.
     text = text.replace("ی", "ي").replace("ک", "ك")

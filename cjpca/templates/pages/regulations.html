@@ -10,8 +10,34 @@
 {% block content %}
 <div x-data="regsPage()" class="flex h-full bg-gray-50 overflow-hidden">
 
+<style>
+ /* Single scrollable axis: a dual-axis (x+y auto) scroll container silently
+    disables position:sticky on the <th> header in Chromium. overflow-x:hidden
+    keeps only the vertical scroll, so the header pins to THIS container. */
+ .reg-scroll { overflow-x: hidden; }
+ /* Header must paint above rows sliding under it — opaque bg + high z-index.
+    Rows get an explicit low stacking context so nothing bleeds through. */
+ .reg-table thead th { position: sticky; top: 0; z-index: 20; background: #F8FAFD; }
+ .reg-table tbody tr { position: relative; z-index: 0; }
+ /* Full-bleed header/rows: the container has no side padding, so the first and
+    last cells provide the edge inset instead (overrides their inline padding). */
+ .reg-table th:first-child, .reg-table td:first-child { padding-left: 26px !important; }
+ .reg-table th:last-child,  .reg-table td:last-child  { padding-right: 26px !important; }
+ /* Scrollbar tinted to the header colour so it blends into the right edge
+    instead of leaving a pale gap between the header and the detail panel. */
+ .reg-scroll { scrollbar-width: thin; scrollbar-color: #CBD5E5 #F8FAFD; }
+ .reg-scroll::-webkit-scrollbar { width: 10px; }
+ .reg-scroll::-webkit-scrollbar-track { background: #F8FAFD; }
+ .reg-scroll::-webkit-scrollbar-thumb { background: #CBD5E5; border-radius: 6px; border: 2px solid #F8FAFD; }
+ .reg-scroll::-webkit-scrollbar-thumb:hover { background: #AEB9CE; }
+ /* Detail panel is its own surface: sit above the global fixed profile widget
+    (z-index:60) so the avatar no longer floats over the panel title/scrollbar.
+    Set here, not inline — the Alpine :style width binding replaces inline style. */
+ .doc-detail-panel { position: relative; z-index: 70; }
+</style>
+
  {# ── Main column ─────────────────────────────────────────────── #}
- <div class="flex flex-col flex-1 min-w-0 overflow-hidden">
+ <div class="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden">
 
  {# Top bar #}
  <div class="bg-white border-b border-gray-100 px-6 py-2.5 flex items-center justify-between flex-shrink-0">
@@ -85,18 +111,15 @@
  </div>
  </div>
 
- {# Card grid #}
- <div class="flex-1 min-w-0 overflow-y-auto overflow-x-auto px-6 py-3">
- {# ── Professional repository table (replaces the card grid) ── #}
- <table style="width:100%;min-width:0;border-collapse:separate;border-spacing:0;">
+ <div class="reg-scroll flex-1 min-w-0 min-h-0 overflow-y-auto pb-3">
+ <table class="reg-table" style="width:100%;min-width:0;border-collapse:separate;border-spacing:0;table-layout:fixed;">
   <thead>
    <tr>
-    <th style="position:sticky;top:0;z-index:1;text-align:left;padding:9px 14px;background:#F8FAFD;font-size:10px;font-weight:800;color:#7B8499;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #E5E8EF;">Document</th>
-    <th style="position:sticky;top:0;z-index:1;text-align:left;padding:9px 12px;background:#F8FAFD;font-size:10px;font-weight:800;color:#7B8499;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #E5E8EF;">Type</th>
-    <th style="position:sticky;top:0;z-index:1;text-align:left;padding:9px 12px;background:#F8FAFD;font-size:10px;font-weight:800;color:#7B8499;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #E5E8EF;">Status</th>
-    <th style="position:sticky;top:0;z-index:1;text-align:left;padding:9px 12px;background:#F8FAFD;font-size:10px;font-weight:800;color:#7B8499;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #E5E8EF;">Jurisdiction</th>
-    <th style="position:sticky;top:0;z-index:1;text-align:left;padding:9px 12px;background:#F8FAFD;font-size:10px;font-weight:800;color:#7B8499;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #E5E8EF;">Updated</th>
-    <th style="position:sticky;top:0;z-index:1;text-align:right;padding:9px 14px;background:#F8FAFD;font-size:10px;font-weight:800;color:#7B8499;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #E5E8EF;">Sections</th>
+    <th style="position:sticky;top:0;z-index:20;text-align:left;padding:9px 14px;background:#F8FAFD;font-size:10px;font-weight:800;color:#7B8499;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #E5E8EF;">Document</th>
+    <th style="position:sticky;top:0;z-index:20;width:132px;text-align:left;padding:9px 12px;background:#F8FAFD;font-size:10px;font-weight:800;color:#7B8499;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #E5E8EF;">Type</th>
+    <th style="position:sticky;top:0;z-index:20;width:84px;text-align:left;padding:9px 12px;background:#F8FAFD;font-size:10px;font-weight:800;color:#7B8499;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #E5E8EF;">Jurisdiction</th>
+    <th x-show="!selectedDoc" style="position:sticky;top:0;z-index:20;width:110px;text-align:left;padding:9px 12px;background:#F8FAFD;font-size:10px;font-weight:800;color:#7B8499;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #E5E8EF;">Updated</th>
+    <th style="position:sticky;top:0;z-index:20;width:92px;text-align:right;padding:9px 14px;background:#F8FAFD;font-size:10px;font-weight:800;color:#7B8499;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #E5E8EF;">Sections</th>
    </tr>
   </thead>
   <tbody>
@@ -106,11 +129,14 @@
       class="cursor-pointer transition-colors hover:bg-[#F5F8FD]"
       :style="{{ doc.pk }} === selectedDoc?.id ? 'background:#EEF2FB;' : ''">
 
-   {# Document — icon + name + id #}
+   {# Document — icon (with status dot) + name + id #}
    <td style="padding:11px 14px;border-bottom:1px solid #F0F3F9;">
     <div style="display:flex;align-items:center;gap:11px;">
-     <div style="width:32px;height:32px;border-radius:8px;background:#EEF2FB;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+     <div style="position:relative;width:32px;height:32px;border-radius:8px;background:#EEF2FB;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
       <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
+      {# Status dot — replaces the STATUS column #}
+      <span title="{% if doc.status == 'indexed' %}Ready{% elif doc.status == 'processing' %}Processing{% else %}Upload issue{% endif %}"
+            style="position:absolute;bottom:-2px;right:-2px;width:10px;height:10px;border-radius:50%;border:2px solid #fff;background:{% if doc.status == 'indexed' %}#1B7F3A{% elif doc.status == 'processing' %}#FFB800{% else %}#D93939{% endif %};"></span>
      </div>
      <div style="min-width:0;">
       <p style="font-size:12.5px;font-weight:700;color:#002583;margin:0;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ doc.name }}</p>
@@ -125,31 +151,17 @@
     <span style="display:inline-block;padding:2px 9px;border-radius:6px;font-size:10.5px;font-weight:600;background:#F1F4FA;color:#4A5878;white-space:nowrap;">{% if 'ministerial' in doc.name|lower or 'order' in doc.name|lower %}Implementing Reg.{% elif 'act' in doc.name|lower or 'law' in doc.name|lower %}Primary Law{% elif 'guide' in doc.name|lower or 'circular' in doc.name|lower %}Guidance{% else %}Regulation{% endif %}</span>
    </td>
 
-   {# Status #}
-   <td style="padding:11px 12px;border-bottom:1px solid #F0F3F9;white-space:nowrap;">
-    {% if doc.status == 'indexed' %}
-    <span style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:#1B7F3A;"><span style="width:6px;height:6px;border-radius:50%;background:#1B7F3A;"></span>Ready</span>
-    {% elif doc.status == 'processing' %}
-    <span style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:#B07A00;"><span style="width:6px;height:6px;border-radius:50%;background:#FFB800;"></span>Processing</span>
-    {% else %}
-    <span style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:#D93939;"><span style="width:6px;height:6px;border-radius:50%;background:#D93939;"></span>Issue</span>
-    {% endif %}
+   {# Jurisdiction — flag only #}
+   <td style="padding:11px 12px;border-bottom:1px solid #F0F3F9;white-space:nowrap;" title="{{ doc.get_jurisdiction_display }}">
+     {% if doc.jurisdiction == 'bahrain' %}<img src="https://flagcdn.com/40x30/bh.png" width="22" height="16" style="border-radius:2px;object-fit:cover;" alt="Bahrain">
+     {% elif doc.jurisdiction == 'india' %}<img src="https://flagcdn.com/40x30/in.png" width="22" height="16" style="border-radius:2px;object-fit:cover;" alt="India">
+     {% elif doc.jurisdiction == 'kuwait' %}<img src="https://flagcdn.com/40x30/kw.png" width="22" height="16" style="border-radius:2px;object-fit:cover;" alt="Kuwait">
+     {% elif doc.jurisdiction == 'bbk' %}<span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:16px;border-radius:2px;background:#EEF2FB;font-size:9px;font-weight:800;color:#002583;">BBK</span>
+     {% else %}<span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:16px;border-radius:2px;background:#EEF2FB;font-size:9px;font-weight:800;color:#002583;">{{ doc.jurisdiction|upper|slice:":3" }}</span>{% endif %}
    </td>
 
-   {# Jurisdiction #}
-   <td style="padding:11px 12px;border-bottom:1px solid #F0F3F9;white-space:nowrap;">
-    <div style="display:flex;align-items:center;gap:7px;">
-     {% if doc.jurisdiction == 'bahrain' %}<img src="https://flagcdn.com/40x30/bh.png" width="20" height="15" style="border-radius:2px;object-fit:cover;" alt="Bahrain">
-     {% elif doc.jurisdiction == 'india' %}<img src="https://flagcdn.com/40x30/in.png" width="20" height="15" style="border-radius:2px;object-fit:cover;" alt="India">
-     {% elif doc.jurisdiction == 'kuwait' %}<img src="https://flagcdn.com/40x30/kw.png" width="20" height="15" style="border-radius:2px;object-fit:cover;" alt="Kuwait">
-     {% elif doc.jurisdiction == 'bbk' %}<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:15px;border-radius:2px;background:#EEF2FB;font-size:9px;font-weight:800;color:#002583;">BBK</span>
-     {% else %}<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:15px;border-radius:2px;background:#EEF2FB;font-size:9px;font-weight:800;color:#002583;">{{ doc.jurisdiction|upper|slice:":3" }}</span>{% endif %}
-     <span style="font-size:11.5px;color:#4A5878;">{{ doc.get_jurisdiction_display }}</span>
-    </div>
-   </td>
-
-   {# Updated #}
-   <td style="padding:11px 12px;border-bottom:1px solid #F0F3F9;font-size:11.5px;color:#4A5878;white-space:nowrap;">{% if doc.effective_date %}{{ doc.effective_date|date:"d M Y" }}{% else %}{{ doc.upload_date|date:"d M Y" }}{% endif %}</td>
+   {# Updated — hidden when the detail panel is open (date is shown in the panel) #}
+   <td x-show="!selectedDoc" style="padding:11px 12px;border-bottom:1px solid #F0F3F9;font-size:11.5px;color:#4A5878;white-space:nowrap;">{% if doc.effective_date %}{{ doc.effective_date|date:"d M Y" }}{% else %}{{ doc.upload_date|date:"d M Y" }}{% endif %}</td>
 
    {# Sections #}
    <td style="padding:11px 14px;border-bottom:1px solid #F0F3F9;text-align:right;font-size:11.5px;font-weight:700;color:#002583;white-space:nowrap;">{% if doc.status == 'indexed' %}{{ doc.chunk_count }}{% else %}<span style="color:#C5CCDB;">—</span>{% endif %}</td>
@@ -509,8 +521,8 @@
 
 {# ── Guided upload wizard ────────────────────────────────────────────────── #}
 <div x-data="uploadWizard()" @open-wizard.window="openWizard()">
- <div x-show="open" x-cloak style="position:fixed;inset:0;z-index:70;background:rgba(0,15,50,0.45);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:24px;" @click.self="open=false">
-  <div style="width:min(600px,95vw);max-height:90vh;background:#fff;border-radius:18px;box-shadow:0 30px 80px rgba(0,0,0,0.35);display:flex;flex-direction:column;overflow:hidden;">
+ <div x-show="open" x-cloak style="position:fixed;top:0;left:0;right:0;bottom:0;width:100vw;height:100vh;z-index:70;background:rgba(0,15,50,0.45);backdrop-filter:blur(3px);display:grid;place-items:center;padding:24px;box-sizing:border-box;" @click.self="open=false">
+  <div style="width:min(860px,94vw);max-height:92vh;margin:auto;background:#fff;border-radius:18px;box-shadow:0 30px 80px rgba(0,0,0,0.35);display:flex;flex-direction:column;overflow:hidden;">
 
    <div style="padding:18px 24px 14px;border-bottom:1px solid #EEF1F7;flex-shrink:0;">
     <div style="display:flex;align-items:center;justify-content:space-between;">
@@ -520,9 +532,15 @@
     <div style="display:flex;align-items:center;gap:6px;margin-top:12px;">
      <template x-for="(s,i) in ['Details','Analyze','Review','Configure','Done']" :key="i">
       <div style="display:flex;align-items:center;gap:6px;flex:1;">
-       <span :style="stepIndex()>=i ? 'background:#002583;color:#fff;' : 'background:#EEF1F7;color:#9AA4BC;'" style="width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0;" x-text="i+1"></span>
-       <span :style="stepIndex()>=i ? 'color:#002583;' : 'color:#9AA4BC;'" style="font-size:11px;font-weight:600;white-space:nowrap;" x-text="s"></span>
-       <span x-show="i<4" style="flex:1;height:2px;background:#EEF1F7;border-radius:2px;"></span>
+       {# 3 states: done (✓) / active / upcoming — geometry from .step-num class #}
+       <span class="step-num"
+             :class="stepIndex()>i ? 'is-done' : (stepIndex()===i ? 'is-active' : 'is-upcoming')">
+        <template x-if="stepIndex()>i"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg></template>
+        <template x-if="stepIndex()<=i"><span x-text="i+1"></span></template>
+       </span>
+       <span class="step-lbl" :class="stepIndex()>=i ? 'is-current' : 'is-upcoming'"
+             style="font-size:11px;font-weight:600;white-space:nowrap;" x-text="s"></span>
+       <span x-show="i<4" class="step-line" :class="stepIndex()>i ? 'done' : ''"></span>
       </div>
      </template>
     </div>
@@ -534,7 +552,7 @@
     {# STEP 1 — Details #}
     <div x-show="step===1">
      <div @dragover.prevent="dragging=true" @dragleave.prevent="dragging=false" @drop.prevent="dragging=false; pickFile($event.dataTransfer.files[0])" @click="$refs.fileIn.click()"
-          :style="dragging ? 'border-color:#002583;background:#F4F7FF;' : 'border-color:#DCE2EE;'" style="border:2px dashed #DCE2EE;border-radius:12px;padding:24px;text-align:center;cursor:pointer;margin-bottom:18px;transition:all .15s;">
+          :style="dragging ? 'border-color:#002583;background:#F4F7FF;' : 'border-color:#DCE2EE;background:#FAFBFE;'" style="border:2px dashed #DCE2EE;border-radius:12px;padding:24px;text-align:center;cursor:pointer;margin-bottom:18px;transition:all .15s;background:#FAFBFE;">
       <input type="file" x-ref="fileIn" accept=".pdf,.docx,.txt" style="display:none;" @change="pickFile($event.target.files[0])">
       <template x-if="!file"><div>
        <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="1.6" style="margin:0 auto 8px;display:block;"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
@@ -547,10 +565,13 @@
       </div></template>
      </div>
 
-     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-      <div style="grid-column:1/-1;"><label class="wz-lbl">Document name</label><input class="wz-in" x-model="meta.name" placeholder="e.g. Personal Data Protection Law"></div>
-      <div><label class="wz-lbl">Language</label><select class="wz-in" x-model="meta.language"><option value="en">English</option><option value="ar">Arabic</option></select></div>
-      <div><label class="wz-lbl">Jurisdiction</label><select class="wz-in" x-model="meta.jurisdiction"><option value="bahrain">Bahrain</option><option value="india">India</option><option value="kuwait">Kuwait</option><option value="bbk">BBK</option><option value="other">Other</option></select></div>
+     <div>
+      <label class="wz-lbl">Document name <span style="color:#9AA4BC;font-weight:400;">(optional — detected if left blank)</span></label>
+      <input class="wz-in" x-model="meta.name" placeholder="e.g. Personal Data Protection Law">
+     </div>
+     <div style="display:flex;align-items:center;gap:8px;margin-top:12px;padding:10px 12px;background:#F4F7FF;border:1px solid #DCE6FB;border-radius:9px;">
+      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="1.8" style="flex-shrink:0;"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg>
+      <span style="font-size:11.5px;color:#3A4560;line-height:1.4;">Language, jurisdiction, category and structure are detected automatically — you'll confirm them next.</span>
      </div>
      <div style="display:flex;justify-content:flex-end;margin-top:20px;">
       <button @click="analyze()" :disabled="!file" :style="!file?'opacity:.45;cursor:not-allowed;':''" class="wz-btn">Analyze &rarr;</button>
@@ -561,9 +582,9 @@
     <div x-show="step===2" x-cloak style="padding:24px 0;text-align:center;">
      <div style="width:44px;height:44px;border:3px solid #EEF1F7;border-top-color:#002583;border-radius:50%;animation:viewer-spin .8s linear infinite;margin:0 auto 14px;"></div>
      <p style="font-size:14px;font-weight:700;color:#002583;margin:0;">Analysing document…</p>
-     <p style="font-size:11.5px;color:#9AA4BC;margin:6px auto 18px;max-width:320px;line-height:1.5;">Extraction, Arabic normalization, structure detection and chunking. Broken-font Arabic is OCR'd — this can take a few minutes.</p>
+     <p style="font-size:11.5px;color:#9AA4BC;margin:6px auto 18px;max-width:330px;line-height:1.5;">Reading the document and detecting its language, metadata and structure — all locally. Scanned or broken-font pages are OCR'd, which can take a little longer.</p>
      <div style="max-width:240px;margin:0 auto;text-align:left;">
-      <template x-for="s in ['Text extraction / OCR','Arabic normalization','Structure detection','Chunk generation']" :key="s">
+      <template x-for="s in ['Reading the document','Detecting metadata','Detecting structure','Preparing your review']" :key="s">
        <div style="display:flex;align-items:center;gap:9px;padding:4px 0;font-size:12px;color:#3A4560;">
         <span style="width:6px;height:6px;border-radius:50%;background:#3B6FE0;flex-shrink:0;"></span><span x-text="s"></span>
        </div>
@@ -573,15 +594,41 @@
 
     {# STEP 3 — Review (structure + confirmation metadata) #}
     <div x-show="step===3" x-cloak>
+
+     {# AI-suggested banner — fields below are pre-filled by the local model to confirm #}
+     <div x-show="meta.ai_suggested" x-cloak style="display:flex;align-items:flex-start;gap:9px;background:#F4F7FF;border:1px solid #DCE6FB;border-radius:10px;padding:10px 12px;margin-bottom:14px;">
+      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="1.8" style="flex-shrink:0;margin-top:1px;"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg>
+      <p style="font-size:11.5px;color:#3A4560;margin:0;line-height:1.5;">These details were read from the document by the local model. Please review and correct anything before indexing.</p>
+     </div>
+
      <p style="font-size:13px;font-weight:700;color:#14213D;margin:0 0 3px;">Detected structure</p>
      <p style="font-size:11.5px;color:#7B8499;margin:0 0 14px;">Verify the parsing looks right, confirm the metadata, then configure indexing.</p>
      <div x-html="analysis && analysis.tree_html"></div>
+
+     {# Suggested bibliographic metadata #}
+     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px;">
+      <div style="grid-column:1/-1;"><label class="wz-lbl">Document name</label>
+       <input class="wz-in" x-model="meta.name" placeholder="Personal Data Protection Law"></div>
+      <div style="grid-column:1/-1;"><label class="wz-lbl">Full official title <span style="color:#9AA4BC;font-weight:400;">(optional)</span></label>
+       <input class="wz-in" x-model="meta.full_name" placeholder="Law No. (30) of 2018 …"></div>
+      <div><label class="wz-lbl">Language <span style="font-size:9px;font-weight:700;color:#1B7F3A;background:#E8F6EC;padding:1px 6px;border-radius:8px;margin-left:4px;">detected</span></label>
+       <select class="wz-in" x-model="meta.language"><option value="en">English</option><option value="ar">Arabic</option></select></div>
+      <div><label class="wz-lbl">Jurisdiction
+        <span x-show="meta.jurisdiction_is_new" x-cloak style="font-size:9px;font-weight:700;color:#B07A00;background:#FFF3D6;padding:1px 6px;border-radius:8px;margin-left:4px;">NEW — will be added</span></label>
+       <select class="wz-in" x-model="meta.jurisdiction" @change="meta.jurisdiction_is_new = isNewJur()">
+        <template x-for="o in jurOptions" :key="o.v"><option :value="o.v" x-text="o.label"></option></template></select></div>
+      <div><label class="wz-lbl">Category
+        <span x-show="meta.category_is_new && meta.regulation_category" x-cloak style="font-size:9px;font-weight:700;color:#B07A00;background:#FFF3D6;padding:1px 6px;border-radius:8px;margin-left:4px;">NEW — will be added</span></label>
+       <input class="wz-in" x-model="meta.regulation_category" @input="meta.category_is_new = isNewCat()" placeholder="e.g. data protection"></div>
+      <div style="grid-column:1/-1;"><label class="wz-lbl">Issuing authority <span style="color:#9AA4BC;font-weight:400;">(optional)</span></label>
+       <input class="wz-in" x-model="meta.issuing_authority" placeholder="e.g. Personal Data Protection Authority"></div>
+     </div>
 
      <div style="margin-top:18px;">
       <label class="wz-lbl">Confirm document type</label>
       <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;">
        <template x-for="t in ['Law','Regulation','Policy','Circular','Contract','Court Judgment','Other']" :key="t">
-        <button type="button" @click="meta.confirmed_type=t" :style="meta.confirmed_type===t ? 'background:#002583;color:#fff;border-color:#002583;' : 'background:#fff;color:#4A5878;border-color:#E5E8EF;'" style="padding:5px 12px;border-radius:20px;border:1px solid;font-size:11px;font-weight:600;cursor:pointer;" x-text="t"></button>
+        <button type="button" class="wz-pill" :class="meta.confirmed_type===t ? 'on' : ''" @click="meta.confirmed_type=t" x-text="t"></button>
        </template>
       </div>
      </div>
@@ -613,9 +660,8 @@
      <p style="font-size:11.5px;color:#7B8499;margin:0 0 10px;">How the document is split into retrievable legal nodes. Automatic reflects the detected structure.</p>
      <div style="display:flex;flex-direction:column;gap:8px;">
       <template x-for="o in strategyOptions()" :key="o.v">
-       <div @click="meta.chunk_strategy=o.v" :style="meta.chunk_strategy===o.v ? 'border-color:#002583;background:#F4F7FF;' : 'border-color:#E5E8EF;background:#fff;'" style="border:1px solid;border-radius:10px;padding:10px 12px;cursor:pointer;display:flex;align-items:center;gap:10px;">
-        <span :style="meta.chunk_strategy===o.v ? 'border-color:#002583;' : 'border-color:#CBD3E1;'" style="width:15px;height:15px;border:2px solid;border-radius:50%;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;">
-         <span x-show="meta.chunk_strategy===o.v" style="width:7px;height:7px;border-radius:50%;background:#002583;"></span></span>
+       <div class="wz-opt" :class="meta.chunk_strategy===o.v ? 'on' : ''" @click="meta.chunk_strategy=o.v">
+        <span class="wz-radio"><span class="wz-radio-dot"></span></span>
         <div style="flex:1;min-width:0;">
          <p style="font-size:12.5px;font-weight:700;color:#14213D;margin:0;"><span x-text="o.label"></span>
           <span x-show="o.rec" style="font-size:9px;font-weight:700;color:#1B7F3A;background:#E8F6EC;padding:1px 6px;border-radius:10px;margin-left:6px;">Recommended</span></p>
@@ -630,9 +676,8 @@
      <p style="font-size:11.5px;color:#7B8499;margin:0 0 10px;">How sources are labelled when this document is cited in answers.</p>
      <div style="display:flex;flex-direction:column;gap:8px;">
       <template x-for="o in [{v:'short',label:'Document + Article'},{v:'full',label:'Full legal citation'},{v:'custom',label:'Custom format'}]" :key="o.v">
-       <div @click="meta.citation_format=o.v" :style="meta.citation_format===o.v ? 'border-color:#002583;background:#F4F7FF;' : 'border-color:#E5E8EF;background:#fff;'" style="border:1px solid;border-radius:10px;padding:10px 12px;cursor:pointer;display:flex;align-items:center;gap:10px;">
-        <span :style="meta.citation_format===o.v ? 'border-color:#002583;' : 'border-color:#CBD3E1;'" style="width:15px;height:15px;border:2px solid;border-radius:50%;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;">
-         <span x-show="meta.citation_format===o.v" style="width:7px;height:7px;border-radius:50%;background:#002583;"></span></span>
+       <div class="wz-opt" :class="meta.citation_format===o.v ? 'on' : ''" @click="meta.citation_format=o.v">
+        <span class="wz-radio"><span class="wz-radio-dot"></span></span>
         <span style="flex:1;font-size:12.5px;font-weight:700;color:#14213D;" x-text="o.label"></span>
        </div>
       </template>
@@ -648,8 +693,7 @@
       <p style="font-size:13px;font-weight:600;color:#fff;margin:0;" x-text="citationPreview()"></p>
      </div>
 
-     {# Opt-in topic classification — powers results-first coverage. Off means
-        the doc still indexes; classification just runs later on first use. #}
+     {# Opt-in topic classification — off still indexes; classification runs later on first use #}
      <label style="display:flex;align-items:flex-start;gap:10px;margin-top:16px;padding:12px 14px;border:1px solid #E5E8EF;border-radius:10px;cursor:pointer;background:#fff;">
       <input type="checkbox" x-model="meta.classify" style="margin-top:2px;width:15px;height:15px;accent-color:#002583;cursor:pointer;">
       <span>
@@ -703,18 +747,60 @@
  .wz-btn { padding:9px 20px; background:#002583; color:#fff; border:0; border-radius:9px; font-size:13px; font-weight:700; cursor:pointer; box-shadow:0 4px 12px rgba(0,37,131,.24); font-family:inherit; }
  .wz-btn:hover:not([disabled]) { background:#001a5e; }
  .wz-btn-ghost { padding:9px 16px; background:#fff; color:#4A5878; border:1px solid #E5E8EF; border-radius:9px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; }
+ /* Pill toggle — geometry in the class so Alpine's :class colour toggle can't
+    wipe it (an inline :style binding used to collapse these to plain text). */
+ .wz-pill { padding:6px 14px; border-radius:20px; border:1px solid #E5E8EF; background:#fff; color:#4A5878; font-size:11.5px; font-weight:600; cursor:pointer; font-family:inherit; transition:background .12s,border-color .12s,color .12s; white-space:nowrap; }
+ .wz-pill:hover { border-color:#B9C4DC; background:#F7F9FE; }
+ .wz-pill.on { background:#002583; border-color:#002583; color:#fff; }
+ .wz-pill.on:hover { background:#001a5e; }
+ /* Selectable option card (chunking / citation) — geometry in the class so the
+    :class state toggle can't wipe padding / radius / flex layout. */
+ .wz-opt { border:1px solid #E5E8EF; border-radius:12px; padding:12px 14px; cursor:pointer; display:flex; align-items:center; gap:11px; background:#fff; transition:border-color .12s,background .12s,box-shadow .12s; }
+ .wz-opt:hover { border-color:#B9C4DC; background:#FAFBFE; }
+ .wz-opt.on { border-color:#002583; background:#F4F7FF; box-shadow:0 0 0 3px rgba(0,37,131,.09); }
+ .wz-radio { width:16px; height:16px; border:2px solid #CBD3E1; border-radius:50%; flex-shrink:0; display:inline-flex; align-items:center; justify-content:center; transition:border-color .12s; }
+ .wz-opt.on .wz-radio { border-color:#002583; }
+ .wz-radio-dot { width:7px; height:7px; border-radius:50%; background:#002583; opacity:0; transition:opacity .12s; }
+ .wz-opt.on .wz-radio-dot { opacity:1; }
+ /* Step badge — fixed geometry lives HERE (a class), not in an inline style the
+    Alpine :style colour binding would replace and collapse to 0 width. */
+ .step-num { flex:0 0 auto; width:22px; height:22px; min-width:22px; border-radius:50%;
+   display:inline-flex; align-items:center; justify-content:center; font-size:10px;
+   font-weight:800; overflow:visible; }
+ .step-num svg { width:12px; height:12px; }
+ .step-num.is-done     { background:#002583; color:#fff; }
+ .step-num.is-active   { background:#002583; color:#fff; box-shadow:0 0 0 3px rgba(0,37,131,.18); }
+ .step-num.is-upcoming { background:#EEF1F7; color:#5A6685; }   /* darker text for AA contrast */
+ .step-lbl.is-current  { color:#002583; }
+ .step-lbl.is-upcoming { color:#5A6685; }
+ /* Connector — geometry in the class so the :class colour toggle can't wipe it. */
+ .step-line { flex:1; height:2px; border-radius:2px; background:#EEF1F7; }
+ .step-line.done { background:#002583; }
 </style>
 
 <script>
 function uploadWizard() {
  const CSRF = (document.cookie.match(/csrftoken=([^;]+)/)||[])[1] || '';
- const DEF = () => ({ name:'', language:'en', jurisdiction:'other', confirmed_type:'',
+ const DEF = () => ({ name:'', full_name:'', language:'en', jurisdiction:'other', confirmed_type:'',
    department:'', confidentiality:'internal', document_number:'', doc_year:'',
+   issuing_authority:'', effective_date:'', regulation_category:'',
    chunk_strategy:'auto', citation_format:'short', citation_abbr:'', citation_template:'',
-   classify:true });
+   classify:true, jurisdiction_is_new:false, category_is_new:false, ai_suggested:false });
+ // Jurisdictions known to the app = the built-in set + any the admin/user has
+ // already created (rendered from TaxonomyNode). A suggested country not in
+ // here is offered as NEW and, on confirm, persisted so it shows up next time.
+ const KNOWN_JURS = [
+   {v:'bahrain',label:'Bahrain'},{v:'india',label:'India'},{v:'kuwait',label:'Kuwait'},
+   {v:'bbk',label:'BBK'},{v:'other',label:'Other'}{% for c in custom_jurisdictions %},
+   {v:'{{ c.code|default:c.name|lower|escapejs }}',label:'{{ c.name|escapejs }}'}{% endfor %}
+ ];
+ // Regulation categories the app already knows (built-ins + admin-created).
+ const KNOWN_CATS = ['data protection','privacy','cybersecurity','aml/kyc','banking',
+   'electronic transactions'{% for c in custom_categories %},'{{ c.name|lower|escapejs }}'{% endfor %}];
  return {
   open:false, step:1, file:null, dragging:false, analysis:null, errorMsg:'', meta:DEF(),
-  procSteps:['Text extraction / OCR','Arabic normalization','Chunk generation','Embedding generation','Vector indexing'],
+  jurOptions: KNOWN_JURS.slice(),
+  procSteps:['Extracting text','Chunking into legal nodes','Generating embeddings','Building the index','Classifying topics'],
   procDone:0, _procTimer:null,
   stepIndex() { return this.step<=1?0 : this.step===2?1 : this.step===3?2 : this.step<=5?3 : 4; },
   openWizard() { this.step=1; this.file=null; this.analysis=null; this.errorMsg=''; this.meta=DEF(); this.procDone=0; this.open=true; },
@@ -743,17 +829,49 @@ function uploadWizard() {
    if(!this.file){ this.errorMsg='Please choose a file first.'; return; }
    this.errorMsg=''; this.step=2;
    const fd=new FormData(); fd.append('file', this.file);
-   ['name','language','jurisdiction'].forEach(k=>{ if(this.meta[k]) fd.append(k,this.meta[k]); });
+   // Only the (optional) name is sent — language + jurisdiction are detected.
+   if(this.meta.name) fd.append('name', this.meta.name);
    try {
     const r=await fetch('{% url "library-analyze" %}',{method:'POST',body:fd,headers:{'X-CSRFToken':CSRF}});
     const d=await r.json();
     if(d.error){ this.errorMsg=d.error; this.step=1; return; }
     this.analysis=d;
+    if(d.language) this.meta.language=d.language;   // detected language
+    this.applySuggestions(d.suggested_meta||{});
     if(!this.meta.citation_abbr) this.meta.citation_abbr=this._guessAbbr(this.meta.name);
-    if(d.structured){ const st=(d.suggested_type||'regulation'); this.meta.confirmed_type = st.charAt(0).toUpperCase()+st.slice(1); this.step=3; }
-    else { await this.finalize(); }
+    if(d.structured){
+     if(!this.meta.confirmed_type){ const st=(d.suggested_type||'regulation'); this.meta.confirmed_type = st.charAt(0).toUpperCase()+st.slice(1); }
+     this.step=3;
+    } else { await this.finalize(); }
    } catch(e){ this.errorMsg='Analysis failed — check the server logs.'; this.step=1; }
   },
+  // Pre-fill the review fields from the LLM's suggestions. Everything here is
+  // a suggestion the user confirms/edits in step 3 — nothing is auto-applied.
+  applySuggestions(sm) {
+   this.meta.ai_suggested = !!(sm && Object.keys(sm).length);
+   if(!sm) return;
+   const set=(k,v)=>{ if(v!==undefined && v!==null && String(v).trim()!=='') this.meta[k]=String(v).trim(); };
+   set('name', sm.name); set('full_name', sm.full_name);
+   set('issuing_authority', sm.issuing_authority); set('document_number', sm.document_id);
+   set('doc_year', sm.doc_year); set('effective_date', sm.effective_date);
+   set('citation_abbr', sm.citation_abbr); set('regulation_category', sm.regulation_category);
+   if(sm.doc_type){ this.meta.confirmed_type = sm.doc_type.charAt(0).toUpperCase()+sm.doc_type.slice(1); }
+   // Jurisdiction — offer a country not yet in the app as NEW.
+   if(sm.jurisdiction){
+    const j=String(sm.jurisdiction).toLowerCase();
+    if(!this.jurOptions.some(o=>o.v===j)){
+     this.jurOptions.push({v:j, label:j.charAt(0).toUpperCase()+j.slice(1)+' — new'});
+     this.meta.jurisdiction_is_new=true;
+    } else { this.meta.jurisdiction_is_new=false; }
+    this.meta.jurisdiction=j;
+   }
+   // Category — new if it isn't one the app already knows.
+   if(sm.regulation_category){
+    this.meta.category_is_new = !KNOWN_CATS.includes(sm.regulation_category.toLowerCase());
+   }
+  },
+  isNewJur() { return !KNOWN_JURS.some(o=>o.v===this.meta.jurisdiction); },
+  isNewCat() { const c=(this.meta.regulation_category||'').toLowerCase(); return !!c && !KNOWN_CATS.includes(c); },
   _runChecklist() {
    this.procDone=0;
    clearInterval(this._procTimer);
@@ -762,6 +880,9 @@ function uploadWizard() {
   async finalize() {
    this.step=5; this._runChecklist();
    const fd=new FormData();
+   fd.append('name', this.meta.name);
+   fd.append('full_name', this.meta.full_name);
+   fd.append('language', this.meta.language);
    fd.append('jurisdiction', this.meta.jurisdiction);
    fd.append('doc_type', (this.meta.confirmed_type||'').toLowerCase().includes('policy')?'policy':'regulation');
    fd.append('chunk_strategy', this.meta.chunk_strategy);
@@ -771,7 +892,14 @@ function uploadWizard() {
    fd.append('doc_year', this.meta.doc_year);
    fd.append('department', this.meta.department);
    fd.append('confidentiality', this.meta.confidentiality);
+   fd.append('issuing_authority', this.meta.issuing_authority);
+   fd.append('effective_date', this.meta.effective_date);
+   fd.append('regulation_category', this.meta.regulation_category);
    fd.append('classify', this.meta.classify ? '1' : '0');
+   // Tell the server to persist a newly-detected country / category as a
+   // TaxonomyNode so it's a known option next time.
+   if(this.meta.jurisdiction_is_new) fd.append('new_jurisdiction','1');
+   if(this.meta.category_is_new)     fd.append('new_category','1');
    if(this.meta.document_number) fd.append('document_id', this.meta.document_number);
    try {
     await fetch('/library/finalize/'+this.analysis.pk+'/',{method:'POST',body:fd,headers:{'X-CSRFToken':CSRF}});

@@ -46,13 +46,16 @@
  {# Fixed 192px sidebar — always visible #}
  {% include 'partials/_sidebar.html' %}
 
- {# Main scrollable content area (min-w-0 lets it shrink so wide page content can't widen the whole app) #}
- <main class="flex-1 min-w-0 overflow-y-auto">
+ {# Main = non-scrolling flex column so in-page sticky headers work (see wrapper below) #}
+ <main class="flex-1 min-w-0 overflow-hidden flex flex-col">
 
  {# Contextual wizard banner (dismissible, per-page colour) #}
  {% include 'partials/_wizard_banner.html' %}
 
+ {# Page area bounded to (main − banner); the page's own scroll container is the real scroller #}
+ <div class="flex-1 min-h-0 overflow-y-auto">
  {% block content %}{% endblock %}
+ </div>
 
  </main>
 

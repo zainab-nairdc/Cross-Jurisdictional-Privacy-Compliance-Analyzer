@@ -13,12 +13,18 @@ hierarchy from the analysis engine. Loaded into the structure modal via HTMX.{% 
 {% if summary %}
 <div style="flex:1;overflow-y:auto;padding:16px 20px;background:#fff;">
 
- {# Detected summary bar #}
+ {# Detected summary bar — counts labelled by the document's OWN scheme #}
  <div style="display:flex;flex-wrap:wrap;align-items:center;gap:20px;padding:12px 16px;background:#F4F6FB;border:1px solid #E9EDF5;border-radius:12px;margin-bottom:18px;">
-  <div><span style="font-size:19px;font-weight:800;color:#002583;">{{ summary.parts }}</span> <span style="font-size:11px;color:#7B8499;">Parts</span></div>
-  <div><span style="font-size:19px;font-weight:800;color:#002583;">{{ summary.sections }}</span> <span style="font-size:11px;color:#7B8499;">Sections</span></div>
-  <div><span style="font-size:19px;font-weight:800;color:#002583;">{{ summary.articles }}</span> <span style="font-size:11px;color:#7B8499;">Articles</span></div>
-  <div><span style="font-size:19px;font-weight:800;color:#B07A00;">{{ summary.definitions }}</span> <span style="font-size:11px;color:#7B8499;">Definitions</span></div>
+  {% if summary.counts %}
+   {% for c in summary.counts %}
+   <div><span style="font-size:19px;font-weight:800;color:#002583;">{{ c.value }}</span> <span style="font-size:11px;color:#7B8499;">{{ c.label }}</span></div>
+   {% endfor %}
+  {% else %}
+   <div><span style="font-size:19px;font-weight:800;color:#002583;">{{ summary.parts }}</span> <span style="font-size:11px;color:#7B8499;">Parts</span></div>
+   <div><span style="font-size:19px;font-weight:800;color:#002583;">{{ summary.sections }}</span> <span style="font-size:11px;color:#7B8499;">Sections</span></div>
+   <div><span style="font-size:19px;font-weight:800;color:#002583;">{{ summary.articles }}</span> <span style="font-size:11px;color:#7B8499;">Articles</span></div>
+   <div><span style="font-size:19px;font-weight:800;color:#B07A00;">{{ summary.definitions }}</span> <span style="font-size:11px;color:#7B8499;">Definitions</span></div>
+  {% endif %}
   <div style="margin-left:auto;">
    <span style="font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;background:#EEF2FB;color:#002583;">Suggested type: {{ summary.suggested_type|capfirst }}</span>
   </div>

@@ -127,10 +127,22 @@ class RegulationsView(TemplateView):
             for d in regs_list
         ])
 
+        # Custom jurisdictions / categories the app has learned (created from
+        # prior uploads via the "NEW — will be added" confirm). These extend the
+        # wizard's built-in option lists so previously-added countries/categories
+        # are selectable and don't re-register as new.
+        from apps.library.models import TaxonomyNode
+        custom_jurisdictions = list(
+            TaxonomyNode.objects.filter(node_type=TaxonomyNode.COUNTRY, is_active=True))
+        custom_categories = list(
+            TaxonomyNode.objects.filter(node_type=TaxonomyNode.TOPIC, is_active=True))
+
         ctx.update({
             'regulations': regs_list,
             'docs_json':   docs_json,
             'preset_tags': PRESET_TAGS,
+            'custom_jurisdictions': custom_jurisdictions,
+            'custom_categories':    custom_categories,
         })
         return ctx
 
@@ -249,6 +261,17 @@ class DocumentDeleteView(View):
                 delete_doc_chunks(title)
             except Exception:
                 pass
+            # Arabic docs live in a SEPARATE store (regulations_ar), which the
+            # English purge above doesn't touch. Without this, deleting an
+            # Arabic document leaves its chunks as ghosts that keep surfacing
+            # in cross-lingual retrieval. Fail-soft: the arabic package may be
+            # unavailable in some deployments.
+            if getattr(doc, 'language', '') == Document.ARABIC:
+                try:
+                    from arabic import store as ar_store
+                    ar_store.delete_source(title)
+                except Exception:
+                    pass
             doc.delete()
             from apps.history.audit import log_event, Actions
             log_event(
@@ -484,19 +507,55 @@ class DocumentViewerView(View):
         })
 
 
-def _english_structure_summary(doc):
-    """Build a Legal-Node summary for an English doc from its indexed chunks.
-    The English pipeline stores an ``article_ref`` per chunk (but no part /
-    section hierarchy), so this is a flat article list — still a real structure
-    preview, just one level deep."""
+def _count_divisions(text: str) -> dict:
+    """Count a document's legal divisions by regex over the full text — exact and
+    deterministic (Article/Chapter/Section/Part + Recitals). Returns {name: count}
+    keyed lowercase. Numbered runs (Articles 1..N) use the sequential run length so
+    stray cross-references (e.g. 'Article 263 TFEU') don't inflate the total."""
+    if not text:
+        return {}
+    out = {}
+    for name in ('part', 'chapter', 'section', 'article', 'rule', 'clause'):
+        nums = {m.group(1).upper() for m in re.finditer(
+            rf'(?im)^[ \t#>*]*{name}[ \t]*\(?\s*([0-9]+|[IVXLCM]+)\b', text)}
+        arabic = sorted(int(n) for n in nums if n.isdigit())
+        if arabic:
+            present, run = set(arabic), 0
+            for i in range(1, max(arabic) + 2):
+                if i in present:
+                    run = i
+                elif i - run > 5:      # a big gap → past the real sequence
+                    break
+            cnt = run or len(nums)
+        else:
+            cnt = len(nums)
+        if cnt >= 2:
+            out[name] = cnt
+    # Recitals — "(N)" paragraphs in the preamble (before the first Article 1).
+    fa = re.search(r'(?im)^[ \t#>*]*article[ \t]*\(?\s*1\b', text)
+    head = text[:fa.start()] if fa else ''
+    recs = {int(m.group(1)) for m in re.finditer(r'(?m)^\s*[-*]?\s*\(\s*(\d+)\s*\)', head)}
+    if len(recs) >= 5:
+        out['recitals'] = max(recs)
+    return out
+
+
+def _flat_chunk_summary(doc):
+    """Fallback: a flat article list built from the indexed chunks. Deduped by
+    article_ref so long sub-chunked articles don't repeat."""
     from collections import OrderedDict
     from apps.comparison.concepts import get_doc_chunks_with_ids
     rows = get_doc_chunks_with_ids(doc, limit=400)
     if not rows:
         return None
     nodes = []
+    seen = set()
     for _nid, content, ref in rows:
         ref = (ref or '').strip().strip('()').strip()
+        key = ref.lower()
+        if key in seen:
+            continue
+        seen.add(key)
         first = (content or '').strip().split('\n', 1)[0][:70]
         nodes.append({'type': 'article', 'number': None,
                       'label': ref or 'Section', 'title': first})
@@ -504,6 +563,84 @@ def _english_structure_summary(doc):
     return {'parts': 0, 'sections': 0, 'articles': len(nodes),
             'definitions': 0, 'total_nodes': len(nodes), 'tree': tree,
             'suggested_type': 'regulation'}
+
+
+def _english_structure_summary(doc):
+    """Clean HIERARCHICAL structure for an English doc: reads the whole document
+    and uses the LLM structure detector to produce Chapters → Articles (with
+    recitals grouped), instead of a flat dump of every chunk. Cached by content
+    hash so the LLM pass runs once per document."""
+    from collections import OrderedDict
+    from django.core.cache import cache
+    ck = f'struct_v2_{doc.pk}_{(doc.content_hash or "")[:12]}'
+    cached = cache.get(ck)
+    if cached is not None:
+        return cached or None
+
+    structure = {}
+    text = ''
+    try:
+        if doc.file and doc.file.name:
+            from reasoning.doc_intel import head_text, infer_structure
+            text = head_text(doc.file.path, max_pages=1000)
+            if text:
+                structure = infer_structure(text)
+    except Exception:
+        logger.exception('structure inference failed for doc %s', doc.pk)
+
+    outline = structure.get('outline') or []
+    if not outline:
+        # No hierarchy detected — fall back to the deduped flat list.
+        return _flat_chunk_summary(doc)
+
+    tree = OrderedDict()
+    n_parts = n_articles = 0
+    for node in outline:
+        label = (node.get('label') or '').strip()
+        title = (node.get('title') or '').strip()
+        kids = node.get('children') or []
+        head = f"{label} — {title}" if title else (label or 'Section')
+        if kids:
+            n_parts += 1
+            n_articles += len(kids)
+            tree[head] = OrderedDict([('—', [
+                {'type': 'article', 'number': None,
+                 'label': (c.get('label') or '').strip() or '—',
+                 'title': (c.get('title') or '').strip()}
+                for c in kids])])
+        else:
+            # Standalone node — a recitals/preamble group or a flat article.
+            is_recital = label.lower().startswith(('recital', 'preamble'))
+            tree[head] = OrderedDict([('—', [
+                {'type': 'note' if is_recital else 'article', 'number': None,
+                 'label': label or '—', 'title': title}])])
+            if not is_recital:
+                n_articles += 1
+
+    # Dynamic level counts — labelled by the document's OWN scheme (Chapters /
+    # Articles / Recitals …), counted DETERMINISTICALLY by regex over the full
+    # text so they're exact (11/99/173 for GDPR), not the LLM's grouped estimate.
+    def _plural(w):
+        w = (w or '').strip() or 'Section'
+        return w if w.endswith('s') else w + 's'
+    levels = [lv for lv in (structure.get('levels') or []) if lv]
+    div = _count_divisions(text)
+    counts = []
+    if len(levels) > 1 and div.get(levels[0].lower()):
+        counts.append({'label': _plural(levels[0]), 'value': div[levels[0].lower()]})
+    inner = levels[1] if len(levels) > 1 else (levels[0] if levels else 'Article')
+    counts.append({'label': _plural(inner),
+                   'value': div.get(inner.lower()) or n_articles})
+    if div.get('recitals'):
+        counts.append({'label': 'Recitals', 'value': div['recitals']})
+
+    summary = {'parts': n_parts, 'sections': 0, 'articles': n_articles,
+               'definitions': 0, 'total_nodes': n_articles,
+               'tree': tree, 'scheme': structure.get('scheme', ''),
+               'counts': counts,
+               'suggested_type': doc.doc_type or 'regulation'}
+    cache.set(ck, summary, 3600)
+    return summary
 
 
 class DocumentStructureView(View):
@@ -536,6 +673,34 @@ class DocumentStructureView(View):
                       {'doc': doc, 'summary': summary, 'rtl': rtl})
 
 
+def _run_doc_intel(pdf_path, metadata_only=False):
+    """Local-LLM metadata (+ optional structure) inference on a document's first
+    pages. Returns (suggested_meta: dict, structure_html: str). Everything is a
+    suggestion the user confirms; fail-soft to ({}, '') so a model hiccup never
+    blocks an upload."""
+    try:
+        from reasoning.doc_intel import (
+            head_text, extract_metadata, infer_structure, structure_to_html,
+        )
+    except Exception:
+        return {}, ''
+    try:
+        text = head_text(pdf_path)          # ~6 pages — title/authority live up front
+        if not text:
+            return {}, ''
+        meta = extract_metadata(text)
+        if metadata_only:
+            return meta, ''
+        # Structure reads the WHOLE document (headings are regex-scanned across
+        # the full text, not sampled), so pull essentially all pages.
+        deep = head_text(pdf_path, max_pages=1000)
+        structure = infer_structure(deep or text)
+        return meta, structure_to_html(structure)
+    except Exception:
+        logger.exception('doc-intel failed for %s', pdf_path)
+        return {}, ''
+
+
 class AnalyzeView(View):
     """POST /library/analyze/ — Phase 1 of the guided upload: create the doc,
     extract/OCR + chunk it (NO embedding yet), cache the chunks, and return the
@@ -546,23 +711,47 @@ class AnalyzeView(View):
         file = request.FILES.get('file')
         if not file:
             return HttpResponseBadRequest('No file provided.')
-        lang = (request.POST.get('language') or 'en').strip()
+        # Language + jurisdiction are DETECTED, not asked upfront. The user only
+        # supplies the file; we detect the language here and the LLM proposes the
+        # jurisdiction, both surfaced in the review step to confirm.
+        forced_lang = (request.POST.get('language') or '').strip().lower()
         doc = Document.objects.create(
             name=(request.POST.get('name') or file.name).strip(),
             full_name=(request.POST.get('full_name') or '').strip(),
             doc_type=(request.POST.get('doc_type') or Document.REGULATION),
             jurisdiction=(request.POST.get('jurisdiction') or Document.OTHER),
-            language=lang,
+            language=(forced_lang or 'en'),
             issuing_authority=(request.POST.get('issuing_authority') or '').strip(),
             version=(request.POST.get('version') or '').strip(),
             notes=(request.POST.get('notes') or '').strip(),
             status='review',
             file=file,
         )
-        # English (for now) has no structure engine — index straight through
-        # the normal pipeline on confirm.
+        # Auto-detect the language from the file (Arabic-char ratio over the text
+        # layer) unless the user explicitly forced one.
+        if forced_lang in ('', 'auto'):
+            try:
+                from arabic.detect import detect_language
+                doc.language = detect_language(doc.file.path)
+                doc.save(update_fields=['language'])
+            except Exception:
+                logger.exception('language auto-detect failed for %s', doc.pk)
+        lang = doc.language
+        # English: no regex structure engine, but the local LLM can read the
+        # first pages to (a) suggest metadata for the user to confirm and
+        # (b) infer the document's own hierarchy. Both are suggestions — the
+        # user reviews them in step 3 before anything is indexed.
         if lang != Document.ARABIC:
-            return JsonResponse({'pk': doc.pk, 'language': lang, 'structured': False})
+            meta, tree_html = _run_doc_intel(doc.file.path)
+            return JsonResponse({
+                'pk': doc.pk, 'language': lang,
+                # Route to the review step whenever the LLM produced anything.
+                'structured': bool(tree_html or meta),
+                'suggested_meta': meta,
+                'suggested_type': (meta.get('doc_type') or 'regulation').capitalize(),
+                'tree_html': tree_html,
+                'ai_suggested': True,
+            })
 
         try:
             from arabic.analyze import analyze
@@ -579,10 +768,15 @@ class AnalyzeView(View):
         tree_html = render_to_string('partials/_structure_tree.html', {'summary': summary})
         counts = {k: summary[k] for k in
                   ('parts', 'sections', 'articles', 'definitions', 'total_nodes')} if summary else {}
+        # Also offer LLM-suggested metadata on the Arabic text (title/authority/
+        # number live up front) for the same confirm-before-index flow.
+        ar_meta = _run_doc_intel(doc.file.path, metadata_only=True)[0]
         return JsonResponse({
             'pk': doc.pk, 'language': 'ar', 'structured': True,
             'used_ocr': result.get('used_ocr', False),
             'suggested_type': result.get('suggested_type', ''),
+            'suggested_meta': ar_meta,
+            'ai_suggested': bool(ar_meta),
             'counts': counts, 'tree_html': tree_html,
         })
 
@@ -598,12 +792,46 @@ class FinalizeView(View):
         doc = get_object_or_404(Document, pk=pk)
 
         fields = []
-        for f in ('doc_type', 'jurisdiction', 'chunk_strategy', 'citation_format',
-                  'citation_template', 'citation_abbr', 'doc_year', 'department',
-                  'confidentiality', 'document_id'):
+        for f in ('name', 'full_name', 'language', 'doc_type', 'jurisdiction',
+                  'chunk_strategy', 'citation_format', 'citation_template',
+                  'citation_abbr', 'doc_year', 'department', 'confidentiality',
+                  'document_id', 'issuing_authority', 'regulation_category'):
             v = request.POST.get(f)
             if v:
-                setattr(doc, f, v); fields.append(f)
+                setattr(doc, f, v.strip()); fields.append(f)
+        # effective_date is a real date field — parse the ISO string the LLM/user
+        # confirmed, ignore anything unparseable.
+        eff = (request.POST.get('effective_date') or '').strip()
+        if eff:
+            from datetime import datetime
+            try:
+                doc.effective_date = datetime.strptime(eff[:10], '%Y-%m-%d').date()
+                fields.append('effective_date')
+            except ValueError:
+                pass
+
+        # Persist a newly-detected country / category the user confirmed as new,
+        # so it becomes a known option in the Structure manager and future
+        # uploads. Uses the admin taxonomy tree (TaxonomyNode) — a "collection"
+        # of jurisdictions and categories the app learns over time.
+        try:
+            from apps.library.models import TaxonomyNode
+            if request.POST.get('new_jurisdiction') == '1' and doc.jurisdiction:
+                code = doc.jurisdiction.strip().lower()
+                if not TaxonomyNode.objects.filter(node_type=TaxonomyNode.COUNTRY, code=code).exists():
+                    TaxonomyNode.objects.create(
+                        name=code.capitalize(), code=code,
+                        node_type=TaxonomyNode.COUNTRY,
+                        description='Added from document upload.')
+            cat = (request.POST.get('regulation_category') or '').strip()
+            if request.POST.get('new_category') == '1' and cat:
+                if not TaxonomyNode.objects.filter(node_type=TaxonomyNode.TOPIC, name__iexact=cat).exists():
+                    TaxonomyNode.objects.create(
+                        name=cat, code=cat.lower().replace(' ', '_'),
+                        node_type=TaxonomyNode.TOPIC,
+                        description='Added from document upload.')
+        except Exception:
+            logger.exception('failed to persist new taxonomy node during finalize')
 
         # Opt-in classification: the uploader ticks "Classify topics now" in the
         # wizard. When set, we tag this doc's sections into the taxonomy right
@@ -1113,90 +1341,3 @@ class ObligationRegisterView(TemplateView):
                                    ('BBK', 'BBK policies')]
         return ctx
 
-
-# ── Structure manager: admin-editable compliance taxonomy tree ─────────────────
-from apps.library.models import TaxonomyNode
-
-
-def _seed_taxonomy():
-    """Create a sensible starter tree the first time the page is opened, so the
-    admin has something to shape instead of a blank slate."""
-    if TaxonomyNode.objects.exists():
-        return
-    def mk(name, ntype, parent=None, order=0, code=''):
-        return TaxonomyNode.objects.create(name=name, node_type=ntype, parent=parent,
-                                           order=order, code=code)
-    jur = mk('Jurisdictions', TaxonomyNode.ROOT, order=0)
-    gcc = mk('GCC', TaxonomyNode.REGION, jur, 0)
-    mk('Bahrain', TaxonomyNode.COUNTRY, gcc, 0, 'bahrain')
-    mk('Kuwait',  TaxonomyNode.COUNTRY, gcc, 1, 'kuwait')
-    sa = mk('South Asia', TaxonomyNode.REGION, jur, 1)
-    mk('India', TaxonomyNode.COUNTRY, sa, 0, 'india')
-    internal = mk('Internal', TaxonomyNode.ROOT, order=1)
-    bbk = mk('BBK Policies', TaxonomyNode.GROUP, internal, 0)
-    mk('Data Protection', TaxonomyNode.SECTION, bbk, 0)
-    mk('Cyber Security',  TaxonomyNode.SECTION, bbk, 1)
-    topics = mk('Topics', TaxonomyNode.ROOT, order=2)
-    for i, t in enumerate(['Consent', 'Breach Notification', 'Cross-border Transfers', 'Data Retention']):
-        mk(t, TaxonomyNode.TOPIC, topics, i)
-
-
-@method_decorator(role_required('admin'), name='dispatch')
-class StructureView(View):
-    """GET /library/structure-manager/ — admin taxonomy tree editor.
-    POST — op = add | rename | delete | move."""
-
-    template_name = 'pages/structure.html'
-
-    def get(self, request):
-        _seed_taxonomy()
-        roots = TaxonomyNode.objects.filter(parent__isnull=True)
-        total = TaxonomyNode.objects.count()
-        return render(request, self.template_name, {
-            'roots': roots,
-            'total': total,
-            'type_choices': TaxonomyNode.TYPE_CHOICES,
-        })
-
-    def post(self, request):
-        op = request.POST.get('op')
-
-        if op == 'add':
-            parent = TaxonomyNode.objects.filter(pk=request.POST.get('parent')).first()
-            siblings = TaxonomyNode.objects.filter(parent=parent)
-            nxt = (siblings.count())
-            TaxonomyNode.objects.create(
-                name=(request.POST.get('name') or 'New node').strip(),
-                node_type=request.POST.get('node_type') or TaxonomyNode.OTHER,
-                code=(request.POST.get('code') or '').strip(),
-                description=(request.POST.get('description') or '').strip(),
-                parent=parent, order=nxt,
-            )
-        elif op == 'rename':
-            n = TaxonomyNode.objects.filter(pk=request.POST.get('pk')).first()
-            if n:
-                n.name = (request.POST.get('name') or n.name).strip()
-                if request.POST.get('node_type'):
-                    n.node_type = request.POST.get('node_type')
-                n.code = (request.POST.get('code') or '').strip()
-                n.description = (request.POST.get('description') or '').strip()
-                n.save()
-        elif op == 'delete':
-            TaxonomyNode.objects.filter(pk=request.POST.get('pk')).delete()
-        elif op == 'move':
-            n = TaxonomyNode.objects.filter(pk=request.POST.get('pk')).first()
-            if n:
-                sibs = list(TaxonomyNode.objects.filter(parent=n.parent))
-                idx = next((i for i, s in enumerate(sibs) if s.pk == n.pk), None)
-                swap = None
-                if idx is not None:
-                    if request.POST.get('dir') == 'up' and idx > 0:
-                        swap = sibs[idx - 1]
-                    elif request.POST.get('dir') == 'down' and idx < len(sibs) - 1:
-                        swap = sibs[idx + 1]
-                if swap:
-                    n.order, swap.order = swap.order, n.order
-                    n.save(update_fields=['order']); swap.save(update_fields=['order'])
-
-        from django.shortcuts import redirect as _redirect
-        return _redirect('library-structure-manager')

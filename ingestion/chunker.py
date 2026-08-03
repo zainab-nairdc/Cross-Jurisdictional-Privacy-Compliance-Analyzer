@@ -262,9 +262,158 @@ def chunk_document(text, meta: dict) -> list[dict]:
         crumbs = [d.metadata[k] for k in ("h1", "h2", "h3", "h4") if d.metadata.get(k)]
         sections.append((" > ".join(crumbs), body))
 
-    if len(sections) >= 2 and any(h for h, _ in sections):
-        print(f"    [chunker] {len(sections)} sections")
+    # PRIMARY: article-based split (fast, no LLM). docling's markdown headers are
+    # unreliable for legal PDFs — it collapsed all of GDPR into a few giant
+    # "Section" blobs — so when the text has a clear Article/Section structure we
+    # chunk by THAT, not by docling's headers. This is what makes per-article
+    # retrieval and citations work. docling headers are only a fallback below.
+    article_sections = _legal_article_split(text)
+    md_ok = len(sections) >= 2 and any(h for h, _ in sections)
+    if len(article_sections) >= 4:
+        print(f"    [chunker] article-based: {len(article_sections)} sections "
+              f"(markdown had {len(sections)})")
+        return _build(article_sections, meta)
+
+    if md_ok:
+        print(f"    [chunker] {len(sections)} sections (markdown)")
         return _build(sections, meta)
 
-    print(f"    [chunker] WARNING: no markdown headers in {meta.get('Document Title','')!r}")
+    if len(article_sections) >= 2:
+        print(f"    [chunker] article-based: {len(article_sections)} sections")
+        return _build(article_sections, meta)
+
+    # Unfamiliar format with no markdown/article headings — ask the local model
+    # for the heading convention and split on it (lossless: it only names the
+    # heading words, we split on verbatim heading lines).
+    llm_sections = _sections_from_llm(text)
+    if len(llm_sections) >= 2:
+        print(f"    [chunker] LLM structure-aware: {len(llm_sections)} sections")
+        return _build(llm_sections, meta)
+
+    print(f"    [chunker] WARNING: no headings in {meta.get('Document Title','')!r}")
     return _build_unstructured(text, meta)
+
+
+# Common legal division words that begin a heading line. Tried in order; the one
+# with the most line-start matches wins. No LLM — deterministic and instant.
+_LEGAL_PREFIXES = ("Article", "Section", "Clause", "Rule", "Regulation",
+                   "المادة", "المــادة", "الماده")
+
+
+def _longest_increasing(seq: list) -> list:
+    """Longest strictly-increasing-by-value subsequence of [(pos, value)], kept
+    in document order. O(n^2) — fine for the ~hundreds of headings in a law."""
+    n = len(seq)
+    if not n:
+        return []
+    dp = [1] * n
+    par = [-1] * n
+    for i in range(n):
+        for j in range(i):
+            if seq[j][1] < seq[i][1] and dp[j] + 1 > dp[i]:
+                dp[i] = dp[j] + 1
+                par[i] = j
+    i = max(range(n), key=lambda k: dp[k])
+    out = []
+    while i != -1:
+        out.append(seq[i])
+        i = par[i]
+    return out[::-1]
+
+
+def _legal_article_split(text: str) -> list[tuple[str, str]]:
+    """Split by the document's dominant legal heading (Article N / Section N /
+    المادة N). Returns [(title, body)] or [] if no clear structure.
+
+    For arabic-numbered headings it keeps only the real sequential run (1..N),
+    which drops preamble cross-references (e.g. GDPR recitals citing 'Article 263
+    TFEU') that would otherwise mis-anchor a chunk. Text before the first real
+    article becomes a 'Preamble' chunk so recitals aren't lost."""
+    best: list = []
+    best_prefix = ""
+    for prefix in _LEGAL_PREFIXES:
+        # Allow leading markdown markers (#, *, >) that docling may prepend to a
+        # heading, plus whitespace, before the prefix word.
+        rgx = re.compile(
+            rf"(?im)^[ \t#>*]*{re.escape(prefix)}[ \t]*\(?\s*([0-9٠-٩]+|[IVXLCM]+)\b"
+        )
+        ms = list(rgx.finditer(text))
+        if len(ms) > len(best):
+            best, best_prefix = ms, prefix
+    if len(best) < 3:
+        return []
+
+    _AR = str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")
+    numeric = [(m.start(), int(m.group(1).translate(_AR)), m.group(1))
+               for m in best if m.group(1).translate(_AR).isdigit()]
+
+    if len(numeric) >= max(3, len(best) // 2):
+        # Arabic-numbered law → keep the main increasing article run.
+        kept = _longest_increasing([(p, v) for p, v, _ in numeric])
+        pos_to_raw = {p: raw for p, _, raw in numeric}
+        positions = [(p, pos_to_raw[p]) for p, _ in kept]
+    else:
+        # Roman / other → dedup by first occurrence of each label.
+        positions = []
+        seen: set = set()
+        for m in best:
+            k = m.group(1)
+            if k in seen:
+                continue
+            seen.add(k)
+            positions.append((m.start(), k))
+
+    sections: list[tuple[str, str]] = []
+    # Preamble: substantive text before the first real heading (recitals, etc.).
+    if positions and positions[0][0] > 400:
+        pre = text[: positions[0][0]].strip()
+        if len(pre) > 400:
+            sections.append(("Preamble", pre))
+    for i, (start, num) in enumerate(positions):
+        end = positions[i + 1][0] if i + 1 < len(positions) else len(text)
+        block = text[start:end].strip()
+        if block:
+            sections.append((f"{best_prefix} {num}", block))
+    return sections
+
+
+def _sections_from_llm(text: str) -> list[tuple[str, str]]:
+    """Split raw text into (title, body) sections using an LLM-detected heading
+    convention. Returns [] if the model finds no convention or the split yields
+    fewer than 2 nodes. Runs only in the no-markdown-header fallback, so the
+    per-document LLM cost is paid only when the cheap path already failed."""
+    try:
+        from reasoning.doc_intel import detect_heading_prefixes
+    except Exception:
+        return []
+    try:
+        info = detect_heading_prefixes(text)
+    except Exception:
+        return []
+    prefixes = [p.strip() for p in (info.get("prefixes") or [])
+                if isinstance(p, str) and p.strip()]
+    if not prefixes:
+        return []
+    # Build a SAFE regex from the escaped prefix words: a line that starts with
+    # one of them followed by a number (arabic or roman). No model-authored
+    # regex — re.escape blocks injection / catastrophic backtracking.
+    alt = "|".join(re.escape(p) for p in prefixes[:8])
+    try:
+        heading_re = re.compile(
+            rf"(?im)^[ \t]*(?:{alt})[ \t]*[\(\.\-:]?[ \t]*[\dIVXLCivxlc٠-٩]+",
+        )
+    except re.error:
+        return []
+    matches = list(heading_re.finditer(text))
+    if len(matches) < 2:
+        return []
+    sections: list[tuple[str, str]] = []
+    for i, m in enumerate(matches):
+        start = m.start()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+        block = text[start:end].strip()
+        if not block:
+            continue
+        title = (block.splitlines()[0].strip() if block else "")[:120]
+        sections.append((title, block))
+    return sections
