@@ -85,7 +85,8 @@ def _build_meta(doc) -> dict:
         'Publication Date':          '',
         'Last Updated':              '',
         'Language':                  'English',
-        'Scope Summary':             '',
+        'Scope Summary':             doc.scope_summary or '',
+        'Key Topics':                ', '.join(doc.concept_tags_csv) if isinstance(doc.concept_tags_csv, list) else '',
         'Source URL':                doc.source_url or '',
         'Notes for Ingestion':       doc.notes or '',
     }
@@ -264,6 +265,14 @@ def _process_job(job_id: int) -> None:
         from ingestion.loaders import load_document
         doc_path = Path(doc.file.path)
         text = load_document(doc_path)
+        # Raw PDF text layer (PyMuPDF) — the chunker structures from THIS, not
+        # docling's markdown headers, which drop/garble headings on many layouts.
+        # Empty for scans / non-PDFs; the chunker then falls back to `text`.
+        try:
+            from reasoning.doc_intel import head_text
+            raw_text = head_text(doc_path, max_pages=1000)
+        except Exception:
+            raw_text = None
         _set_stage(job, 2, 15)
 
         # ── Stage 3: Chunk ────────────────────────────────────────────────────
@@ -273,7 +282,7 @@ def _process_job(job_id: int) -> None:
         from config import OLLAMA_URL, OLLAMA_MODEL
         st_model = get_model()
         meta     = _build_meta(doc)
-        chunks   = chunk_document(text, meta)
+        chunks   = chunk_document(text, meta, raw_text=raw_text)
         if not chunks:
             _fail(job, 'No chunks produced — document may be empty or unreadable.')
             return

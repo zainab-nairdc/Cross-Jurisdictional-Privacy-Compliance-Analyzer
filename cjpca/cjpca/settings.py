@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'apps.library.apps.LibraryConfig',
     'apps.ingestion.apps.IngestionConfig',
     'apps.accounts.apps.AccountsConfig',
+    'apps.feedback.apps.FeedbackConfig',
 ]
 
 MIDDLEWARE = [
@@ -88,6 +89,8 @@ TEMPLATES = [
                 'apps.core.context_processors.nav_counts',
                 # injects user_role / is_analyst / is_reviewer / is_admin
                 'apps.accounts.context_processors.user_role',
+                # custom jurisdictions/categories for the global upload wizard
+                'apps.library.context_processors.upload_taxonomy',
             ],
         },
     },

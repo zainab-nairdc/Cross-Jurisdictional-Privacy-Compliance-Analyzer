@@ -30,6 +30,23 @@
  {# ── Navigation ── #}
  <nav class="flex-1 overflow-y-auto py-3 space-y-4 overflow-x-hidden">
 
+ {% comment %}One front door: upload any document here; it auto-detects regulation
+      vs internal policy and files itself into the right library.{% endcomment %}
+ {% if is_admin %}
+ <div class="px-2">
+ <button type="button" onclick="window.dispatchEvent(new CustomEvent('open-wizard'))" title="Add document"
+ class="w-full flex items-center py-2 rounded-md text-sm font-semibold transition-colors"
+ :class="sidebarOpen ? 'gap-2.5 px-2.5 justify-start' : 'justify-center px-1'"
+ style="background:#F47920;color:#ffffff;"
+ onmouseover="this.style.background='#d96812'" onmouseout="this.style.background='#F47920'">
+ <svg class="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+ </svg>
+ <span x-show="sidebarOpen" class="whitespace-nowrap">Add document</span>
+ </button>
+ </div>
+ {% endif %}
+
  {# ── Main ── #}
  <div>
  <p x-show="sidebarOpen" class="px-3 mb-1 text-[10px] font-bold uppercase tracking-[0.07em]" style="color:rgba(255,255,255,0.5);">Main</p>

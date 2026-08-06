@@ -133,6 +133,14 @@ class ObligationComparison(BaseModel):
     # prompt populates it from the three axes (majority vote, ties = 'Neither').
     stricter_jurisdiction: str = Field(default="Neither")
     notes:                 str = Field(default="")
+    # ── Operational output — the "so what" a compliance officer needs ──────────
+    # Translates the legal comparison into an ACTION: can one control satisfy both,
+    # and what (if anything) must change. Populated by the comparison prompt; rides
+    # into ComparisonRun.report_json so the workspace can render it with no migration.
+    practical_conclusion:  str = Field(default="")   # one plain, actionable sentence
+    compliance_impact:     str = Field(default="Not Assessable")  # None | Minor | New control needed | Not Assessable
+    shared_controls:       list[str] = Field(default_factory=list)  # controls/policies/evidence satisfying BOTH
+    terminology_note:      str = Field(default="")   # e.g. "Bahrain 'Data Protection Guardian' = GDPR 'DPO'"
     citation_verified:     bool = Field(default=False)
     # NLI hallucination risk for the AI's prose summary on this row.
     # 0.0 = fully entailed by the cited chunk, 1.0 = unsupported / contradicted.

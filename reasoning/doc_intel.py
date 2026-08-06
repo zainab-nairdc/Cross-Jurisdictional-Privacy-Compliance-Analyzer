@@ -53,25 +53,38 @@ def _chat_json(prompt: str, model: str = MODEL) -> dict:
         return {}
 
 
-_METADATA_PROMPT = """You are a legal-document cataloguer. Read the opening of a
-regulation or policy and extract its bibliographic metadata. Use ONLY what the
-text states — never invent a number, date, or authority. If a field is not
-present, return an empty string "".
+_METADATA_PROMPT = """You are a legal/compliance document cataloguer preparing a
+document for a RETRIEVAL system used by a bank's compliance, risk and legal
+teams. Read the opening of a regulation or internal policy and extract metadata
+that makes it easy to FILTER, FIND, and CITE later. Use ONLY what the text states
+— never invent a number, date, authority, or fact. If a field is not present,
+return an empty string "" (or [] for the list fields).
 
 Return a JSON object with EXACTLY these keys:
 - "name": short human title, e.g. "Bahrain PDPL" or "PDPA Order 43/2022"
 - "full_name": the official full title as printed
-- "doc_type": "regulation" or "policy" (internal bank policies/SOPs = policy)
+- "doc_type": "regulation" (a law / regulation / circular issued by an authority)
+  or "policy" (an internal bank policy / SOP / procedure / guideline)
 - "jurisdiction": the country/region the document governs, as a lowercase slug,
   e.g. "bahrain","india","kuwait","saudi","uae","qatar","oman","egypt","eu".
   Use the REAL country even if unusual — do not force it into a short list.
 - "regulation_category": the subject area, lowercase, e.g. "data protection",
-  "cybersecurity", "aml/kyc", "banking", "privacy", "electronic transactions"
+  "cybersecurity","aml/kyc","banking","privacy","electronic transactions",
+  "internal controls","risk management"
 - "issuing_authority": the body that issued it, verbatim if stated
-- "document_id": the law/order/decision number only (digits), e.g. "30" or "43"
+- "document_id": the law/order/decision/policy number only (digits), e.g. "30"
 - "doc_year": 4-digit year of issuance, e.g. "2018"
 - "effective_date": ISO date YYYY-MM-DD if an effective/commencement date is stated, else ""
+- "version": the document version if stated (e.g. "v2.1", "2023"), else ""
 - "citation_abbr": a short citation label if obvious (e.g. "PDPL"), else ""
+- "scope_summary": ONE grounded sentence describing WHAT the document governs and
+  WHO it applies to — the one-line context a reviewer wants when this document
+  appears in search results. No marketing language.
+- "key_topics": array of 3-6 short lowercase subject tags for what the document
+  actually covers, e.g. ["consent","data breach notification","cross-border
+  transfer","data subject rights"]. These help route retrieval to the right doc.
+- "owner_department": for an internal policy, the owning department if stated
+  (e.g. "Compliance","Risk","Legal","IT"), else ""
 - "confidence": your confidence 0.0-1.0 that these values are correct
 
 Document opening:
@@ -97,8 +110,20 @@ def extract_metadata(text: str, filename: str = "") -> dict:
     # normalise: keep only known keys, coerce types, clamp confidence
     keys = ["name", "full_name", "doc_type", "jurisdiction", "regulation_category",
             "issuing_authority", "document_id", "doc_year", "effective_date",
-            "citation_abbr"]
+            "version", "citation_abbr", "scope_summary", "owner_department"]
     out = {k: str(data.get(k, "") or "").strip() for k in keys}
+    # key_topics is a list — normalise to lowercase, de-dupe, cap at 6.
+    kt = data.get("key_topics") or []
+    if isinstance(kt, str):
+        kt = [kt]
+    seen: set = set()
+    topics: list[str] = []
+    for t in kt:
+        t = re.sub(r"\s+", " ", str(t or "")).strip().lower()
+        if t and t not in seen:
+            seen.add(t)
+            topics.append(t)
+    out["key_topics"] = topics[:6]
     # Keep the REAL detected country as a slug — do NOT clamp to a fixed list.
     # A jurisdiction the corpus hasn't seen (e.g. "egypt") flows through so the
     # wizard can offer to create it. Slugify: lowercase, spaces/punct -> nothing.
@@ -256,6 +281,52 @@ def _extract_full_outline(text: str, levels: list[dict], cap: int = 400) -> list
     return root
 
 
+def _extract_numbered_outline(text: str, label_word: str = "", cap: int = 200) -> list[dict]:
+    """Fallback outline for documents whose divisions are BARE numbered headings
+    ('1.', '2.', …) with the number on its own line and the title on the next —
+    a common policy / procedure format that carries no 'Article'/'Section' prefix
+    for the prefix regex to latch onto. Reads the whole text, takes the title from
+    the line after each lone number, strips any TOC dotted leader + page number,
+    and keeps a single clean, monotonically-increasing 1..N run so stray numbered
+    list items in the body can't leak in."""
+    lines = text.splitlines()
+    found: dict[int, str] = {}
+    for i, l in enumerate(lines):
+        m = re.match(r"^[ \t]*(\d{1,3})\.[ \t]*$", l)    # a line that is only "N." (the
+                                                          # trailing dot separates real
+                                                          # clause numbers from bare page
+                                                          # numbers like a lone "2")
+        if not m:
+            continue
+        num = int(m.group(1))
+        if num in found:                                  # first (usually TOC) wins
+            continue
+        title = ""
+        for j in range(i + 1, min(i + 4, len(lines))):
+            s = lines[j].strip()
+            if s:
+                title = s
+                break
+        # Drop a table-of-contents dotted leader + trailing page number
+        # ("Purpose of the Policy ........ 3" -> "Purpose of the Policy").
+        title = re.split(r"\s*\.{3,}\s*", title)[0].strip(" .-:—")
+        # A real heading title starts with an uppercase letter and is short-ish.
+        if not title or not title[:1].isalpha() or not title[:1].isupper():
+            continue
+        if not (2 < len(title) <= 90):
+            continue
+        found[num] = title[:90]
+    # Keep only the leading 1,2,3,… run.
+    lw = (label_word or "").strip()
+    out: list[dict] = []
+    n = 1
+    while n in found and len(out) < cap:
+        label = f"{lw} {n}".strip() if lw else f"{n}."
+        out.append({"label": label, "title": found[n], "children": []})
+        n += 1
+    return out
+
+
 def infer_structure(text: str, sample_chars: int = 12000) -> dict:
     """Infer the document's full structural hierarchy by reading the WHOLE text.
 
@@ -272,6 +343,18 @@ def infer_structure(text: str, sample_chars: int = 12000) -> dict:
     levels = [lv for lv in (meta.get("levels") or []) if isinstance(lv, dict)]
     outline = _extract_full_outline(text, levels) if levels else []
 
+    # Prefix-based scan found nothing (the LLM named a level, e.g. "Clause", but
+    # the headings are bare-numbered — "1." on its own line, title on the next —
+    # so no "<prefix> <n>" ever matched). Fall back to a numbered-heading scan,
+    # labelling with the detected level word when there is one ("Clause 1").
+    if not outline:
+        label_word = (levels[0].get("name") or levels[0].get("prefix") or "").strip() if levels else ""
+        numbered = _extract_numbered_outline(text, label_word)
+        if len(numbered) >= 3:
+            outline = numbered
+            meta["scheme"] = (label_word + "s").capitalize() if label_word else "Numbered sections"
+            levels = levels or [{"name": label_word or "Section"}]
+
     # Recitals: count them across the whole doc rather than listing all 173.
     if meta.get("has_recitals"):
         n_rec = len(re.findall(r"(?m)^\s*\(\d+\)\s", text))
@@ -287,18 +370,23 @@ def infer_structure(text: str, sample_chars: int = 12000) -> dict:
     }
 
 
-_HEADING_PROMPT = """You are segmenting a legal document into its nodes. Identify
-the heading convention that marks where each numbered division STARTS.
+_HEADING_PROMPT = """You are segmenting a legal or policy document into its nodes.
+Identify how the document marks where each numbered division STARTS.
 
 Return a JSON object:
 - "prefixes": array of the literal words that begin a heading line, e.g.
-  ["Article"], ["Section"], ["Chapter","Article"], or Arabic ["المادة","الفصل"].
+  ["Article"], ["Section"], ["Chapter","Article"], ["Clause"], Arabic ["المادة"].
   Use ONLY words that actually appear at the start of headings in the text below.
+- "numbered": true if the divisions are BARE-NUMBERED — a lone number such as
+  "1.", "2.", "3." begins each division with NO keyword word before it. Else false.
+- "level_word": if the document has its own name for these numbered divisions
+  (e.g. a Contents header labelled "Clause" or "Section"), give that ONE word;
+  otherwise "".
 - "examples": array of 2-4 verbatim heading strings copied from the text
 - "confidence": 0.0-1.0
 
-Do not invent words that are not present. If the text has no consistent heading
-convention, return an empty "prefixes" array.
+Do not invent words that are not present. If there is no consistent heading
+convention, return an empty "prefixes" array and "numbered": false.
 
 Document:
 ---

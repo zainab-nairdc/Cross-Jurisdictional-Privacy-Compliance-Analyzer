@@ -43,6 +43,38 @@ template: |
   similarity_score 0-100: 90+ Equivalent, 70-89 Partially Equivalent, 40-69 Different, 0-39 Conflicting.
   confidence_score 0-100: your confidence in this row's classification and citations.
 
+  ACCURACY RULES (CRITICAL — legal correctness; violations destroy trust):
+  - LAWFUL BASIS ≠ CONSENT. NEVER say a regulation "requires consent to process
+    personal data." Both regimes permit several lawful bases (contract, legal
+    obligation, legitimate interests, public interest, consent, ...). Write:
+    "requires a lawful basis; where consent is relied upon, it must be informed,
+    specific, and freely given."
+  - NEVER say a topic is "only" in one regulation, or that the other "does not
+    legislate" / "is silent" on it. You are given a limited set of chunks; the
+    other jurisdiction may cover it in a separate instrument. Say instead that one
+    side has "broader or more explicit provisions" on that topic.
+  - Name SPECIFIC rights / mechanisms — right to object, data portability, adequacy
+    decisions, SCCs, a 72-hour breach-notification deadline — never a vague
+    "broader protections."
+  - Do NOT overstate formal requirements (e.g. "all consent must be in writing")
+    unless the chunk states it plainly.
+
+  OPERATIONAL OUTPUT (THE POINT — reach a CONCLUSION, not just a similarity score):
+  Answer the compliance officer's real question for each obligation:
+  - practical_conclusion: ONE plain sentence on whether a single control / policy /
+    evidence set can satisfy BOTH sides, e.g. "A single accountability framework
+    (ROPA, governance policy, DPO oversight, audit evidence) satisfies both."
+  - compliance_impact: exactly one of "None" (existing controls suffice), "Minor"
+    (small administrative additions), "New control needed", or "Not Assessable" —
+    from the controller's perspective, does anything NEW have to be implemented?
+  - shared_controls: 2-6 concrete controls/policies/evidence artefacts that satisfy
+    BOTH sides (e.g. "Records of Processing Activities", "Privacy Governance Policy",
+    "Data Protection Impact Assessment", "Staff training", "Audit evidence"). Empty
+    list if the obligations genuinely diverge.
+  - terminology_note: a term that maps across the two (e.g. "Bahrain 'Data Protection
+    Guardian' = GDPR 'DPO'"), else "".
+  Use operational language — policy / process / evidence / control impact — not legal jargon.
+
   STRICTNESS RULE (three orthogonal axes — assess each independently):
   Replace the old single "stricter" verdict with three axes. For each axis, return one of:
   "A", "B", "Equivalent", "Not Assessable".
@@ -76,6 +108,14 @@ template: |
   - Adjectives like "stricter", "broader", "narrower" are allowed without intensifiers.
   - Notes/key_difference/summary fields all follow the same tone rules.
 
+  {% if gold_examples %}
+  REVIEWER-APPROVED EXAMPLES (feedback loop) — a human reviewer has already approved
+  these verdicts on this topic. Use them as guidance for verdict granularity, tone,
+  and the operational conclusion. Do NOT copy their citations; ground your own in
+  the chunks below.
+  {{ gold_examples }}
+  {% endif %}
+
   {{ context_a }}
 
   {{ context_b }}
@@ -104,10 +144,14 @@ template: |
         "substantive_stricter": "B",
         "enforcement_stricter": "Not Assessable",
         "stricter_jurisdiction": "A",
-        "notes": "2-3 sentences of legal nuance, practical impact, or compliance risk — comparative language only"
+        "notes": "2-3 sentences of legal nuance, practical impact, or compliance risk — comparative language only",
+        "practical_conclusion": "one plain sentence: can a single control satisfy both, and what (if anything) to do",
+        "compliance_impact": "None | Minor | New control needed | Not Assessable",
+        "shared_controls": ["Records of Processing Activities", "Privacy Governance Policy"],
+        "terminology_note": "e.g. Bahrain 'Data Protection Guardian' = GDPR 'DPO', or empty string"
       }
     ],
-    "summary": "3-5 sentence executive summary describing what each regulation does, where they overlap, and where they diverge. Comparative language only — describe mechanisms, not magnitudes."
+    "summary": "3-5 sentence executive summary describing what each regulation does, where they overlap, and where they diverge. Follow the ACCURACY RULES: lawful basis is not consent; never say a topic is 'only' in one regulation (say 'broader / more explicit provisions'); name specific mechanisms. Comparative language only — describe mechanisms, not magnitudes."
   }
 
   {% if correction_hint %}

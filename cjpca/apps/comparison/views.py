@@ -273,6 +273,10 @@ def _run_comparison_background(
                 chunk_id_a=getattr(o, 'reg_a_chunk_id', '') or '',
                 chunk_id_b=getattr(o, 'reg_b_chunk_id', '') or '',
                 hallucination_risk=getattr(o, 'hallucination_risk', 0.0) or 0.0,
+                practical_conclusion=getattr(o, 'practical_conclusion', '') or '',
+                compliance_impact=getattr(o, 'compliance_impact', '') or '',
+                shared_controls=getattr(o, 'shared_controls', []) or [],
+                terminology_note=getattr(o, 'terminology_note', '') or '',
             ))
 
         # Orphan results for asymmetric topics
@@ -548,6 +552,10 @@ class RunComparisonView(View):
                 chunk_id_a=getattr(o, 'reg_a_chunk_id', '') or '',
                 chunk_id_b=getattr(o, 'reg_b_chunk_id', '') or '',
                 hallucination_risk=getattr(o, 'hallucination_risk', 0.0) or 0.0,
+                practical_conclusion=getattr(o, 'practical_conclusion', '') or '',
+                compliance_impact=getattr(o, 'compliance_impact', '') or '',
+                shared_controls=getattr(o, 'shared_controls', []) or [],
+                terminology_note=getattr(o, 'terminology_note', '') or '',
             ))
 
         ComparisonResult.objects.bulk_create(to_create)

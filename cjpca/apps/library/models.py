@@ -129,7 +129,8 @@ class Document(models.Model):
     superseded_by       = models.CharField(max_length=255, blank=True)   # stem of newer doc
     parent_regulation   = models.CharField(max_length=50,  blank=True)
     cross_references    = models.TextField(blank=True)
-    concept_tags_csv    = models.JSONField(default=list, blank=True)     # from the CSV column
+    concept_tags_csv    = models.JSONField(default=list, blank=True)     # key topics (LLM-extracted)
+    scope_summary       = models.TextField(blank=True, default='')       # one-line "what/who it governs"
 
     # ── Coverage / caching ──
     # sha256 of the source file bytes. Cache key for mapping results and the

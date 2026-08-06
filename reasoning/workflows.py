@@ -111,12 +111,24 @@ class ComparisonState(TypedDict, total=False):
 
 async def _comparison_draft(state: ComparisonState) -> dict:
     prompt = load_prompt("comparison_workflow.yaml")
+    # Feedback loop: if a reviewer has already approved verdicts on this topic,
+    # inject them as few-shot guidance. Empty on a cold start, so no behaviour change
+    # until real approvals exist.
+    gold_examples = ""
+    try:
+        from apps.feedback.services import build_fewshot
+        q = state.get("query")
+        if isinstance(q, str) and q.strip():
+            gold_examples = build_fewshot(q)
+    except Exception:
+        gold_examples = ""
     text   = prompt.format(
         query           = state["query"],
         context_a       = state["context_a"],
         context_b       = state["context_b"],
         correction_hint = state.get("cite_issues") or "",
         previous_answer = state["draft"].model_dump_json() if state.get("draft") else "",
+        gold_examples   = gold_examples,
     )
     draft = await _draft_with_parser(text, ComparisonReport)
     return {"draft": draft, "retries": state.get("retries", 0)}
@@ -753,11 +765,17 @@ def compare_regulations_auto(
         all_obligations.extend(sub.obligations)
         summaries.append(f"[{label}] {sub.summary}".strip())
 
+    # NOTE: only_a/only_b reflect topics classified in ONE document's chunks, not a
+    # legal finding that the other jurisdiction is silent — it may cover them in a
+    # separate instrument (e.g. Bahrain's implementing Orders) that wasn't in scope.
+    # Label accordingly so the summary never implies "the other has no law on this".
     if only_a:
-        summaries.append("Topics only " + reg_a + " legislates on (not compared): "
+        summaries.append("Topics with broader or more explicit provisions in " + reg_a
+                         + " (the other jurisdiction may address them in separate instruments): "
                          + ", ".join(TAXONOMY.get(t, {}).get("label", t) for t in only_a) + ".")
     if only_b:
-        summaries.append("Topics only " + reg_b + " legislates on (not compared): "
+        summaries.append("Topics with broader or more explicit provisions in " + reg_b
+                         + " (the other jurisdiction may address them in separate instruments): "
                          + ", ".join(TAXONOMY.get(t, {}).get("label", t) for t in only_b) + ".")
 
     report = ComparisonReport(

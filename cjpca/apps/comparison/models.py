@@ -211,7 +211,24 @@ class ComparisonResult(models.Model):
     chunk_id_a       = models.CharField(max_length=64, blank=True, db_index=True)
     chunk_id_b       = models.CharField(max_length=64, blank=True, db_index=True)
     hallucination_risk = models.FloatField(default=0.0)
+    # ── Operational output — the "so what" for a compliance officer ────────────
+    practical_conclusion = models.TextField(blank=True)                 # one actionable sentence
+    compliance_impact    = models.CharField(max_length=40, blank=True)  # None | Minor | New control needed | Not Assessable
+    shared_controls      = models.JSONField(default=list, blank=True)   # controls/policies satisfying BOTH
+    terminology_note     = models.TextField(blank=True)                 # cross-term mapping
     created_at       = models.DateTimeField(auto_now_add=True)
+
+    IMPACT_STYLES = {
+        'none':               ('#1E7E48', '#E7F4EC', 'No new control required'),
+        'minor':              ('#B86E00', '#FAEFD6', 'Minor additions'),
+        'new control needed': ('#C0392B', '#FBE7E4', 'New control needed'),
+    }
+
+    @property
+    def impact_style(self):
+        """(color, bg, label) for the compliance-impact pill; falls back to neutral."""
+        return self.IMPACT_STYLES.get((self.compliance_impact or '').strip().lower(),
+                                      ('#5A6685', '#EEF1F8', self.compliance_impact or 'Not assessed'))
 
     class Meta:
         ordering = ['id']

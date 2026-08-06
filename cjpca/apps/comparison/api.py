@@ -327,6 +327,16 @@ class ResultTransitionView(View):
         result.lifecycle = new_lifecycle
         result.save(update_fields=['lifecycle'])
 
+        # RAG feedback loop — capture the reviewer's decision as a labelled signal,
+        # and on approval promote the row to a reusable gold exemplar (best-effort).
+        try:
+            from apps.feedback.services import capture_comparison_transition
+            capture_comparison_transition(
+                result, new_lifecycle,
+                actor=request.user if request.user.is_authenticated else None)
+        except Exception:
+            pass
+
         # Cross-cutting AuditLog row in addition to the comparison-specific
         # AuditEvent above (which stays as the lifecycle review-trail).
         from apps.history.audit import log_event, Actions

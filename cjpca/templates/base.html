@@ -64,6 +64,12 @@
 
  {# Global overlays — included once, toggled via Alpine state #}
  {% include 'partials/_doc_viewer.html' %}
+ {% comment %}One front door for ingestion: the upload wizard lives here so it's
+    reachable from any page (opened via the 'open-wizard' window event). It
+    auto-detects regulation vs internal policy and files it into the right library.{% endcomment %}
+ {% if is_admin %}
+   {% include 'partials/_upload_wizard.html' with mode='auto' %}
+ {% endif %}
  {# Copilot — available to every signed-in user #}
  {% if request.user.is_authenticated %}
    {% include 'partials/_copilot.html' %}

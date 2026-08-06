@@ -795,10 +795,17 @@ class FinalizeView(View):
         for f in ('name', 'full_name', 'language', 'doc_type', 'jurisdiction',
                   'chunk_strategy', 'citation_format', 'citation_template',
                   'citation_abbr', 'doc_year', 'department', 'confidentiality',
-                  'document_id', 'issuing_authority', 'regulation_category'):
+                  'document_id', 'issuing_authority', 'regulation_category',
+                  'version', 'scope_summary'):
             v = request.POST.get(f)
             if v:
                 setattr(doc, f, v.strip()); fields.append(f)
+        # key_topics: LLM-extracted subject tags, sent comma-separated → stored as
+        # a list on concept_tags_csv so they ride into chunk metadata for retrieval.
+        kt = (request.POST.get('key_topics') or '').strip()
+        if kt:
+            doc.concept_tags_csv = [t.strip() for t in kt.split(',') if t.strip()]
+            fields.append('concept_tags_csv')
         # effective_date is a real date field — parse the ISO string the LLM/user
         # confirmed, ignore anything unparseable.
         eff = (request.POST.get('effective_date') or '').strip()

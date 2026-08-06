@@ -145,6 +145,7 @@ def _make_chunk(text, meta, chunk_id, index, total, *,
         "last_updated":      str(meta.get("Last Updated", "")).strip(),
         "language":          str(meta.get("Language", "English")).strip(),
         "scope_summary":     str(meta.get("Scope Summary", "")).strip(),
+        "key_topics":        str(meta.get("Key Topics", "")).strip(),
         "source_url":        str(meta.get("Source URL", "")).strip(),
     }
 
@@ -158,6 +159,25 @@ def _has_real_body(content: str) -> bool:
     body underneath is empty (e.g. "## Ministry of Justice" with nothing
     after it). we throw those away — they're not useful chunks."""
     return len(_tokenizer.encode(content.strip())) >= _MIN_BODY_TOKENS
+
+
+_DOTTED_LEADER_RE = re.compile(r"\.{4,}\s*\d*\s*$")
+
+
+def _is_toc_section(title: str, body: str) -> bool:
+    """A table-of-contents / index section — dotted-leader lines ending in a page
+    number ('Purpose of the Policy ......... 3'), usually under a 'Contents'
+    heading. It's navigation, not substance: indexing it just pollutes retrieval
+    (a query can match the TOC's title list instead of the real clause body)."""
+    t = (title or "").strip().lower()
+    if "table of contents" in t or t in ("contents", "contents clause", "index"):
+        return True
+    lines = [l for l in (body or "").splitlines() if l.strip()]
+    if len(lines) >= 4:
+        dotted = sum(1 for l in lines if _DOTTED_LEADER_RE.search(l))
+        if dotted >= max(4, len(lines) * 0.5):
+            return True
+    return False
 
 
 def _classify(text: str, section_title: str) -> str:
@@ -193,6 +213,8 @@ def _build(sections: list[tuple[str, str]], meta: dict) -> list[dict]:
         if not body or not _has_real_body(body):
             continue
         title = (hpath.rsplit(">", 1)[-1].strip() if ">" in hpath else hpath.strip()) or f"Section_{i+1}"
+        if _is_toc_section(title, body):
+            continue                    # skip the table of contents — navigation, not content
         title = _canonical_ref(title)
         slug  = _slug(title, hpath or title)
 
@@ -245,14 +267,22 @@ def _build_unstructured(text: str, meta: dict) -> list[dict]:
     ]
 
 
-def chunk_document(text, meta: dict) -> list[dict]:
+def chunk_document(text, meta: dict, raw_text: str | None = None) -> list[dict]:
     """the one function you call from outside.
     pass in the markdown text + the metadata dict for the document, get
-    back a list of chunk dicts ready for the embedder."""
+    back a list of chunk dicts ready for the embedder.
+
+    raw_text (optional) is the PDF's plain text layer. docling's markdown
+    drops/garbles headings on some layouts (e.g. a policy whose clauses are
+    'N.' on their own line — docling loses clause 5 and turns the table of
+    contents into a chunk), but the raw text keeps them, so we detect the
+    document's true clause structure from raw_text when the markdown-based
+    splits come up short. Falls back to `text` when raw_text isn't given."""
     if hasattr(text, "text") and not isinstance(text, str):
         text = text.text
     if not isinstance(text, str) or not text.strip():
         return []
+    struct_text = raw_text if (raw_text and raw_text.strip()) else text
 
     sections: list[tuple[str, str]] = []
     for d in _md_splitter.split_text(text):
@@ -274,21 +304,36 @@ def chunk_document(text, meta: dict) -> list[dict]:
               f"(markdown had {len(sections)})")
         return _build(article_sections, meta)
 
-    if md_ok:
-        print(f"    [chunker] {len(sections)} sections (markdown)")
-        return _build(sections, meta)
+    # SECONDARY: the document's true clause structure, read from the raw text —
+    # bare-numbered headings ('1.' on its own line, title on the next) that carry
+    # no Article/Section keyword and that docling mangles. Preferred over docling
+    # markdown so a policy indexes as clean, whole clauses with 'Clause N' refs
+    # that match the structure preview, instead of TOC noise + fragmented bullets.
+    # LLM-DETERMINED structure — the authority for every document that isn't an
+    # exact keyword-Article law. The model names the heading convention (Article /
+    # Section / Clause / bare-numbered) from the RAW text and we split on those
+    # verbatim heading lines — the model never rewrites the legal text. docling's
+    # markdown headers are unreliable (dropped headings, TOC-as-a-chunk, split
+    # bullets), so they are now only a last-resort fallback.
+    llm_sections = _sections_from_llm(struct_text)
+    if len(llm_sections) >= 3:
+        print(f"    [chunker] LLM structure-aware: {len(llm_sections)} sections")
+        return _build(llm_sections, meta)
+
+    # Offline-safe deterministic fallback: split clean bare-numbered clauses when
+    # the LLM is unavailable but the document is clearly clause/numbered.
+    numbered = _numbered_split(struct_text, _numbered_level_word(struct_text))
+    if len(numbered) >= 4:
+        print(f"    [chunker] clause-based: {len(numbered)} sections (raw text)")
+        return _build(numbered, meta)
 
     if len(article_sections) >= 2:
         print(f"    [chunker] article-based: {len(article_sections)} sections")
         return _build(article_sections, meta)
 
-    # Unfamiliar format with no markdown/article headings — ask the local model
-    # for the heading convention and split on it (lossless: it only names the
-    # heading words, we split on verbatim heading lines).
-    llm_sections = _sections_from_llm(text)
-    if len(llm_sections) >= 2:
-        print(f"    [chunker] LLM structure-aware: {len(llm_sections)} sections")
-        return _build(llm_sections, meta)
+    if md_ok:
+        print(f"    [chunker] {len(sections)} sections (markdown fallback)")
+        return _build(sections, meta)
 
     print(f"    [chunker] WARNING: no headings in {meta.get('Document Title','')!r}")
     return _build_unstructured(text, meta)
@@ -377,6 +422,72 @@ def _legal_article_split(text: str) -> list[tuple[str, str]]:
     return sections
 
 
+def _numbered_level_word(text: str) -> str:
+    """The word a document uses for its numbered divisions ('Clause', 'Section',
+    'Article', 'Rule', 'Part'…), taken from a standalone heading word near the top
+    (e.g. a Contents column header 'Clause'). Defaults to 'Section'."""
+    head = text[:4000]
+    for w in ("Clause", "Article", "Section", "Rule", "Regulation", "Part", "Paragraph", "Item"):
+        if re.search(rf"(?im)^[ \t]*{w}s?[ \t]*$", head):
+            return w
+    return "Section"
+
+
+def _numbered_split(text: str, level_word: str = "Section", cap: int = 400) -> list[tuple[str, str]]:
+    """Split a document whose divisions are BARE numbered headings — 'N.' on its
+    own line with the title on the next line — into (title, body) sections. This
+    is the common policy / procedure format that carries no Article/Section
+    keyword for _legal_article_split to catch, and that docling's markdown
+    mangles. The table of contents lists the same 'N.' earlier, so we keep the
+    LAST occurrence of each number (the body heading, not the TOC entry) and only
+    the clean leading 1..N run — giving whole, correctly-labelled clauses."""
+    lines = text.splitlines()
+    offs: list[int] = []
+    o = 0
+    for l in lines:
+        offs.append(o)
+        o += len(l) + 1
+    per_num: dict[int, tuple[int, str]] = {}
+    for i, l in enumerate(lines):
+        m = re.match(r"^[ \t]*(\d{1,3})\.[ \t]*$", l)     # a line that is only "N."
+        if not m:
+            continue
+        num = int(m.group(1))
+        title = ""
+        for j in range(i + 1, min(i + 4, len(lines))):
+            s = lines[j].strip()
+            if s:
+                title = s
+                break
+        title = re.split(r"\s*\.{3,}\s*", title)[0].strip(" .-:—")   # drop a TOC dotted leader
+        if not title or not title[:1].isalpha() or not title[:1].isupper():
+            continue
+        if not (2 < len(title) <= 90):
+            continue
+        per_num[num] = (offs[i], title[:90])   # last wins → the body heading, not the TOC
+    if len(per_num) < 4:
+        return []
+    seq: list[tuple[int, int, str]] = []
+    n = 1
+    while n in per_num and len(seq) < cap:
+        off, title = per_num[n]
+        seq.append((n, off, title))
+        n += 1
+    if len(seq) < 4:
+        return []
+    seq.sort(key=lambda x: x[1])
+    lw = (level_word or "").strip()
+    sections: list[tuple[str, str]] = []
+    for idx, (num, start, title) in enumerate(seq):
+        end = seq[idx + 1][1] if idx + 1 < len(seq) else len(text)
+        body = text[start:end].strip()
+        if not body:
+            continue
+        label = f"{lw} {num}" if lw else f"{num}."
+        sections.append((f"{label}: {title}", body))
+    return sections
+
+
 def _sections_from_llm(text: str) -> list[tuple[str, str]]:
     """Split raw text into (title, body) sections using an LLM-detected heading
     convention. Returns [] if the model finds no convention or the split yields
@@ -392,20 +503,37 @@ def _sections_from_llm(text: str) -> list[tuple[str, str]]:
         return []
     prefixes = [p.strip() for p in (info.get("prefixes") or [])
                 if isinstance(p, str) and p.strip()]
-    if not prefixes:
-        return []
-    # Build a SAFE regex from the escaped prefix words: a line that starts with
-    # one of them followed by a number (arabic or roman). No model-authored
-    # regex — re.escape blocks injection / catastrophic backtracking.
-    alt = "|".join(re.escape(p) for p in prefixes[:8])
-    try:
-        heading_re = re.compile(
-            rf"(?im)^[ \t]*(?:{alt})[ \t]*[\(\.\-:]?[ \t]*[\dIVXLCivxlc٠-٩]+",
-        )
-    except re.error:
-        return []
-    matches = list(heading_re.finditer(text))
+    # The word the document calls its divisions, for labelling a bare-numbered
+    # split — the model's explicit level_word, else the prefix it named (a policy
+    # whose Contents header says "Clause" but whose headings are "1.", "2."), else
+    # a word scanned from the text. Used by the bare-numbered fallback below.
+    level_word = ((info.get("level_word") or "").strip()
+                  or (prefixes[0] if prefixes else "")
+                  or _numbered_level_word(text))
+
+    matches: list = []
+    if prefixes:
+        # Build a SAFE regex from the escaped prefix words: a line that starts with
+        # one of them followed by a number (arabic or roman). No model-authored
+        # regex — re.escape blocks injection / catastrophic backtracking.
+        alt = "|".join(re.escape(p) for p in prefixes[:8])
+        try:
+            heading_re = re.compile(
+                rf"(?im)^[ \t]*(?:{alt})[ \t]*[\(\.\-:]?[ \t]*[\dIVXLCivxlc٠-٩]+",
+            )
+            matches = list(heading_re.finditer(text))
+        except re.error:
+            matches = []
+
+    # Prefix headings didn't line up (or there was no prefix). The model routinely
+    # mistakes a Contents label ("Clause") for a prefix while the real headings are
+    # bare numbers, so ALWAYS try the bare-numbered split as the fallback, labelled
+    # with the level word the model gave. This is what makes the LLM path cover
+    # policies/procedures/contracts with no Article/Section keyword.
     if len(matches) < 2:
+        numbered = _numbered_split(text, level_word)
+        if len(numbered) >= 2:
+            return numbered
         return []
     sections: list[tuple[str, str]] = []
     for i, m in enumerate(matches):
