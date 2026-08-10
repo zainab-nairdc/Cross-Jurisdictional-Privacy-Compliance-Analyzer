@@ -24,6 +24,63 @@ def _is_arabic_char(c: str) -> bool:
             0xFE70 <= o <= 0xFEFF)
 
 
+# Legacy Arabic typefaces that predate Unicode. They draw Arabic glyphs from
+# Latin code points, so a PDF built with them extracts as Latin gibberish
+# ("IOÉ``ŸG" for "المادة") no matter which extractor reads it.
+_ARABIC_FONT_HINTS = (
+    "axt", "arabic", "arabtype", "simplified", "traditional", "decotype",
+    "sakkal", "majalla", "ge_ss", "ge ss", "naskh", "kufi", "thuluth",
+    "diwani", "amiri", "lateef", "scheherazade", "mcs", "hacen",
+)
+
+
+def _page_fonts(doc, sample_pages: int) -> list[str]:
+    """Font names used on the sampled pages, lowercased. Subset prefixes
+    ("AAAAAB+AXtManalBold") are kept as-is; the hint match is a substring test."""
+    names = []
+    for i in range(min(sample_pages, len(doc))):
+        try:
+            names += [str(f[3]).lower() for f in doc[i].get_fonts(full=True)]
+        except Exception:
+            continue
+    return names
+
+
+def _junk_ratio(letters: list[str]) -> float:
+    """Share of letters that are Latin-1 supplement oddities (À-ÿ). Real English
+    prose is ~0; text drawn from a legacy Arabic font is dominated by them."""
+    if not letters:
+        return 0.0
+    return sum(1 for c in letters if 0x00C0 <= ord(c) <= 0x00FF) / len(letters)
+
+
+def text_layer_is_broken(pdf_path, sample_pages: int = 5) -> bool:
+    """True when the PDF HAS a text layer but it can't be trusted.
+
+    The Oman PDPL is the reference case: Type1 `AXtManal*` fonts with
+    MacRomanEncoding and no ToUnicode CMap. Every page extracts 1000+ characters
+    of Latin punctuation soup with an Arabic ratio of exactly 0.000, so a
+    language check that only counts Arabic characters concludes "English" and
+    sends a 10-page Arabic law down the English pipeline.
+    """
+    try:
+        doc = fitz.open(str(pdf_path))
+    except Exception:
+        return False
+    try:
+        text = "".join(doc[i].get_text("text") for i in range(min(sample_pages, len(doc))))
+        letters = [c for c in text if c.isalpha()]
+        if len(letters) < 50:
+            return False                      # no text layer at all — not our case
+        if any(_is_arabic_char(c) for c in letters):
+            return False                      # real Arabic came through
+        font_names = _page_fonts(doc, sample_pages)
+    finally:
+        doc.close()
+    legacy_arabic_font = any(h in n for n in font_names for h in _ARABIC_FONT_HINTS)
+    return legacy_arabic_font and _junk_ratio(letters) > 0.15
+
+
 def detect_language(pdf_path, sample_pages: int = 5, threshold: float = 0.30) -> str:
     """Return 'ar' if the document is predominantly Arabic, else 'en'.
 
@@ -32,7 +89,14 @@ def detect_language(pdf_path, sample_pages: int = 5, threshold: float = 0.30) ->
     0.30 comfortably separates an Arabic law (mostly Arabic) from an English one
     with the odd Arabic word in a header.
     """
-    doc = fitz.open(str(pdf_path))
+    # PyMuPDF only opens PDFs (and a few image formats). A non-PDF the caller
+    # passed by mistake — most commonly a legacy .doc — raises here; treat that as
+    # "can't tell" and default to the English path rather than crashing the whole
+    # analyze / ingestion job. Real format rejection happens up front in the view.
+    try:
+        doc = fitz.open(str(pdf_path))
+    except Exception:
+        return "en"
     try:
         text = "".join(
             doc[i].get_text("text") for i in range(min(sample_pages, len(doc)))
@@ -44,7 +108,15 @@ def detect_language(pdf_path, sample_pages: int = 5, threshold: float = 0.30) ->
     if not letters:
         return "en"  # no text layer (scan/empty) — default to the English path
     arabic_ratio = sum(_is_arabic_char(c) for c in letters) / len(letters)
-    return "ar" if arabic_ratio >= threshold else "en"
+    if arabic_ratio >= threshold:
+        return "ar"
+    # Zero Arabic found, but the text layer may be unreadable rather than English.
+    # Decided from the FONTS, which stay legible when the glyph mapping doesn't:
+    # a legacy Arabic typeface means an Arabic document, and routing it to 'ar'
+    # lets needs_ocr() take over and read the pixels instead.
+    if text_layer_is_broken(pdf_path, sample_pages):
+        return "ar"
+    return "en"
 
 
 def _arabic_tokens(text: str) -> list[str]:

@@ -39,6 +39,7 @@ def _get_reg(jurisdiction: str, preferred_pk: int = None):
         jurisdiction=jurisdiction,
         doc_type=Document.REGULATION,
         status=Document.INDEXED,
+        superseded=False,          # only the in-force version, never a repealed one
     )
     if preferred_pk:
         doc = qs.filter(pk=preferred_pk).first()
@@ -53,11 +54,13 @@ def _get_reg(jurisdiction: str, preferred_pk: int = None):
 
 
 def _all_regs(jurisdiction: str):
-    """All indexed regulations for a jurisdiction, for user selection."""
+    """In-force indexed regulations for a jurisdiction, for user selection.
+    Superseded versions are excluded so no one compares against a repealed law."""
     return list(Document.objects.filter(
         jurisdiction=jurisdiction,
         doc_type=Document.REGULATION,
         status=Document.INDEXED,
+        superseded=False,
     ).order_by('name'))
 
 

@@ -475,7 +475,8 @@ class MappingSetupView(TemplateView):
 
         reg_qs = (
             Document.objects
-            .filter(doc_type=Document.REGULATION, status=Document.INDEXED)
+            .filter(doc_type=Document.REGULATION, status=Document.INDEXED,
+                    superseded=False)   # in-force versions only — hide repealed ones
             .order_by('jurisdiction', 'name')
         )
         reg_list = list(reg_qs)

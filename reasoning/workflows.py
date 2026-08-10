@@ -114,12 +114,18 @@ async def _comparison_draft(state: ComparisonState) -> dict:
     # Feedback loop: if a reviewer has already approved verdicts on this topic,
     # inject them as few-shot guidance. Empty on a cold start, so no behaviour change
     # until real approvals exist.
+    # Generation few-shot lever — OFF by default: the A/B eval showed injecting
+    # approved examples into the prompt does not reliably help (avg -0.027). The
+    # working lever is retrieval reranking (_apply_feedback). Kept behind a flag
+    # for future experiments only.
     gold_examples = ""
     try:
-        from apps.feedback.services import build_fewshot
-        q = state.get("query")
-        if isinstance(q, str) and q.strip():
-            gold_examples = build_fewshot(q)
+        from django.conf import settings
+        if getattr(settings, "FEEDBACK_FEWSHOT_ENABLED", False):
+            from apps.feedback.services import build_fewshot
+            q = state.get("query")
+            if isinstance(q, str) and q.strip():
+                gold_examples = build_fewshot(q)
     except Exception:
         gold_examples = ""
     text   = prompt.format(
@@ -493,6 +499,21 @@ def _multi_query_mapping_retrieve(
     return {"regulation": list(seen_reg.values()), "policies": list(seen_pol.values())}
 
 
+def _apply_feedback(nodes):
+    """Re-rank retrieved nodes by accumulated reviewer feedback — approved clauses
+    move up, rejected ones move down. This is where the feedback loop closes on
+    LIVE retrieval. Gated by settings.FEEDBACK_RERANK_ENABLED and a safe no-op on a
+    cold start (no feedback) or any error, so it never degrades base retrieval."""
+    try:
+        from django.conf import settings
+        if not getattr(settings, "FEEDBACK_RERANK_ENABLED", True):
+            return nodes
+        from apps.feedback.services import feedback_rerank
+        return feedback_rerank(nodes)
+    except Exception:
+        return nodes
+
+
 def _scoped_retrieve(
     query:        str,
     top_k:        int,
@@ -521,15 +542,15 @@ def _scoped_retrieve(
     search by design (see `chunk_tags` table).
     """
     if not doc_titles:
-        return hybrid_search(query, top_k=top_k, jurisdiction=jurisdiction,
-                             topic=topic, subcategory=subcategory, rerank=rerank)
+        return _apply_feedback(hybrid_search(query, top_k=top_k, jurisdiction=jurisdiction,
+                                             topic=topic, subcategory=subcategory, rerank=rerank))
 
     primary = hybrid_search(
         query, top_k=top_k, jurisdiction=jurisdiction,
         doc_titles=doc_titles, topic=topic, subcategory=subcategory, rerank=rerank,
     )
     if scope_mode != "open":
-        return primary
+        return _apply_feedback(primary)
 
     # open mode: also pull from the broader corpus, dedupe by node_id.
     # taxonomy filter still applies — open scope means "wider doc set",
@@ -540,7 +561,7 @@ def _scoped_retrieve(
     )
     seen_ids = {n.node.metadata.get("node_id") for n in primary}
     extra = [n for n in secondary if n.node.metadata.get("node_id") not in seen_ids]
-    return primary + extra[:top_k]
+    return _apply_feedback(primary + extra[:top_k])
 
 
 # Strips a formatted context-header echo the local model sometimes copies

@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Add Document — CJPCA{% endblock %}
+
+{% block content %}
+<div style="height:100%;overflow-y:auto;background:#F6F8FC;">
+ <div style="max-width:1560px;margin:0 auto;padding:26px 28px 56px;">
+
+  {# Page header #}
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:20px;">
+   <div>
+    <h1 style="font-size:22px;font-weight:800;color:#101828;margin:0;letter-spacing:-.01em;">Add document</h1>
+    <p style="font-size:13px;color:#667085;margin:6px 0 0;">Upload a regulation or internal policy.</p>
+   </div>
+   <a href="{% url 'library-regulations' %}" style="flex-shrink:0;display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:#475467;text-decoration:none;padding:8px 14px;border:1px solid #E4E7EC;border-radius:9px;background:#fff;">
+    &larr; Back to library
+   </a>
+  </div>
+
+  {# Main wizard + guidance sidebar #}
+  <div style="display:grid;grid-template-columns:minmax(0,1fr) 292px;gap:22px;align-items:start;">
+
+   {# Left: the guided wizard, rendered inline as a page (not a modal) #}
+   <div style="min-width:0;">
+    {% include 'partials/_upload_wizard.html' with mode='auto' page_mode=True %}
+   </div>
+
+   {# Right: guidance #}
+   <aside style="display:flex;flex-direction:column;gap:16px;">
+
+    {# Format guidelines #}
+    <div style="background:#fff;border:1px solid #EDF0F6;border-radius:14px;padding:16px 17px;box-shadow:0 1px 3px rgba(15,23,42,.04);">
+     <p style="font-size:12px;font-weight:800;color:#101828;margin:0 0 11px;text-transform:uppercase;letter-spacing:.04em;">Format guidelines</p>
+     <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px;">
+      {% for g in guidelines %}
+      <li style="display:flex;gap:9px;align-items:flex-start;font-size:12px;color:#475467;line-height:1.5;">
+       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#3B6FE0" stroke-width="2.2" style="flex-shrink:0;margin-top:1px;"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+       <span>{{ g }}</span>
+      </li>
+      {% endfor %}
+     </ul>
+    </div>
+
+    {# Recent uploads #}
+    <div style="background:#fff;border:1px solid #EDF0F6;border-radius:14px;padding:16px 17px;box-shadow:0 1px 3px rgba(15,23,42,.04);">
+     <p style="font-size:12px;font-weight:800;color:#101828;margin:0 0 11px;text-transform:uppercase;letter-spacing:.04em;">Recent uploads</p>
+     {% if recent_uploads %}
+     <div style="display:flex;flex-direction:column;gap:11px;">
+      {% for d in recent_uploads %}
+      <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+       <span style="flex-shrink:0;width:30px;height:30px;border-radius:8px;background:#EEF2FB;display:flex;align-items:center;justify-content:center;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#3B6FE0" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
+       </span>
+       <div style="min-width:0;flex:1;">
+        <p style="font-size:12px;font-weight:600;color:#1D2939;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ d.name }}</p>
+        <p style="font-size:10.5px;color:#98A2B3;margin:1px 0 0;">{{ d.get_doc_type_display }} · {{ d.upload_date|date:"d M Y" }}</p>
+       </div>
+       {% if d.status == 'indexed' %}
+       <span style="flex-shrink:0;font-size:9.5px;font-weight:700;color:#1E7E48;background:#E7F4EC;border-radius:20px;padding:2px 8px;">Indexed</span>
+       {% else %}
+       <span style="flex-shrink:0;font-size:9.5px;font-weight:700;color:#B07A00;background:#FBF0D8;border-radius:20px;padding:2px 8px;">{{ d.status|capfirst }}</span>
+       {% endif %}
+      </div>
+      {% endfor %}
+     </div>
+     {% else %}
+     <p style="font-size:11.5px;color:#98A2B3;margin:0;">No documents uploaded yet.</p>
+     {% endif %}
+    </div>
+
+   </aside>
+  </div>
+ </div>
+</div>
+{% endblock %}

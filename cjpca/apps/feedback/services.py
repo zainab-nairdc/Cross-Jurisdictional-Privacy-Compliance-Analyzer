@@ -141,6 +141,83 @@ def feedback_rerank(nodes, alpha=0.5, scores=None):
     return sorted(nodes, key=adjusted, reverse=True)
 
 
+# ── Document deletion ↔ the learning loop ────────────────────────────────────
+# ComparisonRun.reg_a/reg_b are FKs with on_delete=CASCADE, so deleting a
+# document already takes its runs and results with it. Feedback rows are linked
+# LOOSELY (source_app + source_id -> ComparisonResult.pk), so they survive that
+# cascade and would be left pointing at pks that no longer exist. The delete flow
+# therefore asks the user what to do with them, and these two helpers implement
+# both answers. Both must run BEFORE doc.delete(), while the runs still resolve.
+
+def _result_ids_for_document(doc):
+    """pks of every ComparisonResult produced from a run involving this document."""
+    from apps.comparison.models import ComparisonResult
+    from django.db.models import Q
+    return list(
+        ComparisonResult.objects
+        .filter(Q(run__reg_a=doc) | Q(run__reg_b=doc))
+        .values_list('pk', flat=True)
+    )
+
+
+def document_learning_footprint(doc):
+    """What the loop has learned from this document: {'signals': n, 'gold': n}.
+    Shown in the delete dialog so the choice is made with the numbers visible."""
+    from django.db.models import Q
+    from .models import FeedbackSignal, GoldExemplar
+    try:
+        ids = _result_ids_for_document(doc)
+        signals = FeedbackSignal.objects.filter(source_app='comparison', source_id__in=ids).count()
+        gold = GoldExemplar.objects.filter(
+            Q(source_id__in=ids) | Q(reg_a=doc.name) | Q(reg_b=doc.name)).count()
+        return {'signals': signals, 'gold': gold}
+    except Exception:
+        return {'signals': 0, 'gold': 0}
+
+
+def purge_document_learning(doc, mode='keep'):
+    """Apply the reviewer's choice for a document about to be deleted.
+
+    mode='keep':  retain the reviewer decisions and approved exemplars. Their
+                   source rows are about to vanish, so each row is tombstoned
+                   with the document name: without that marker the dangling
+                   source_id could later be re-matched to an unrelated row (pks
+                   are reused after deletion on SQLite), silently attributing
+                   old feedback to new work. Gold stays active, so approved
+                   conclusions keep steering generation. The document's chunks
+                   are purged either way, so its retrieval boosts go inert.
+    mode='purge': delete the signals and exemplars too, so nothing this document
+                  taught the system survives it.
+
+    Returns {'mode', 'signals', 'gold'} with the counts actually affected.
+    """
+    from django.db.models import Q
+    from .models import FeedbackSignal, GoldExemplar
+    out = {'mode': mode, 'signals': 0, 'gold': 0}
+    try:
+        ids = _result_ids_for_document(doc)
+        signals = FeedbackSignal.objects.filter(source_app='comparison', source_id__in=ids)
+        gold = GoldExemplar.objects.filter(
+            Q(source_id__in=ids) | Q(reg_a=doc.name) | Q(reg_b=doc.name))
+        if mode == 'purge':
+            out['signals'] = signals.count()
+            out['gold'] = gold.count()
+            signals.delete()
+            gold.delete()
+        else:
+            marker = f'[source document deleted: {doc.name}]'
+            out['signals'] = signals.count()
+            out['gold'] = gold.count()
+            for s in signals.only('pk', 'note'):
+                if marker not in (s.note or ''):
+                    s.note = f'{s.note}\n{marker}'.strip()
+                    s.save(update_fields=['note'])
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception('purge_document_learning failed')
+    return out
+
+
 def capture_comparison_transition(result, new_lifecycle, actor=None):
     """Called from the reviewer transition view. Records the decision and, on
     approval, promotes the row to a gold exemplar. Best-effort: never raises into

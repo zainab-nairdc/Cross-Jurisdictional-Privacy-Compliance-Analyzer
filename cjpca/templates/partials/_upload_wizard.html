@@ -1,17 +1,19 @@
 {% comment %}Shared upload wizard — used by regulations (mode='regulation') and
    internal policies (mode='policy'). Byte-identical flow; mode only sets the
    title and the default document type. Listens for the window 'open-wizard' event.{% endcomment %}
-<div x-data="uploadWizard()" @open-wizard.window="openWizard()">
- <div x-show="open" x-cloak style="position:fixed;top:0;left:0;right:0;bottom:0;width:100vw;height:100vh;z-index:70;background:rgba(0,15,50,0.45);backdrop-filter:blur(3px);display:grid;place-items:center;padding:24px;box-sizing:border-box;" @click.self="open=false">
-  <div :style="{ width: (step===3 || step===4) ? 'min(1120px,96vw)' : 'min(860px,94vw)' }" style="width:min(860px,94vw);max-height:92vh;margin:auto;background:#fff;border-radius:18px;box-shadow:0 30px 80px rgba(0,0,0,0.35);display:flex;flex-direction:column;overflow:hidden;transition:width .22s ease;">
+<div x-data="uploadWizard()" {% if page_mode %}x-init="openWizard()"{% else %}@open-wizard.window="openWizard()"{% endif %}>
+ <div {% if page_mode %}style="width:100%;"{% else %}x-show="open" x-cloak style="position:fixed;top:0;left:0;right:0;bottom:0;width:100vw;height:100vh;z-index:70;background:rgba(0,15,50,0.45);backdrop-filter:blur(3px);display:grid;place-items:center;padding:24px;box-sizing:border-box;" @click.self="open=false"{% endif %}>
+  <div {% if page_mode %}style="width:100%;background:#fff;border:1px solid #EDF0F6;border-radius:16px;box-shadow:0 1px 3px rgba(15,23,42,.05);display:flex;flex-direction:column;overflow:hidden;"{% else %}:style="{ width: (step===3 || step===5) ? 'min(1320px,96vw)' : 'min(860px,94vw)' }" style="width:min(860px,94vw);max-height:92vh;margin:auto;background:#fff;border-radius:18px;box-shadow:0 30px 80px rgba(0,0,0,0.35);display:flex;flex-direction:column;overflow:hidden;transition:width .22s ease;"{% endif %}>
 
    <div style="padding:18px 24px 14px;border-bottom:1px solid #EEF1F7;flex-shrink:0;">
+    {% if not page_mode %}
     <div style="display:flex;align-items:center;justify-content:space-between;">
      <p style="font-size:15px;font-weight:800;color:#14213D;margin:0;">{% if mode == 'policy' %}Add internal policy{% elif mode == 'regulation' %}Add Legal Document{% else %}Add document{% endif %}</p>
      <button @click="open=false" style="background:none;border:none;cursor:pointer;color:#9AA4BC;font-size:22px;line-height:1;">&times;</button>
     </div>
+    {% endif %}
     <div style="display:flex;align-items:center;gap:6px;margin-top:12px;">
-     <template x-for="(s,i) in ['Details','Analyze','Review','Configure','Done']" :key="i">
+     <template x-for="(s,i) in ['Details','Analyze','Review','Version','Configure','Done']" :key="i">
       <div style="display:flex;align-items:center;gap:6px;flex:1;">
        {# 3 states: done (✓) / active / upcoming — geometry from .step-num class #}
        <span class="step-num"
@@ -21,7 +23,7 @@
        </span>
        <span class="step-lbl" :class="stepIndex()>=i ? 'is-current' : 'is-upcoming'"
              style="font-size:11px;font-weight:600;white-space:nowrap;" x-text="s"></span>
-       <span x-show="i<4" class="step-line" :class="stepIndex()>i ? 'done' : ''"></span>
+       <span x-show="i<5" class="step-line" :class="stepIndex()>i ? 'done' : ''"></span>
       </div>
      </template>
     </div>
@@ -33,14 +35,17 @@
     {# STEP 1 — Details #}
     <div x-show="step===1">
      <div @dragover.prevent="dragging=true" @dragleave.prevent="dragging=false" @drop.prevent="dragging=false; pickFile($event.dataTransfer.files[0])" @click="$refs.fileIn.click()"
-          :style="dragging ? 'border-color:#002583;background:#F4F7FF;' : 'border-color:#DCE2EE;background:#FAFBFE;'" style="border:2px dashed #DCE2EE;border-radius:12px;padding:24px;text-align:center;cursor:pointer;margin-bottom:18px;transition:all .15s;background:#FAFBFE;">
+          class="wz-drop" :class="dragging ? 'is-dragging' : ''">
       <input type="file" x-ref="fileIn" accept=".pdf,.docx,.txt" style="display:none;" @change="pickFile($event.target.files[0])">
-      <template x-if="!file"><div>
-       <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="1.6" style="margin:0 auto 8px;display:block;"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
-       <p style="font-size:13px;font-weight:700;color:#002583;margin:0;">Drag a document here, or click to browse</p>
-       <p style="font-size:11px;color:#9AA4BC;margin:4px 0 0;">PDF · DOCX · TXT</p>
+      <template x-if="!file"><div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;">
+       <svg width="30" height="30" fill="none" viewBox="0 0 24 24" stroke="#3B6FE0" stroke-width="1.5" style="display:block;"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l-3 3m3-3l3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z"/></svg>
+       <p style="font-size:14px;font-weight:700;color:#14213D;margin:0;">Drag &amp; Drop files here</p>
+       <p style="font-size:12px;color:#98A2B3;margin:0;">or click to browse from your computer</p>
+       <button type="button" @click.stop="$refs.fileIn.click()"
+         style="margin-top:3px;display:inline-flex;align-items:center;gap:7px;padding:7px 18px;border-radius:9px;border:1px solid #D9E0EF;background:#fff;color:#002583;font-size:12.5px;font-weight:700;cursor:pointer;box-shadow:0 1px 2px rgba(15,23,42,.06);font-family:inherit;">Browse Files</button>
+       <p style="font-size:10.5px;color:#B8C0D0;margin:2px 0 0;">PDF · DOCX · TXT</p>
       </div></template>
-      <template x-if="file"><div style="display:flex;align-items:center;justify-content:center;gap:8px;">
+      <template x-if="file"><div style="max-width:560px;margin:0 auto;display:flex;align-items:center;justify-content:center;gap:8px;padding:4px 0;">
        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#1B7F3A" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
        <span style="font-size:12.5px;font-weight:600;color:#14213D;" x-text="file.name"></span>
       </div></template>
@@ -49,10 +54,6 @@
      <div>
       <label class="wz-lbl">Document name <span style="color:#9AA4BC;font-weight:400;">(optional — detected if left blank)</span></label>
       <input class="wz-in" x-model="meta.name" placeholder="e.g. Personal Data Protection Law">
-     </div>
-     <div style="display:flex;align-items:center;gap:8px;margin-top:12px;padding:10px 12px;background:#F4F7FF;border:1px solid #DCE6FB;border-radius:9px;">
-      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="1.8" style="flex-shrink:0;"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg>
-      <span style="font-size:11.5px;color:#3A4560;line-height:1.4;">Language, jurisdiction, category and structure are detected automatically — you'll confirm them next.</span>
      </div>
      <div style="display:flex;justify-content:flex-end;margin-top:20px;">
       <button @click="analyze()" :disabled="!file" :style="!file?'opacity:.45;cursor:not-allowed;':''" class="wz-btn">Analyze &rarr;</button>
@@ -74,17 +75,15 @@
     </div>
 
     {# STEP 3 — Review (structure + confirmation metadata) #}
-    <div x-show="step===3" x-cloak>
+    <div x-show="step===3" x-cloak class="wz-step3">
 
      {# Header #}
-     <p style="font-size:13px;font-weight:700;color:#14213D;margin:0 0 3px;">Review &amp; confirm</p>
-     <p style="font-size:11.5px;color:#7B8499;margin:0 0 16px;">These details were read from the document by the local model. Check the structure, correct the metadata, then configure indexing.</p>
+     <p style="font-size:13px;font-weight:700;color:#14213D;margin:0 0 16px;">Review &amp; confirm</p>
 
-     {# Two columns: structure (own scroll) | metadata — sized to fit without the modal scrolling #}
-     <div style="display:grid;grid-template-columns:360px minmax(0,1fr);gap:22px;align-items:start;">
+     <div class="wz-rev">
 
       {# ── Left: detected structure ── #}
-      <div style="border:1px solid #E9EDF5;border-radius:12px;background:#FAFBFE;display:flex;flex-direction:column;max-height:520px;overflow:hidden;">
+      <div style="border:1px solid #E9EDF5;border-radius:12px;background:#FAFBFE;display:flex;flex-direction:column;max-height:452px;overflow:hidden;">
        <div style="padding:12px 14px 10px;border-bottom:1px solid #EEF1F7;flex-shrink:0;">
         <p style="font-size:12px;font-weight:700;color:#14213D;margin:0;">Detected structure</p>
         <p style="font-size:10.5px;color:#8A93A8;margin:2px 0 0;">Verify the parsing looks right.</p>
@@ -99,39 +98,54 @@
       </div>
 
       {# ── Right: metadata (pre-filled by the local model, confirm/edit) ── #}
-      <div style="min-width:0;">
-       <div x-show="meta.ai_suggested" x-cloak style="display:flex;align-items:flex-start;gap:8px;background:#F4F7FF;border:1px solid #DCE6FB;border-radius:10px;padding:9px 11px;margin-bottom:14px;">
+      <div class="wz-meta-col">
+       <div x-show="meta.ai_suggested" x-cloak style="display:flex;align-items:flex-start;gap:8px;background:#F4F7FF;border:1px solid #DCE6FB;border-radius:10px;padding:8px 11px;margin-bottom:11px;">
         <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="1.8" style="flex-shrink:0;margin-top:1px;"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg>
         <p style="font-size:11px;color:#3A4560;margin:0;line-height:1.45;">AI-suggested from the document — review and correct before indexing.</p>
        </div>
 
-       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-        <div style="grid-column:1/-1;"><label class="wz-lbl">Document name</label>
+       <div class="wz-meta">
+        <div class="wz-span2"><label class="wz-lbl">Document name</label>
          <input class="wz-in" x-model="meta.name" placeholder="Personal Data Protection Law"></div>
-        <div style="grid-column:1/-1;"><label class="wz-lbl">Full official title <span style="color:#9AA4BC;font-weight:400;">(optional)</span></label>
+        <div class="wz-span2"><label class="wz-lbl">Full official title <span style="color:#9AA4BC;font-weight:400;">(optional)</span></label>
          <input class="wz-in" x-model="meta.full_name" placeholder="Law No. (30) of 2018 …"></div>
         <div><label class="wz-lbl">Language <span style="font-size:9px;font-weight:700;color:#1B7F3A;background:#E8F6EC;padding:1px 6px;border-radius:8px;margin-left:4px;">detected</span></label>
          <select class="wz-in" x-model="meta.language"><option value="en">English</option><option value="ar">Arabic</option></select></div>
         <div><label class="wz-lbl">Jurisdiction
-          <span x-show="meta.jurisdiction_is_new" x-cloak style="font-size:9px;font-weight:700;color:#B07A00;background:#FFF3D6;padding:1px 6px;border-radius:8px;margin-left:4px;">NEW</span></label>
-         <select class="wz-in" x-model="meta.jurisdiction" @change="meta.jurisdiction_is_new = isNewJur()">
-          <template x-for="o in jurOptions" :key="o.v"><option :value="o.v" x-text="o.label"></option></template></select></div>
+          <span x-show="meta.jurisdiction_is_new && meta.jurisdiction && meta.jurisdiction!=='other'" x-cloak style="font-size:9px;font-weight:700;color:#B07A00;background:#FFF3D6;padding:1px 6px;border-radius:8px;margin-left:4px;">NEW</span></label>
+         {% comment %}Combobox: an <input> always shows the AI-suggested value (a
+            <select> silently drops a value whose option isn't in the DOM yet).
+            Datalist offers known ones; you can also just type a new country.{% endcomment %}
+         {% comment %}Displayed capitalised (Qatar) but stored lowercase: the value is the
+            jurisdiction KEY the rest of the app matches on, so it's normalised on blur
+            whatever the user types.{% endcomment %}
+         <input class="wz-in wz-cap" list="jur-datalist" x-model="meta.jurisdiction"
+           @input="meta.jurisdiction_is_new = isNewJur()"
+           @change="meta.jurisdiction = (meta.jurisdiction||'').trim().toLowerCase(); meta.jurisdiction_is_new = isNewJur()"
+           @blur="meta.jurisdiction = (meta.jurisdiction||'').trim().toLowerCase(); meta.jurisdiction_is_new = isNewJur()"
+           placeholder="detected automatically — e.g. Bahrain">
+         <datalist id="jur-datalist">
+          <template x-for="o in jurOptions" :key="o.v"><option :value="o.v" x-text="o.label"></option></template>
+         </datalist></div>
         <div><label class="wz-lbl">Category
           <span x-show="meta.category_is_new && meta.regulation_category" x-cloak style="font-size:9px;font-weight:700;color:#B07A00;background:#FFF3D6;padding:1px 6px;border-radius:8px;margin-left:4px;">NEW</span></label>
          <input class="wz-in" x-model="meta.regulation_category" @input="meta.category_is_new = isNewCat()" placeholder="e.g. data protection"></div>
         <div><label class="wz-lbl">Issuing authority <span style="color:#9AA4BC;font-weight:400;">(optional)</span></label>
          <input class="wz-in" x-model="meta.issuing_authority" placeholder="e.g. PDPA"></div>
-        <div style="grid-column:1/-1;"><label class="wz-lbl">Scope summary
+        <div class="wz-span2"><label class="wz-lbl">Scope summary
+          <span style="font-size:9px;font-weight:700;color:#3B6FE0;background:#EEF2FB;padding:1px 6px;border-radius:8px;margin-left:4px;">AI</span></label>
+         <textarea class="wz-in wz-grow" x-model="meta.scope_summary" rows="2"
+           x-effect="meta.scope_summary; step; $nextTick(() => autoGrow($el))"
+           @input="autoGrow($el)" placeholder="What the document governs and who it applies to…"></textarea></div>
+        <div class="wz-span2"><label class="wz-lbl">Key topics
           <span style="font-size:9px;font-weight:700;color:#3B6FE0;background:#EEF2FB;padding:1px 6px;border-radius:8px;margin-left:4px;">AI</span>
-          <span style="color:#9AA4BC;font-weight:400;">— saved with the index for retrieval</span></label>
-         <textarea class="wz-in" x-model="meta.scope_summary" rows="2" style="resize:none;" placeholder="What the document governs and who it applies to…"></textarea></div>
-        <div style="grid-column:1/-1;"><label class="wz-lbl">Key topics
-          <span style="font-size:9px;font-weight:700;color:#3B6FE0;background:#EEF2FB;padding:1px 6px;border-radius:8px;margin-left:4px;">AI</span>
-          <span style="color:#9AA4BC;font-weight:400;">comma-separated — help retrieval find this document</span></label>
-         <input class="wz-in" x-model="meta.key_topics" placeholder="e.g. consent, data breach notification, retention"></div>
+          <span style="color:#9AA4BC;font-weight:400;">comma-separated</span></label>
+         <textarea class="wz-in wz-grow" x-model="meta.key_topics" rows="2"
+           x-effect="meta.key_topics; step; $nextTick(() => autoGrow($el))"
+           @input="autoGrow($el)" placeholder="consent, data breach notification, retention"></textarea></div>
        </div>
 
-       <div style="margin-top:14px;">
+       <div style="margin-top:11px;">
         <label class="wz-lbl">Confirm document type</label>
         <div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:6px;">
          <template x-for="t in ['Law','Regulation','Policy','Circular','Contract','Court Judgment','Other']" :key="t">
@@ -140,7 +154,7 @@
         </div>
        </div>
 
-       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px;">
+       <div class="wz-meta" style="margin-top:11px;">
         <div><label class="wz-lbl">Department</label>
          <select class="wz-in" x-model="meta.department">
           <option value="">—</option><option>Legal</option><option>Compliance</option>
@@ -157,14 +171,84 @@
       </div>
      </div>
 
-     <div style="display:flex;justify-content:space-between;margin-top:22px;">
+     <div style="display:flex;justify-content:space-between;margin-top:14px;">
       <button @click="step=1" class="wz-btn-ghost">&larr; Back</button>
-      <button @click="step=4" class="wz-btn">Configure indexing &rarr;</button>
+      <button @click="step=4" class="wz-btn">Version &amp; lineage &rarr;</button>
      </div>
     </div>
 
-    {# STEP 4 — Configure (chunking strategy + citation format) #}
+    {# STEP 4 — Version lineage (regulations only; policies pass straight through) #}
     <div x-show="step===4" x-cloak>
+     <p style="font-size:13px;font-weight:700;color:#14213D;margin:0 0 3px;">Version &amp; lineage</p>
+     <p style="font-size:11.5px;color:#7B8499;margin:0 0 16px;">Is this a newer version of something already in the library, and what should happen to the old one?</p>
+
+     <template x-if="isPolicyType()">
+      <div style="padding:16px 18px;border:1px solid #E5E8EF;border-radius:12px;background:#FAFBFE;font-size:12px;color:#7B8499;line-height:1.5;">
+       This is an internal policy, so there is no regulation lineage to set. Continue to indexing.
+      </div>
+     </template>
+
+     <template x-if="!isPolicyType()">
+      <div>
+       <div style="display:flex;align-items:center;gap:14px;padding:14px 16px;border:1px solid #E5E8EF;border-radius:12px;background:#FAFBFE;">
+        <span style="flex-shrink:0;width:34px;height:34px;border-radius:9px;background:#EEF2FB;display:flex;align-items:center;justify-content:center;">
+         <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4M16 17H4m0 0l4 4m-4-4l4-4"/></svg>
+        </span>
+        <div style="flex:1;min-width:0;">
+         <p style="font-size:12.5px;font-weight:700;color:#14213D;margin:0;">Newer version of an existing regulation?</p>
+         <p x-show="!topSuggestion() && !versionLinkedToSuggestion()" style="font-size:11px;color:#8A93A8;margin:2px 0 0;line-height:1.45;">Link it to the law it replaces so they're tracked as one history.</p>
+         <p x-show="versionLinkedToSuggestion()" x-cloak style="font-size:11px;color:#1E7E48;margin:2px 0 0;line-height:1.45;font-weight:600;">Linked to <span x-text="versionAutoLinked && prettyReg(versionAutoLinked.name)"></span>. Change it if that's wrong.</p>
+         <p x-show="topSuggestion() && !versionLinkedToSuggestion()" x-cloak style="font-size:11px;color:#002583;margin:2px 0 0;line-height:1.45;font-weight:600;">Looks like a newer version of <span x-text="topSuggestion() && prettyReg(topSuggestion().name)"></span>.</p>
+        </div>
+        <template x-if="hasReg()">
+         <div style="flex:0 0 300px;display:flex;flex-direction:column;gap:4px;">
+          <select class="wz-in" x-model="meta.version_of" style="width:100%;">
+           <option value="">No, this is a separate law</option>
+           <template x-if="versionRanked().likely.length">
+            <optgroup label="Likely matches">
+             <template x-for="r in versionRanked().likely" :key="'L'+r.id"><option :value="r.id" x-text="prettyReg(r.name)"></option></template>
+            </optgroup>
+           </template>
+           <template x-if="versionRanked().other.length">
+            <optgroup label="All other regulations">
+             <template x-for="r in versionRanked().other" :key="'O'+r.id"><option :value="r.id" x-text="prettyReg(r.name)"></option></template>
+            </optgroup>
+           </template>
+          </select>
+          <span style="align-self:flex-end;font-size:10px;color:#9AA4BC;"
+                x-text="regCount() + ' regulation' + (regCount()===1?'':'s') + ' in the library'"></span>
+         </div>
+        </template>
+        <template x-if="!hasReg()">
+         <span style="flex:0 0 300px;font-size:11px;color:#9AA4BC;font-style:italic;line-height:1.45;text-align:right;">No other regulations in the library yet, so this will be its first version.</span>
+        </template>
+       </div>
+
+       {# Only meaningful once a parent is chosen: what happens to the version being replaced. #}
+       <div x-show="meta.version_of" x-cloak style="margin-top:12px;padding:14px 16px;border:1px solid #E5E8EF;border-radius:12px;background:#fff;">
+        <p style="font-size:12px;font-weight:700;color:#14213D;margin:0 0 8px;">What happens to <span x-text="selectedParentName()"></span>?</p>
+        <label class="wz-opt" :style="meta.old_version_action==='supersede' ? { borderColor:'#002583', background:'#F5F7FE' } : {}">
+         <input type="radio" value="supersede" x-model="meta.old_version_action" style="margin-top:2px;accent-color:#002583;">
+         <span><b style="font-size:12px;color:#14213D;">Keep it, marked as superseded</b>
+          <span style="display:block;font-size:11px;color:#7B8499;line-height:1.45;margin-top:1px;">Stays in the library as history and approved analyses that cite it are flagged for re-review. It is no longer treated as in force.</span></span>
+        </label>
+        <label class="wz-opt" :style="meta.old_version_action==='delete' ? { borderColor:'#D92D20', background:'#FEF6F5' } : {}">
+         <input type="radio" value="delete" x-model="meta.old_version_action" style="margin-top:2px;accent-color:#D92D20;">
+         <span><b style="font-size:12px;color:#14213D;">Delete it from the library</b>
+          <span style="display:block;font-size:11px;color:#7B8499;line-height:1.45;margin-top:1px;">Removes the old document and its indexed sections. Anything that cited it loses its source. This cannot be undone.</span></span>
+        </label>
+       </div>
+      </div>
+     </template>
+
+     <div style="display:flex;justify-content:space-between;margin-top:22px;">
+      <button @click="step=3" class="wz-btn-ghost">&larr; Back</button>
+      <button @click="step=5" class="wz-btn">Configure indexing &rarr;</button>
+     </div>
+    </div>
+
+    {# STEP 5 — Configure (chunking strategy + citation format) #}
+    <div x-show="step===5" x-cloak>
      {# Header #}
      <p style="font-size:13px;font-weight:700;color:#14213D;margin:0 0 3px;">Configure indexing</p>
      <p style="font-size:11.5px;color:#7B8499;margin:0 0 16px;">How the document is split into retrievable nodes, and how it's cited in answers.</p>
@@ -226,13 +310,13 @@
      </label>
 
      <div style="display:flex;justify-content:space-between;margin-top:22px;">
-      <button @click="step=3" class="wz-btn-ghost">&larr; Back</button>
+      <button @click="step=4" class="wz-btn-ghost">&larr; Back</button>
       <button @click="finalize()" class="wz-btn">Confirm &amp; Index &check;</button>
      </div>
     </div>
 
-    {# STEP 5 — Indexing (processing checklist) #}
-    <div x-show="step===5" x-cloak style="padding:22px 4px;">
+    {# STEP 6 — Indexing (processing checklist) #}
+    <div x-show="step===6" x-cloak style="padding:22px 4px;">
      <p style="font-size:14px;font-weight:800;color:#14213D;margin:0 0 16px;text-align:center;">Processing document…</p>
      <div style="max-width:280px;margin:0 auto;">
       <template x-for="(s,i) in procSteps" :key="i">
@@ -250,8 +334,8 @@
      </div>
     </div>
 
-    {# STEP 6 — Done #}
-    <div x-show="step===6" x-cloak style="padding:26px 0;text-align:center;">
+    {# STEP 7 — Done #}
+    <div x-show="step===7" x-cloak style="padding:26px 0;text-align:center;">
      <div style="width:54px;height:54px;border-radius:50%;background:#E8F6EC;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;">
       <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="#1B7F3A" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
      </div>
@@ -259,9 +343,11 @@
      <p style="font-size:12px;color:#7B8499;margin:6px 0 0;">
       Filed under <b style="color:#002583;" x-text="filedLabel||'the library'"></b> — indexed and answerable in Copilot.
      </p>
-     <a :href="filedUrl||'#'" x-show="filedUrl" style="display:inline-flex;align-items:center;gap:6px;margin-top:14px;padding:8px 18px;border-radius:9px;background:#002583;color:#fff;font-size:12px;font-weight:700;text-decoration:none;">
-      View <span x-text="filedLabel"></span> &rarr;
-     </a>
+     <div x-show="filedUrl" x-cloak style="margin-top:14px;">
+      <a :href="filedUrl||'#'" style="display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border-radius:9px;background:#002583;color:#fff;font-size:12px;font-weight:700;text-decoration:none;">
+       View <span x-text="filedLabel"></span> &rarr;
+      </a>
+     </div>
     </div>
    </div>
   </div>
@@ -272,9 +358,45 @@
  .wz-lbl { display:block; font-size:11px; font-weight:700; color:#3A4560; margin-bottom:5px; }
  .wz-in { width:100%; box-sizing:border-box; padding:9px 11px; border:1px solid #E5E8EF; border-radius:9px; font-size:13px; color:#14213D; outline:none; font-family:inherit; }
  .wz-in:focus { border-color:#002583; box-shadow:0 0 0 3px rgba(0,37,131,.12); }
+ /* Country names read as names ("Qatar", "saudi arabia" -> "Saudi Arabia") while the
+    underlying value stays the lowercase key. Display only. */
+ .wz-cap { text-transform: capitalize; }
+ .wz-cap::placeholder { text-transform: none; }
+ .wz-opt { display:flex; gap:9px; align-items:flex-start; padding:9px 11px; border:1px solid #E5E8EF;
+   border-radius:9px; margin-bottom:7px; cursor:pointer; transition:border-color .12s, background .12s; }
+ .wz-opt:last-child { margin-bottom:0; }
+ .wz-opt:hover { border-color:#C9D2E4; }
+
+ /* ── Step 3 layout ──────────────────────────────────────────────────────────
+    Sized by CONTAINER width, not viewport: the wizard renders both as a modal
+    and as a page column next to a sidebar, so the same viewport gives it very
+    different room. A fixed 4-across grid left every field ~150px wide and cut
+    off values like "data protection" and the official title. */
+ /* The container must be an ANCESTOR of what it sizes — a @container rule can't
+    restyle the element that declares the container. Hence wz-step3 wrapping wz-rev. */
+ .wz-step3 { container: wzrev / inline-size; }
+ .wz-rev { display:grid; grid-template-columns:minmax(0,320px) minmax(0,1fr); gap:20px; align-items:start; }
+ .wz-meta-col { container: wzmeta / inline-size; min-width:0; }
+ .wz-meta { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
+ .wz-span2 { grid-column: span 2; }
+ /* Fields need ~190px to show their content; below that, halve the columns. */
+ @container wzmeta (max-width: 780px) { .wz-meta { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+ @container wzmeta (max-width: 400px) { .wz-meta { grid-template-columns:minmax(0,1fr); }
+   .wz-span2 { grid-column: span 1; } }
+ /* Too tight for side-by-side: structure moves above the metadata, full width. */
+ @container wzrev (max-width: 720px) { .wz-rev { grid-template-columns:minmax(0,1fr); } }
+
+ /* The AI's summary and topics are as long as the document makes them. A fixed
+    rows="2" clipped the last line mid-letter; these grow to fit (autoGrow) and
+    scroll past the cap instead of hiding text. */
+ .wz-grow { line-height:1.5; min-height:56px; max-height:190px; overflow-y:auto; resize:vertical; }
  .wz-btn { padding:9px 20px; background:#002583; color:#fff; border:0; border-radius:9px; font-size:13px; font-weight:700; cursor:pointer; box-shadow:0 4px 12px rgba(0,37,131,.24); font-family:inherit; }
  .wz-btn:hover:not([disabled]) { background:#001a5e; }
  .wz-btn-ghost { padding:9px 16px; background:#fff; color:#4A5878; border:1px solid #E5E8EF; border-radius:9px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; }
+ /* Dropzone — geometry in a CLASS so Alpine's :style (drag state) can't wipe it.
+    Toggling only the .is-dragging modifier keeps max-width/padding/border intact. */
+ .wz-drop { width:100%; margin:0 0 22px; border:2px dashed #C4D0E8; border-radius:12px; padding:16px 24px; text-align:center; cursor:pointer; transition:border-color .15s, background .15s; background:#F8FAFF; }
+ .wz-drop.is-dragging { border-color:#3B6FE0; background:#F0F5FF; }
  /* Pill toggle — geometry in the class so Alpine's :class colour toggle can't
     wipe it (an inline :style binding used to collapse these to plain text). */
  .wz-pill { padding:6px 14px; border-radius:20px; border:1px solid #E5E8EF; background:#fff; color:#4A5878; font-size:11.5px; font-weight:600; cursor:pointer; font-family:inherit; transition:background .12s,border-color .12s,color .12s; white-space:nowrap; }
@@ -312,10 +434,13 @@ function uploadWizard() {
  const WIZARD_MODE = '{{ mode|default:"regulation" }}';
  const DEF = () => ({ name:'', full_name:'', language:'en', jurisdiction:(WIZARD_MODE==='policy'?'bbk':'other'), confirmed_type:(WIZARD_MODE==='policy'?'Policy':''),
    department:'', confidentiality:'internal', document_number:'', doc_year:'', version:'',
-   issuing_authority:'', effective_date:'', regulation_category:'',
-   scope_summary:'', key_topics:'',
+   issuing_authority:'', effective_date:'', regulation_category:'', privacy_relevance:'',
+   scope_summary:'', key_topics:'', version_of:'', old_version_action:'supersede',
    chunk_strategy:'auto', citation_format:'short', citation_abbr:'', citation_template:'',
    classify:true, jurisdiction_is_new:false, category_is_new:false, ai_suggested:false });
+ // In-force regulations this document could be a newer version of (from the server).
+ let EXISTING_REGS = [];
+ try { EXISTING_REGS = JSON.parse('{{ existing_regulations_json|default:"[]"|escapejs }}') || []; } catch(e) { EXISTING_REGS = []; }
  // Jurisdictions known to the app = the built-in set + any the admin/user has
  // already created (rendered from TaxonomyNode). A suggested country not in
  // here is offered as NEW and, on confirm, persisted so it shows up next time.
@@ -336,10 +461,17 @@ function uploadWizard() {
   open:false, step:1, file:null, dragging:false, analysis:null, errorMsg:'', meta:DEF(),
   filedLabel:'', filedUrl:'',
   jurOptions: KNOWN_JURS.slice(),
+  versionAutoLinked: null,   // the regulation autoLinkVersion() picked, for the hint
+  addingJur:false, newJurRaw:'',
   procSteps:['Extracting text','Chunking into legal nodes','Generating embeddings','Building the index','Classifying topics'],
   procDone:0, _procTimer:null,
-  stepIndex() { return this.step<=1?0 : this.step===2?1 : this.step===3?2 : this.step<=5?3 : 4; },
-  openWizard() { this.step=1; this.file=null; this.analysis=null; this.errorMsg=''; this.meta=DEF(); this.procDone=0; this.open=true; },
+  // step -> progress-bar label index. Steps 1-5 map straight across; indexing (6)
+  // and done (7) both sit on the last label.
+  stepIndex() {
+   return this.step<=1?0 : this.step===2?1 : this.step===3?2
+        : this.step===4?3 : this.step===5?4 : 5;
+  },
+  openWizard() { this.step=1; this.file=null; this.analysis=null; this.errorMsg=''; this.meta=DEF(); this.procDone=0; this.addingJur=false; this.newJurRaw=''; this.open=true; },
   pickFile(f) { if(!f) return; this.file=f; if(!this.meta.name) this.meta.name=f.name.replace(/\.[^.]+$/,''); },
   // acronym from the document name → default short citation label ("PDPL")
   _guessAbbr(n) { const a=(n||'').split(/\s+/).filter(w=>/^[A-Za-z]/.test(w)).map(w=>w[0].toUpperCase()).join(''); return a.length>=2?a.slice(0,6):(n||'').slice(0,12); },
@@ -391,38 +523,136 @@ function uploadWizard() {
    set('issuing_authority', sm.issuing_authority); set('document_number', sm.document_id);
    set('doc_year', sm.doc_year); set('effective_date', sm.effective_date);
    set('citation_abbr', sm.citation_abbr); set('regulation_category', sm.regulation_category);
+   set('privacy_relevance', sm.privacy_relevance);
    set('version', sm.version); set('scope_summary', sm.scope_summary);
    set('department', sm.owner_department);
    if(Array.isArray(sm.key_topics)) this.meta.key_topics = sm.key_topics.join(', ');
    if(sm.doc_type){ this.meta.confirmed_type = sm.doc_type.charAt(0).toUpperCase()+sm.doc_type.slice(1); }
-   // Jurisdiction — offer a country not yet in the app as NEW.
-   if(sm.jurisdiction){
+   // Jurisdiction — the AI's suggested country. The field is a combobox <input>, so
+   // setting the value shows it immediately (no option-in-DOM timing to worry about).
+   if(sm.jurisdiction && sm.jurisdiction!=='other'){
     const j=String(sm.jurisdiction).toLowerCase();
-    if(!this.jurOptions.some(o=>o.v===j)){
-     this.jurOptions.push({v:j, label:j.charAt(0).toUpperCase()+j.slice(1)+' — new'});
-     this.meta.jurisdiction_is_new=true;
-    } else { this.meta.jurisdiction_is_new=false; }
+    const known=this.jurOptions.some(o=>o.v===j);
+    if(!known){ this.jurOptions.push({v:j, label:j.charAt(0).toUpperCase()+j.slice(1)+' — new'}); }
     this.meta.jurisdiction=j;
+    this.meta.jurisdiction_is_new=!known;
    }
    // Category — new if it isn't one the app already knows.
    if(sm.regulation_category){
     this.meta.category_is_new = !KNOWN_CATS.includes(sm.regulation_category.toLowerCase());
    }
+   // Ranking depends on the jurisdiction/category/name just applied, so link last.
+   this.autoLinkVersion();
+  },
+  // Grow a textarea to its content, up to the CSS max-height (then it scrolls).
+  // Skipped while the step is hidden: a display:none element reports
+  // scrollHeight 0, which would collapse the box before it's ever seen.
+  autoGrow(el) {
+   if(!el || !el.offsetParent) return;
+   el.style.height = 'auto';
+   el.style.height = Math.max(el.scrollHeight, 56) + 'px';
   },
   isNewJur() { return !KNOWN_JURS.some(o=>o.v===this.meta.jurisdiction); },
+  // Switch the jurisdiction field into "type a new country" mode.
+  startAddJur() { this.addingJur=true; this.newJurRaw=''; this.meta.jurisdiction=''; this.meta.jurisdiction_is_new=true;
+    this.$nextTick(()=>{ if(this.$refs.newJurIn) this.$refs.newJurIn.focus(); }); },
   isNewCat() { const c=(this.meta.regulation_category||'').toLowerCase(); return !!c && !KNOWN_CATS.includes(c); },
+  isPolicyType() { return (this.meta.confirmed_type||'').toLowerCase().includes('policy'); },
+  hasReg() { return EXISTING_REGS.length > 0; },
+  // Existing in-force regulations in the SAME jurisdiction that this document
+  // could be a newer version of. Scoped by jurisdiction so the list is relevant.
+  // Significant tokens of a name for similarity — drop years, version words and
+  // filler so "Egypt PDPL 2020" ≈ "egypt_pdpl (2025 amendment)".
+  _regTokens(n) {
+   const STOP=new Set(['law','no','of','the','act','regulation','version','amendment','amended','draft']);
+   return (n||'').toLowerCase().split(/[^a-z0-9]+/)
+     .filter(t => t && !/^(19|20)\d{2}$/.test(t) && !STOP.has(t));
+  },
+  _nameSim(a,b) {
+   const A=new Set(this._regTokens(a)), B=new Set(this._regTokens(b));
+   if(!A.size || !B.size) return 0;
+   let inter=0; A.forEach(t => { if(B.has(t)) inter++; });
+   return inter / Math.max(A.size, B.size);
+  },
+  // Likelihood that an existing reg `r` is the law THIS document is a version of.
+  _regScore(r) {
+   const j=(this.meta.jurisdiction||'').toLowerCase();
+   const c=(this.meta.regulation_category||'').toLowerCase();
+   let s=0;
+   if(j && (r.jurisdiction||'').toLowerCase()===j) s+=100;   // same jurisdiction
+   if(c && (r.category||'').toLowerCase()===c)     s+=30;    // same category
+   // Best name overlap across name AND official title, both directions — the
+   // stored name is often a slug ("qatar_pdpl") while the title is the real name.
+   const mine=[this.meta.name, this.meta.full_name], theirs=[r.name, r.full_name];
+   let nm=0;
+   mine.forEach(a => theirs.forEach(b => { nm=Math.max(nm, this._nameSim(a,b)); }));
+   s += nm*60;
+   return s;
+  },
+  // All in-force regs, RANKED (not filtered) — never hides a candidate behind a
+  // brittle jurisdiction-string match. Split into likely vs. the rest.
+  versionRanked() {
+   const scored = EXISTING_REGS.map(r => ({r, s:this._regScore(r)}))
+     .sort((a,b) => b.s - a.s);
+   return {
+    likely: scored.filter(x => x.s >= 40).map(x => x.r),
+    other:  scored.filter(x => x.s <  40).map(x => x.r),
+   };
+  },
+  regCount() { return EXISTING_REGS.length; },
+  selectedParentName() {
+   const r = EXISTING_REGS.find(x => String(x.id) === String(this.meta.version_of));
+   return r ? this.prettyReg(r.name) : 'the old version';
+  },
+  // True while the auto-linked suggestion is still the chosen one. Goes false the
+  // moment the user picks something else, so the hint follows the dropdown.
+  versionLinkedToSuggestion() {
+   return !!(this.versionAutoLinked &&
+             String(this.meta.version_of) === String(this.versionAutoLinked.id));
+  },
+  // The single strongest candidate, only when it's a confident match and nothing
+  // has been chosen yet — drives the inline "looks like a newer version of X" nudge.
+  topSuggestion() {
+   if(this.meta.version_of) return null;
+   const scored = EXISTING_REGS.map(r => ({r, s:this._regScore(r)}))
+     .sort((a,b) => b.s - a.s)[0];
+   return (scored && scored.s >= 100) ? scored.r : null;
+  },
+  // A confident match is SELECTED, not just suggested: the user was being asked to
+  // act on a conclusion the app had already reached. Still fully reversible from
+  // the dropdown, and only ever applied when nothing has been chosen yet.
+  autoLinkVersion() {
+   if(this.meta.version_of) return;
+   if(this.isPolicyType()) return;                 // regulations only
+   const top = this.topSuggestion();
+   if(!top) return;
+   this.versionAutoLinked = top;
+   // $nextTick so the <option> exists before x-model writes the value; setting a
+   // select's value before its options render leaves it on the empty choice.
+   this.$nextTick(() => { this.meta.version_of = String(top.id); });
+  },
+  // Tidy a stored machine name for display: "qatar_pdpl" → "Qatar PDPL".
+  // Words with a vowel are title-cased; vowel-less tokens (pdpl, gdpr) are acronyms.
+  prettyReg(n) {
+   return (n||'').split(/[_\-\s]+/).filter(Boolean)
+     .map(w => /[aeiou]/i.test(w) ? w.charAt(0).toUpperCase()+w.slice(1) : w.toUpperCase())
+     .join(' ');
+  },
   _runChecklist() {
    this.procDone=0;
    clearInterval(this._procTimer);
    this._procTimer=setInterval(()=>{ if(this.procDone<this.procSteps.length-1) this.procDone++; else clearInterval(this._procTimer); }, 550);
   },
   async finalize() {
-   this.step=5; this._runChecklist();
+   this.step=6; this._runChecklist(); this.errorMsg='';
+   // Everything is inside the try: a throw while BUILDING the request used to
+   // escape finalize() entirely, so the checklist span forever with no error.
+   try {
    const fd=new FormData();
    fd.append('name', this.meta.name);
    fd.append('full_name', this.meta.full_name);
    fd.append('language', this.meta.language);
-   fd.append('jurisdiction', this.meta.jurisdiction);
+   fd.append('jurisdiction', (this.meta.jurisdiction||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'') || 'other');
    fd.append('doc_type', (this.meta.confirmed_type||'').toLowerCase().includes('policy')?'policy':'regulation');
    fd.append('chunk_strategy', this.meta.chunk_strategy);
    fd.append('citation_format', this.meta.citation_format);
@@ -434,6 +664,7 @@ function uploadWizard() {
    fd.append('issuing_authority', this.meta.issuing_authority);
    fd.append('effective_date', this.meta.effective_date);
    fd.append('regulation_category', this.meta.regulation_category);
+   fd.append('privacy_relevance', this.meta.privacy_relevance);
    fd.append('version', this.meta.version);
    fd.append('scope_summary', this.meta.scope_summary);
    fd.append('key_topics', this.meta.key_topics);
@@ -443,17 +674,31 @@ function uploadWizard() {
    if(this.meta.jurisdiction_is_new) fd.append('new_jurisdiction','1');
    if(this.meta.category_is_new)     fd.append('new_category','1');
    if(this.meta.document_number) fd.append('document_id', this.meta.document_number);
+   // Declared BEFORE its first use: reading a `const` above its declaration is a
+   // ReferenceError (temporal dead zone), which threw out of finalize() before the
+   // fetch ever fired and left the wizard sitting on "Processing document…".
    const isPolicy = (this.meta.confirmed_type||'').toLowerCase().includes('policy');
+   // Version lineage — only for regulations, and only when a parent was chosen.
+   if(!isPolicy && this.meta.version_of){
+    fd.append('version_of', this.meta.version_of);
+    fd.append('old_version_action', this.meta.old_version_action || 'supersede');
+   }
    this.filedLabel = isPolicy ? 'Internal Policies' : 'Regulations';
    this.filedUrl   = isPolicy ? POL_URL : REG_URL;
-   try {
-    await fetch('/library/finalize/'+this.analysis.pk+'/',{method:'POST',body:fd,headers:{'X-CSRFToken':CSRF}});
+    const res = await fetch('/library/finalize/'+this.analysis.pk+'/',{method:'POST',body:fd,headers:{'X-CSRFToken':CSRF}});
+    // A 500 still resolves the fetch promise — without this check the wizard
+    // reported "Knowledge base ready" for a document that never indexed.
+    if(!res.ok) throw new Error('server returned '+res.status);
     clearInterval(this._procTimer); this.procDone=this.procSteps.length;
-    this.step=6;
+    this.step=7;
     // Land the user in the library the document was filed into (one front door,
     // auto-routed) rather than reloading whatever page they opened it from.
     setTimeout(()=>{ window.location.assign(this.filedUrl); }, 1600);
-   } catch(e){ clearInterval(this._procTimer); this.errorMsg='Indexing failed.'; this.step=4; }
+   } catch(e){
+    clearInterval(this._procTimer);
+    this.errorMsg='Indexing failed — '+((e && e.message) || 'unexpected error')+'.';
+    this.step=5;   // back to Configure, where Confirm & Index lives
+   }
   }
  };
 }

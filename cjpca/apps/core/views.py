@@ -680,6 +680,21 @@ class CopilotMessageView(View):
                 nodes = hybrid_search(**kwargs_h)
             except Exception:
                 nodes = []
+            # Structure-aware augmentation ("read like a person"): similarity
+            # above found the document; now walk its outline, pick the relevant
+            # article(s) and read them WHOLE, prepended ahead of the flat chunks.
+            from django.conf import settings as _settings
+            if getattr(_settings, 'NAVIGATOR_ENABLED', False):
+                try:
+                    from reasoning.navigator import navigate, top_doc_title
+                    target = doc_title or top_doc_title(nodes)
+                    nav_nodes = navigate(message, target) if target else []
+                    if nav_nodes:
+                        seen = {n.node.metadata.get('node_id') for n in nav_nodes}
+                        nodes = nav_nodes + [n for n in nodes
+                                             if n.node.metadata.get('node_id') not in seen]
+                except Exception:
+                    pass
             for n in nodes:
                 m = n.node.metadata
                 chunks.append({

@@ -27,8 +27,152 @@ _JUR_LABELS = {
 }
 
 
+def _purge_document(doc, actor=None, reason='', learning_mode='keep', request=None):
+    """Delete a document AND its indexed content. Chunks live in bm25 + chroma (and
+    the Arabic store for Arabic docs); doc.delete() alone leaves them searchable as
+    ghost citations. Fail-soft per store so one unavailable backend can't strand a
+    half-deleted document. Returns the purged document's name."""
+    name, doc_type, pk = doc.name, doc.doc_type, doc.pk
+    title = getattr(doc, 'chunk_doc_title', '') or doc.full_name or doc.name
+    try:
+        from apps.feedback.services import purge_document_learning
+        learning = purge_document_learning(doc, mode=learning_mode)
+    except Exception:
+        learning = {'mode': learning_mode, 'signals': 0, 'gold': 0}
+    try:
+        from retrieval.bm25_store import delete_by_doc_title
+        from ingestion.indexer import delete_doc_chunks
+        delete_by_doc_title(title)
+        delete_doc_chunks(title)
+    except Exception:
+        logger.exception('chunk purge failed for %s', title)
+    if getattr(doc, 'language', '') == Document.ARABIC:
+        try:
+            from arabic import store as ar_store
+            ar_store.delete_source(title)
+        except Exception:
+            pass
+    doc.delete()
+    try:
+        from apps.history.audit import log_event, Actions
+        who = getattr(actor, 'username', None) or 'system'
+        log_event(actor, Actions.DOCUMENT_DELETE,
+                  request=request,
+                  target_type='library.Document', target_id=pk,
+                  description=f'{who} deleted document "{name}"' + (f' ({reason})' if reason else ''),
+                  metadata={'doc_name': name, 'doc_type': doc_type, 'reason': reason,
+                            'learning_mode': learning.get('mode'),
+                            'learning_signals': learning.get('signals'),
+                            'learning_gold': learning.get('gold')})
+    except Exception:
+        pass
+    return name
+
+
+def _jur_label(doc):
+    """Display label for a jurisdiction. get_jurisdiction_display() only maps the
+    built-in choices, so countries added later (qatar, oman, egypt...) come back as
+    the raw lowercase key. Title-case those, keep short codes upper: 'qatar' ->
+    'Qatar', 'saudi_arabia' -> 'Saudi Arabia', 'eu' -> 'EU'."""
+    raw = (getattr(doc, 'jurisdiction', '') or '').strip()
+    label = doc.get_jurisdiction_display() if raw else ''
+    if label and label != raw:
+        return label
+    if not raw:
+        return ''
+    return raw.upper() if len(raw) <= 3 else raw.replace('_', ' ').title()
+
+
+def _learning_counts(docs):
+    """{doc_pk: {'signals': n, 'gold': n}}: what the RAG feedback loop has learned
+    from each document, so the delete dialog can state the cost of purging it in
+    numbers. Built with a handful of aggregate queries rather than per-document
+    lookups. Fail-soft: an empty map just hides the counts."""
+    from django.db.models import Q
+    counts = {d.pk: {'signals': 0, 'gold': 0} for d in docs}
+    try:
+        from apps.comparison.models import ComparisonResult
+        from apps.feedback.models import FeedbackSignal, GoldExemplar
+    except Exception:
+        return counts
+    try:
+        ids = list(counts.keys())
+        by_name = {d.name: d.pk for d in docs}
+        # result pk -> the document(s) whose run produced it
+        result_docs: dict[int, set] = {}
+        rows = (ComparisonResult.objects
+                .filter(Q(run__reg_a_id__in=ids) | Q(run__reg_b_id__in=ids))
+                .values_list('pk', 'run__reg_a_id', 'run__reg_b_id'))
+        for rpk, a, b in rows:
+            for dpk in (a, b):
+                if dpk in counts:
+                    result_docs.setdefault(rpk, set()).add(dpk)
+        for sid in (FeedbackSignal.objects
+                    .filter(source_app='comparison', source_id__in=result_docs.keys())
+                    .values_list('source_id', flat=True)):
+            for dpk in result_docs.get(sid, ()):
+                counts[dpk]['signals'] += 1
+        for sid, reg_a, reg_b in GoldExemplar.objects.values_list('source_id', 'reg_a', 'reg_b'):
+            hit = set(result_docs.get(sid, ()))
+            for name in (reg_a, reg_b):          # gold also references docs by NAME
+                if name in by_name:
+                    hit.add(by_name[name])
+            for dpk in hit:
+                counts[dpk]['gold'] += 1
+    except Exception:
+        logger.exception('_learning_counts failed')
+    return counts
+
+
+def _prune_stale_drafts(max_age_hours: int = 2):
+    """Delete abandoned upload drafts — documents that were analysed (status
+    'review') but never confirmed/indexed — once they're older than a couple
+    hours (well past any active review session). Stops unfinished drafts from
+    piling up in the library. Files are removed too; drafts have no indexed
+    chunks, so the pre_delete purge is a no-op. Fail-soft."""
+    import os
+    from datetime import timedelta
+    from django.utils import timezone
+    try:
+        cutoff = timezone.now() - timedelta(hours=max_age_hours)
+        stale = list(Document.objects.filter(status='review', upload_date__lt=cutoff))
+        for d in stale:
+            try:
+                if d.file and d.file.name and os.path.exists(d.file.path):
+                    os.remove(d.file.path)
+            except Exception:
+                pass
+        if stale:
+            Document.objects.filter(pk__in=[d.pk for d in stale]).delete()
+            logger.info('Pruned %d stale upload draft(s).', len(stale))
+    except Exception:
+        logger.exception('stale-draft prune failed')
+
+
 @method_decorator(role_required(*ALL_ROLES), name='dispatch')
 @method_decorator(ensure_csrf_cookie, name='dispatch')
+class AddDocumentView(TemplateView):
+    """GET /library/add/ — the guided upload wizard on its own full page
+    (instead of the global modal). Renders the same wizard component in
+    page mode, with a Format-guidelines panel and recent uploads alongside."""
+    template_name = 'pages/add_document.html'
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['recent_uploads'] = list(
+            Document.objects.order_by('-upload_date')[:5]
+            .only('id', 'name', 'doc_type', 'status', 'upload_date'))
+        ctx['guidelines'] = [
+            'PDF, DOCX or TXT — one document per upload.',
+            'Text-based PDFs work best; scanned pages are OCR’d (slower).',
+            'Language, jurisdiction and structure are auto-detected — you confirm them.',
+            'Everything is processed locally; nothing leaves this machine.',
+        ]
+        # Tell base.html not to also render the global modal wizard here.
+        ctx['on_add_document_page'] = True
+        return ctx
+
+
 class RegulationsView(TemplateView):
     """GET /library/regulations/ — regulations library (Page 5, §8.7).
 
@@ -42,6 +186,8 @@ class RegulationsView(TemplateView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
+
+        _prune_stale_drafts()
 
         # Send the full regulation set to the browser; Alpine filters/searches
         # client-side from the docs_json payload (see regsPage() in
@@ -90,6 +236,8 @@ class RegulationsView(TemplateView):
         for d in regs_list:
             d.topics = _enrich_topics(d)
 
+        _learned = _learning_counts(regs_list)
+
         docs_json = json.dumps([
             {
                 'id':                d.pk,
@@ -97,8 +245,9 @@ class RegulationsView(TemplateView):
                 'type_label':        _type_label(d.name),
                 'full_name':         d.full_name or '',
                 'jurisdiction':      d.jurisdiction,
-                'jurisdiction_display': d.get_jurisdiction_display(),
+                'jurisdiction_display': _jur_label(d),
                 'status':            d.status,
+                'attention':         d.attention,
                 'issuing_authority': d.issuing_authority or '',
                 'effective_date':    d.effective_date.strftime('%d %b %Y') if d.effective_date else '',
                 'version':           d.version or '',
@@ -119,10 +268,16 @@ class RegulationsView(TemplateView):
                 'privacy_relevance':   d.privacy_relevance or '',
                 'applicable_sector':   d.applicable_sector or '',
                 'superseded':          bool(d.superseded),
+                'version_status':      d.version_status,
                 'superseded_by':       d.superseded_by or '',
                 'parent_regulation':   d.parent_regulation or '',
+                'family_id':           d.family_root_id,
+                'version_of':          d.version_of_id,
                 'cross_references':    d.cross_references or '',
                 'concept_tags_csv':    d.concept_tags_csv or [],
+                # Feedback-loop footprint, shown in the delete dialog.
+                'learned_signals':     _learned.get(d.pk, {}).get('signals', 0),
+                'learned_gold':        _learned.get(d.pk, {}).get('gold', 0),
             }
             for d in regs_list
         ])
@@ -161,6 +316,8 @@ class PoliciesView(TemplateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
 
+        _prune_stale_drafts()
+
         # one query, materialised so we can iterate twice (stats + docs_json)
         # without re-hitting the DB. Alpine handles all filtering client-side.
         policies_list = list(
@@ -198,6 +355,7 @@ class PoliciesView(TemplateView):
                 'full_name':         d.full_name or '',
                 'jurisdiction':      d.jurisdiction,
                 'status':            d.status,
+                'attention':         d.attention,
                 'issuing_authority': d.issuing_authority or '',
                 'effective_date':    d.effective_date.strftime('%d %b %Y') if d.effective_date else '',
                 'version':           d.version or '',
@@ -217,8 +375,11 @@ class PoliciesView(TemplateView):
                 'privacy_relevance':   d.privacy_relevance or '',
                 'applicable_sector':   d.applicable_sector or '',
                 'superseded':          bool(d.superseded),
+                'version_status':      d.version_status,
                 'superseded_by':       d.superseded_by or '',
                 'parent_regulation':   d.parent_regulation or '',
+                'family_id':           d.family_root_id,
+                'version_of':          d.version_of_id,
                 'cross_references':    d.cross_references or '',
                 'concept_tags_csv':    d.concept_tags_csv or [],
             }
@@ -234,52 +395,63 @@ class PoliciesView(TemplateView):
 
 
 @method_decorator(role_required('admin'), name='dispatch')
+class DocumentSupersedeView(View):
+    """POST /library/<pk>/supersede/  {new_pk} — mark this regulation version
+    superseded by a newer one, link the lineage, and report the approved analyses
+    that now need re-review. The old version is kept (never deleted).
+
+    Auth: authenticated only, matching the PoC's relaxed RBAC. In production this
+    is an Admin/Business-Administrator action (per the roles definition)."""
+
+    def post(self, request, pk):
+        from django.http import JsonResponse
+        if not request.user.is_authenticated:
+            return JsonResponse({'error': 'Sign in required.'}, status=403)
+        old = get_object_or_404(Document, pk=pk)
+        new = Document.objects.filter(pk=request.POST.get('new_pk')).first()
+        if not new:
+            return JsonResponse({'error': 'Pick the new version.'}, status=400)
+        if new.pk == old.pk:
+            return JsonResponse({'error': 'A version cannot supersede itself.'}, status=400)
+        affected = old.supersede_with(new, actor=request.user)
+        rows = [{'run_id': r.run_id, 'citation_a': r.citation_a, 'citation_b': r.citation_b or ''}
+                for r in (affected[:50] if affected is not None else [])]
+        return JsonResponse({
+            'ok': True, 'old': old.name, 'new': new.name,
+            'old_status': old.version_status, 'new_status': new.version_status,
+            'affected_count': affected.count() if affected is not None else 0,
+            'affected': rows,
+        })
+
+
 class DocumentDeleteView(View):
     """GET/POST /library/delete/<pk>/ — confirm + delete a document."""
 
     def get(self, request, pk):
         doc = get_object_or_404(Document, pk=pk)
         chunk_count = getattr(doc, 'chunk_count', None) or 0
+        try:
+            from apps.feedback.services import document_learning_footprint
+            learning = document_learning_footprint(doc)
+        except Exception:
+            learning = {'signals': 0, 'gold': 0}
         return render(request, 'pages/document_delete_confirm.html', {
             'doc': doc,
             'chunk_count': chunk_count,
+            'learning': learning,
+            'jur_label': _jur_label(doc),
         })
 
     def post(self, request, pk):
         try:
             doc = Document.objects.get(pk=pk)
-            doc_name = doc.name
-            doc_type = doc.doc_type
-            # Purge the document's chunks from the search stores before removing
-            # the DB row — doc.delete() only drops the record, leaving searchable
-            # "ghost" chunks in bm25 + chroma that still surface as citations.
-            title = getattr(doc, 'chunk_doc_title', '') or doc.full_name or doc.name
-            try:
-                from retrieval.bm25_store import delete_by_doc_title
-                from ingestion.indexer    import delete_doc_chunks
-                delete_by_doc_title(title)
-                delete_doc_chunks(title)
-            except Exception:
-                pass
-            # Arabic docs live in a SEPARATE store (regulations_ar), which the
-            # English purge above doesn't touch. Without this, deleting an
-            # Arabic document leaves its chunks as ghosts that keep surfacing
-            # in cross-lingual retrieval. Fail-soft: the arabic package may be
-            # unavailable in some deployments.
-            if getattr(doc, 'language', '') == Document.ARABIC:
-                try:
-                    from arabic import store as ar_store
-                    ar_store.delete_source(title)
-                except Exception:
-                    pass
-            doc.delete()
-            from apps.history.audit import log_event, Actions
-            log_event(
-                request.user, Actions.DOCUMENT_DELETE,
-                request=request,
-                target_type='library.Document', target_id=pk,
-                description=f'{request.user.username} deleted document "{doc_name}"',
-                metadata={'doc_name': doc_name, 'doc_type': doc_type},
+            # One purge path shared with the upload wizard's "delete the old
+            # version" choice, so the two can't drift: chunks out of bm25 + chroma
+            # (+ the Arabic store) before the row goes, or doc.delete() leaves
+            # searchable ghost chunks that still surface as citations.
+            _purge_document(
+                doc, actor=request.user, request=request,
+                learning_mode=('purge' if request.POST.get('learning_mode') == 'purge' else 'keep'),
             )
         except Document.DoesNotExist:
             pass
@@ -711,6 +883,15 @@ class AnalyzeView(View):
         file = request.FILES.get('file')
         if not file:
             return HttpResponseBadRequest('No file provided.')
+        # Format guard — the pipeline (PyMuPDF + docling) handles PDF / DOCX / TXT.
+        # A legacy binary .doc can't be parsed by either, so reject it up front with
+        # a clear fix rather than letting the ingestion job fail deep in the parser.
+        _name = (file.name or '').lower()
+        if not _name.endswith(('.pdf', '.docx', '.txt')):
+            _kind = 'Legacy .doc files' if _name.endswith('.doc') else 'This file type'
+            return JsonResponse(
+                {'error': f'{_kind} aren’t supported. Please save the document as '
+                          f'PDF or .docx and upload it again.'}, status=400)
         # Language + jurisdiction are DETECTED, not asked upfront. The user only
         # supplies the file; we detect the language here and the LLM proposes the
         # jurisdiction, both surfaced in the review step to confirm.
@@ -758,7 +939,8 @@ class AnalyzeView(View):
             result = analyze(doc.file.path, declared_language=Document.ARABIC)
         except Exception as exc:
             doc.status = Document.FAILED
-            doc.save(update_fields=['status'])
+            doc.status_detail = str(exc)[:500]
+            doc.save(update_fields=['status', 'status_detail'])
             return JsonResponse({'pk': doc.pk, 'error': f'Analysis failed: {exc}'}, status=500)
 
         summary = result.get('structure')
@@ -796,7 +978,7 @@ class FinalizeView(View):
                   'chunk_strategy', 'citation_format', 'citation_template',
                   'citation_abbr', 'doc_year', 'department', 'confidentiality',
                   'document_id', 'issuing_authority', 'regulation_category',
-                  'version', 'scope_summary'):
+                  'privacy_relevance', 'version', 'scope_summary'):
             v = request.POST.get(f)
             if v:
                 setattr(doc, f, v.strip()); fields.append(f)
@@ -806,6 +988,41 @@ class FinalizeView(View):
         if kt:
             doc.concept_tags_csv = [t.strip() for t in kt.split(',') if t.strip()]
             fields.append('concept_tags_csv')
+        # Version lineage — the uploader linked this document as a newer version of
+        # an existing regulation. Set the explicit family link, guarding against a
+        # self-link or an obviously invalid target.
+        vof = (request.POST.get('version_of') or '').strip()
+        if vof.isdigit() and int(vof) != doc.pk:
+            parent = Document.objects.filter(
+                pk=int(vof), doc_type=Document.REGULATION).first()
+            if parent and parent.family_root_id != doc.pk:   # no cycle
+                # What happens to the version being replaced is the uploader's
+                # choice in the wizard. Default keeps it: an audit trail usually
+                # needs the text that was in force at the time.
+                old_action = (request.POST.get('old_version_action') or 'supersede').strip().lower()
+                if old_action == 'delete':
+                    # No version_of link: the FK target is about to disappear, and
+                    # saving a pointer to a deleted row would fail. Carry the
+                    # identity across instead, then purge the old document exactly
+                    # the way DocumentDeleteView does.
+                    if parent.document_id and not doc.document_id:
+                        doc.document_id = parent.document_id
+                        fields.append('document_id')
+                    doc.parent_regulation = parent.document_id or parent.chunk_doc_title or parent.name
+                    fields.append('parent_regulation')
+                    _purge_document(parent, actor=request.user,
+                                    reason=f'replaced by new version "{doc.name}"')
+                else:
+                    doc.version_of = parent
+                    fields.append('version_of')
+                    if old_action != 'keep':
+                        # supersede: flags the old version and any approved
+                        # analyses that cited it for re-review.
+                        try:
+                            parent.supersede_with(doc, actor=request.user)
+                        except Exception:
+                            logger.exception('supersede_with failed for %s -> %s', parent.pk, doc.pk)
+
         # effective_date is a real date field — parse the ISO string the LLM/user
         # confirmed, ignore anything unparseable.
         eff = (request.POST.get('effective_date') or '').strip()

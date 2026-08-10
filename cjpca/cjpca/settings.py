@@ -218,3 +218,18 @@ if not DEBUG:
     SECURE_BROWSER_XSS_FILTER      = True
     SECURE_CONTENT_TYPE_NOSNIFF    = True
     X_FRAME_OPTIONS                = 'DENY'
+
+# ── RAG feedback loop ────────────────────────────────────────────────────────
+# Retrieval reranking from reviewer feedback (approved clauses up, rejected down).
+# Safe no-op until approvals exist; this is the lever the eval showed works.
+FEEDBACK_RERANK_ENABLED = True
+# Generation few-shot lever — OFF: the A/B eval showed it does not reliably help.
+FEEDBACK_FEWSHOT_ENABLED = False
+
+# ── Structure-aware retrieval (navigator-lite) ───────────────────────────────
+# "Read like a person": for a Copilot question, similarity finds the document,
+# then the model walks its outline, picks the relevant article(s), and reads
+# them WHOLE (heading intact) — prepended to the ordinary similarity chunks.
+# Adds ~one local-LLM call per question; set False if demo latency matters.
+NAVIGATOR_ENABLED = True
+

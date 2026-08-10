@@ -34,8 +34,8 @@
       vs internal policy and files itself into the right library.{% endcomment %}
  {% if is_admin %}
  <div class="px-2">
- <button type="button" onclick="window.dispatchEvent(new CustomEvent('open-wizard'))" title="Add document"
- class="w-full flex items-center py-2 rounded-md text-sm font-semibold transition-colors"
+ <a href="{% url 'library-add' %}" title="Add document"
+ class="w-full flex items-center py-2 rounded-md text-sm font-semibold transition-colors no-underline"
  :class="sidebarOpen ? 'gap-2.5 px-2.5 justify-start' : 'justify-center px-1'"
  style="background:#F47920;color:#ffffff;"
  onmouseover="this.style.background='#d96812'" onmouseout="this.style.background='#F47920'">
@@ -43,7 +43,7 @@
  <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
  </svg>
  <span x-show="sidebarOpen" class="whitespace-nowrap">Add document</span>
- </button>
+ </a>
  </div>
  {% endif %}
 
@@ -185,7 +185,7 @@
  fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
  <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
  </svg>
- <span x-show="sidebarOpen" class="whitespace-nowrap">History</span>
+ <span x-show="sidebarOpen" class="whitespace-nowrap">Audit logs</span>
  </a>
  </li>
  {% endif %}

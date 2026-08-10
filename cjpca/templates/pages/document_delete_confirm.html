@@ -28,7 +28,7 @@
 
    <div style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:12px;color:#374151;">
     <div style="margin-bottom:4px;"><strong>Name:</strong> {{ doc.name }}</div>
-    {% if doc.jurisdiction %}<div style="margin-bottom:4px;"><strong>Jurisdiction:</strong> {{ doc.jurisdiction }}</div>{% endif %}
+    {% if doc.jurisdiction %}<div style="margin-bottom:4px;"><strong>Jurisdiction:</strong> {{ jur_label }}</div>{% endif %}
     {% if doc.doc_type %}<div style="margin-bottom:4px;"><strong>Type:</strong> {{ doc.doc_type }}</div>{% endif %}
     <div style="margin-bottom:4px;"><strong>Chunks indexed:</strong> {{ chunk_count }}</div>
     <div><strong>Uploaded:</strong> {{ doc.upload_date|date:"d M Y" }}</div>
@@ -38,10 +38,35 @@
     This action cannot be undone.
    </p>
 
-   <form method="post" action="{% url 'library-delete' doc.pk %}" style="display:flex;gap:10px;justify-content:flex-end;">
+   <form method="post" action="{% url 'library-delete' doc.pk %}"
+         x-data="{ typed: '', get matches() { return this.typed.trim().toLowerCase() === '{{ doc.name|escapejs }}'.trim().toLowerCase(); } }"
+         @submit="if(!matches) $event.preventDefault()">
     {% csrf_token %}
-    <a href="{% url 'library-view' doc.pk %}" style="padding:9px 18px;background:#fff;color:#1F2937;border:1px solid #D1D5DB;border-radius:6px;font-size:13px;font-weight:600;text-decoration:none;">Cancel</a>
-    <button type="submit" style="padding:9px 18px;background:#B91C1C;color:#fff;border:0;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;">Delete document</button>
+
+    <p style="font-size:10px;font-weight:700;color:#94A0B8;text-transform:uppercase;letter-spacing:.07em;margin:0 0 8px;">What it learned from this document</p>
+    <label style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid #E5E7EB;border-radius:8px;margin-bottom:8px;cursor:pointer;">
+     <input type="radio" name="learning_mode" value="keep" checked style="margin-top:3px;">
+     <span style="font-size:12.5px;color:#374151;line-height:1.5;">
+      <strong>Keep what it learned.</strong> {{ learning.gold }} approved exemplar{{ learning.gold|pluralize }} keep steering future comparisons and {{ learning.signals }} reviewer decision{{ learning.signals|pluralize }} stay in the audit trail, marked as coming from a deleted source.
+     </span>
+    </label>
+    <label style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid #E5E7EB;border-radius:8px;margin-bottom:16px;cursor:pointer;">
+     <input type="radio" name="learning_mode" value="purge" style="margin-top:3px;">
+     <span style="font-size:12.5px;color:#374151;line-height:1.5;">
+      <strong>Remove everything.</strong> Delete those {{ learning.signals }} decision{{ learning.signals|pluralize }} and {{ learning.gold }} exemplar{{ learning.gold|pluralize }} as well. Quality gained from this document is lost.
+     </span>
+    </label>
+
+    <label for="del-name" style="display:block;font-size:12px;color:#6B7280;margin:0 0 6px;">Type <strong style="color:#1F2937;">{{ doc.name }}</strong> to confirm</label>
+    <input id="del-name" type="text" x-model="typed" autocomplete="off" spellcheck="false" placeholder="Document name"
+           style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid #D1D5DB;border-radius:6px;font-family:inherit;font-size:13px;margin-bottom:16px;">
+
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+     <a href="{% url 'library-view' doc.pk %}" style="padding:9px 18px;background:#fff;color:#1F2937;border:1px solid #D1D5DB;border-radius:6px;font-size:13px;font-weight:600;text-decoration:none;">Cancel</a>
+     <button type="submit" :disabled="!matches"
+             :style="matches ? { background: '#B91C1C', cursor: 'pointer' } : { background: '#E7C5C5', cursor: 'not-allowed' }"
+             style="padding:9px 18px;color:#fff;border:0;border-radius:6px;font-size:13px;font-weight:700;">Delete document</button>
+    </div>
    </form>
 
   </div>

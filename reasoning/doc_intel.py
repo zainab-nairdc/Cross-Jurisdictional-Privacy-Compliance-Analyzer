@@ -35,7 +35,11 @@ _HEAD_CHARS = 6000
 
 
 def _client() -> "ollama.Client":
-    return ollama.Client(host=OLLAMA_URL)
+    # A timeout is essential: without one, a stalled/overloaded Ollama makes the
+    # analyze request hang forever and the wizard spinner never resolves. With it,
+    # a slow call fails cleanly → _chat_json returns {} → the upload degrades to
+    # "no suggestion" instead of freezing.
+    return ollama.Client(host=OLLAMA_URL, timeout=120)
 
 
 def _chat_json(prompt: str, model: str = MODEL) -> dict:
@@ -71,6 +75,10 @@ Return a JSON object with EXACTLY these keys:
 - "regulation_category": the subject area, lowercase, e.g. "data protection",
   "cybersecurity","aml/kyc","banking","privacy","electronic transactions",
   "internal controls","risk management"
+- "privacy_relevance": how central personal-data / privacy is to this document —
+  "high" (the document is fundamentally about data protection / privacy),
+  "partial" (privacy is one of several topics it covers), or
+  "low" (barely or not privacy-related). Judge from the actual content.
 - "issuing_authority": the body that issued it, verbatim if stated
 - "document_id": the law/order/decision/policy number only (digits), e.g. "30"
 - "doc_year": 4-digit year of issuance, e.g. "2018"
@@ -94,6 +102,39 @@ Document opening:
 JSON:"""
 
 
+# Country → substrings that reliably signal it. Kept deliberately conservative
+# (well-known names/authorities) so inference only fires on a clear signal.
+_COUNTRY_HINTS = {
+    "bahrain": ["bahrain"],
+    "kuwait":  ["kuwait"],
+    "qatar":   ["qatar"],
+    "saudi":   ["saudi", "kingdom of saudi", "ksa"],
+    "uae":     ["united arab emirates", "u.a.e", "abu dhabi", "dubai"],
+    "oman":    ["sultanate of oman", "oman"],
+    "egypt":   ["egypt", "egyptian"],
+    "india":   ["republic of india", "indian ", "india"],
+    "jordan":  ["jordan"],
+    "lebanon": ["lebanon", "lebanese"],
+    "turkey":  ["turkey", "turkish", "türkiye"],
+    "eu":      ["european union", "european parliament", "regulation (eu)", "gdpr"],
+    "uk":      ["united kingdom", "u.k.", "great britain"],
+    "usa":     ["united states", "u.s.a", "federal register"],
+}
+
+
+def _infer_jurisdiction(blob: str) -> str:
+    """Best-guess country slug from free text (issuing authority, title, scope).
+    Returns '' when nothing matches confidently. Picks the country with the most
+    keyword hits so a stray mention doesn't outweigh the real jurisdiction."""
+    b = (blob or "").lower()
+    best, best_n = "", 0
+    for slug, kws in _COUNTRY_HINTS.items():
+        n = sum(b.count(k) for k in kws)
+        if n > best_n:
+            best, best_n = slug, n
+    return best
+
+
 def extract_metadata(text: str, filename: str = "") -> dict:
     """Propose bibliographic metadata for a document from its opening text.
 
@@ -110,8 +151,12 @@ def extract_metadata(text: str, filename: str = "") -> dict:
     # normalise: keep only known keys, coerce types, clamp confidence
     keys = ["name", "full_name", "doc_type", "jurisdiction", "regulation_category",
             "issuing_authority", "document_id", "doc_year", "effective_date",
-            "version", "citation_abbr", "scope_summary", "owner_department"]
+            "version", "citation_abbr", "scope_summary", "owner_department",
+            "privacy_relevance"]
     out = {k: str(data.get(k, "") or "").strip() for k in keys}
+    # privacy_relevance: constrain to the three allowed buckets (else blank).
+    pr = out.get("privacy_relevance", "").lower()
+    out["privacy_relevance"] = pr if pr in ("high", "partial", "low") else ""
     # key_topics is a list — normalise to lowercase, de-dupe, cap at 6.
     kt = data.get("key_topics") or []
     if isinstance(kt, str):
@@ -128,6 +173,15 @@ def extract_metadata(text: str, filename: str = "") -> dict:
     # A jurisdiction the corpus hasn't seen (e.g. "egypt") flows through so the
     # wizard can offer to create it. Slugify: lowercase, spaces/punct -> nothing.
     jl = re.sub(r"[^a-z0-9]+", "", out["jurisdiction"].lower())
+    # Safety net: the model sometimes leaves jurisdiction blank even when the
+    # country is obvious in the issuing authority / title (e.g. "Amir of the State
+    # of Qatar"). Infer it deterministically from the fields it DID extract so the
+    # user doesn't have to type a jurisdiction the document plainly states.
+    if jl in ("", "other"):
+        inferred = _infer_jurisdiction(" ".join([
+            out.get("issuing_authority", ""), out.get("full_name", ""),
+            out.get("name", ""), out.get("scope_summary", ""), head]))
+        jl = inferred or jl
     out["jurisdiction"] = jl or "other"
     out["regulation_category"] = out["regulation_category"].lower()
     out["doc_type"] = "policy" if out["doc_type"].lower().startswith("pol") else "regulation"

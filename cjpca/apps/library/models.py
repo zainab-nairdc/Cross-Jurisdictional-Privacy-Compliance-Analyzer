@@ -98,6 +98,10 @@ class Document(models.Model):
     source_url        = models.URLField(max_length=500, blank=True)
     notes             = models.TextField(blank=True)
     status            = models.CharField(max_length=20, choices=STATUS_CHOICES, default=PROCESSING)
+    # Human-readable reason a document ended up in FAILED ("needs attention"),
+    # captured at the point of failure so the UI can tell the user what went
+    # wrong and what to do — instead of a bare red dot.
+    status_detail     = models.CharField(max_length=500, blank=True, default='')
     upload_date       = models.DateTimeField(auto_now_add=True)
     chunk_count       = models.PositiveIntegerField(default=0)
     token_count       = models.PositiveIntegerField(default=0)
@@ -128,6 +132,12 @@ class Document(models.Model):
     superseded          = models.BooleanField(default=False)
     superseded_by       = models.CharField(max_length=255, blank=True)   # stem of newer doc
     parent_regulation   = models.CharField(max_length=50,  blank=True)
+    # Explicit version lineage set by the uploader ("this is a newer version of
+    # <existing regulation>"). Defines the version FAMILY deliberately — a human
+    # says two documents are the same law — instead of guessing from names.
+    version_of          = models.ForeignKey('self', null=True, blank=True,
+                                            on_delete=models.SET_NULL,
+                                            related_name='newer_versions')
     cross_references    = models.TextField(blank=True)
     concept_tags_csv    = models.JSONField(default=list, blank=True)     # key topics (LLM-extracted)
     scope_summary       = models.TextField(blank=True, default='')       # one-line "what/who it governs"
@@ -209,6 +219,124 @@ class Document(models.Model):
             return ''
         from pathlib import Path
         return Path(self.file.name).stem
+
+    @property
+    def attention(self):
+        """For a FAILED ('needs attention') document, a plain-language summary of
+        what went wrong plus concrete next steps — classified from the captured
+        `status_detail`. Returns None when the document is fine."""
+        if self.status != self.FAILED:
+            return None
+        detail = (self.status_detail or '').strip()
+        low = detail.lower()
+        if any(k in low for k in ('ollama', 'connection', 'refused', 'timed out', 'timeout', 'engine')):
+            summary = "The local AI engine (Ollama) wasn’t reachable while indexing this document."
+            actions = ["Start Ollama — open the app, or run `ollama serve` in a terminal.",
+                       "Then delete this document and upload it again."]
+        elif any(k in low for k in ('ocr', 'scanned', 'image', 'text layer', 'no text', 'empty')):
+            summary = "The document’s text couldn’t be read — it looks like a scanned or image-only file."
+            actions = ["Open the file and check the text is selectable, not a picture.",
+                       "Re-save it as a text-based PDF (or run OCR on it), then upload again."]
+        elif any(k in low for k in ('unsupported', 'format', '.doc', 'parse', 'corrupt', 'fzerror', 'password', 'encrypted')):
+            summary = "The file couldn’t be opened — it may be an unsupported, encrypted or corrupt format."
+            actions = ["Make sure it’s a real PDF, .docx or .txt (legacy .doc and password-protected files aren’t supported).",
+                       "Export a clean, unprotected copy and upload it again."]
+        else:
+            summary = "This document failed while being indexed."
+            actions = ["Check the file opens and is a valid PDF, .docx or .txt.",
+                       "Make sure the local AI engine (Ollama) is running.",
+                       "Delete this document and upload it again."]
+        return {"detail": detail, "summary": summary, "actions": actions}
+
+    # ── Version management ─────────────────────────────────────────────────────
+    @property
+    def version_status(self) -> str:
+        """'superseded' | 'upcoming' | 'in_force', derived from the supersede flag
+        and the effective date. Exactly one version of a regulation should be
+        'in_force' at a time."""
+        if self.superseded:
+            return 'superseded'
+        from django.utils import timezone
+        if self.effective_date and self.effective_date > timezone.now().date():
+            return 'upcoming'
+        return 'in_force'
+
+    @property
+    def family_root_id(self):
+        """The pk of the oldest ancestor in this document's version lineage —
+        the stable identity of the LAW across all its versions. A document with
+        no `version_of` is its own root. Walks the explicit `version_of` chain
+        (guarded against cycles). Two documents in the same family share a root."""
+        d, seen = self, set()
+        while d.version_of_id and d.version_of_id not in seen:
+            seen.add(d.pk)
+            d = d.version_of
+        return d.pk
+
+    def version_family(self):
+        """Every OTHER document that is a version of the same law — i.e. shares
+        this document's family root, established by the explicit `version_of`
+        link the uploader set. Falls back to the legacy document_id/supersede
+        match for documents linked before explicit lineage existed."""
+        root = self.family_root_id
+        # Everything whose lineage rolls up to the same root.
+        ids = [d.pk for d in Document.objects.all().only('id', 'version_of')
+               if d.family_root_id == root]
+        from django.db.models import Q
+        keys = Q(pk__in=ids)
+        # Legacy fallback (pre-lineage links).
+        if self.document_id:
+            keys |= Q(document_id=self.document_id)
+        stem = self.chunk_doc_title
+        if stem:
+            keys |= Q(parent_regulation=stem) | Q(superseded_by=stem)
+        if self.parent_regulation:
+            keys |= Q(document_id=self.parent_regulation)
+        return Document.objects.filter(keys).exclude(pk=self.pk)
+
+    def affected_approved_analyses(self):
+        """Approved comparison results whose run used THIS document — the work that
+        would need re-review if this version is superseded. Returns a queryset (may
+        be empty), or None if the comparison app isn't available."""
+        try:
+            from django.db.models import Q
+            from apps.comparison.models import ComparisonResult
+            return ComparisonResult.objects.filter(
+                Q(run__reg_a=self) | Q(run__reg_b=self),
+                lifecycle=ComparisonResult.APPROVED)
+        except Exception:
+            return None
+
+    def supersede_with(self, new_version, actor=None):
+        """Mark THIS version superseded by `new_version`, link the lineage, and
+        return the approved analyses affected (for the 're-review recommended'
+        flag). Never deletes the old version — history is preserved for audit."""
+        self.superseded = True
+        self.superseded_by = new_version.chunk_doc_title or new_version.name
+        self.save(update_fields=['superseded', 'superseded_by'])
+
+        new_version.parent_regulation = self.document_id or self.chunk_doc_title
+        if self.document_id and not new_version.document_id:
+            new_version.document_id = self.document_id
+        # Establish the explicit lineage if it wasn't set at upload, so the two
+        # versions are a proper family going forward (unless it would form a cycle).
+        if not new_version.version_of_id and new_version.pk != self.pk:
+            new_version.version_of = self
+        new_version.superseded = False
+        new_version.save(update_fields=['parent_regulation', 'document_id',
+                                        'superseded', 'version_of'])
+
+        affected = self.affected_approved_analyses()
+        try:
+            from apps.history.audit import log_event, Actions
+            log_event(actor, getattr(Actions, 'DOC_SUPERSEDED', 'doc.superseded'),
+                      target_type='library.Document', target_id=self.pk,
+                      description=f'{self.name} superseded by {new_version.name}',
+                      metadata={'superseded_by': new_version.chunk_doc_title,
+                                'affected_approved': affected.count() if affected is not None else 0})
+        except Exception:
+            pass
+        return affected
 
 
 class TaxonomyNode(models.Model):

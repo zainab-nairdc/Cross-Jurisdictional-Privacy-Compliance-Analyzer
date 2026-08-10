@@ -44,14 +44,20 @@ def _role_category_filter(role: str) -> set | None:
 
 
 # Display metadata per category — controls badge colour, label.
+# BBK brand palette only: navy (#002583) for system/security events, orange
+# (from the logo, deepened to #C2410C for text contrast) for work/action events.
+# BBK logo palette: deep blue for system/security events, orange for work
+# events. (Gold removed by request.) White text on both.
+_BLUE   = {'color': '#FFFFFF', 'bg': '#121676'}
+_ORANGE = {'color': '#FFFFFF', 'bg': '#F79A2E'}
 EVENT_META = {
-    'auth':        {'label': 'Auth',       'color': '#002583', 'bg': '#E5E8EF'},
-    'comparison':  {'label': 'Comparison', 'color': '#002583', 'bg': '#E5E8EF'},
-    'review':      {'label': 'Review',     'color': '#FFB800', 'bg': '#E5E8EF'},
-    'upload':      {'label': 'Upload',     'color': '#002583', 'bg': '#E5E8EF'},
-    'mapping':     {'label': 'Mapping',    'color': '#FFB800', 'bg': '#E5E8EF'},
-    'admin':       {'label': 'Admin',      'color': '#002583', 'bg': '#E5E8EF'},
-    'export':      {'label': 'Export',     'color': '#15803D', 'bg': '#E5E8EF'},
+    'auth':        {'label': 'Auth',       **_BLUE},
+    'comparison':  {'label': 'Comparison', **_BLUE},
+    'admin':       {'label': 'Admin',      **_BLUE},
+    'mapping':     {'label': 'Mapping',    **_ORANGE},
+    'upload':      {'label': 'Upload',     **_ORANGE},
+    'review':      {'label': 'Review',     **_ORANGE},
+    'export':      {'label': 'Export',     **_ORANGE},
 }
 
 

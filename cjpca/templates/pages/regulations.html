@@ -11,6 +11,18 @@
 <div x-data="regsPage()" class="flex h-full bg-gray-50 overflow-hidden">
 
 <style>
+ /* Modal backdrop centring lives in a class, NOT inline: Alpine's x-show hides
+    by setting inline display:none and shows by REMOVING the inline display
+    property, which also wipes an inline display:flex, dropping the dialog to
+    the top-left corner. A class survives that removal. */
+ .cj-overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 24px; }
+ .del-confirm-field { width:100%; box-sizing:border-box; padding:9px 12px; border:1px solid #E4E7EC; border-radius:9px;
+   font-family:inherit; font-size:12.5px; color:#14213D; background:#fff; }
+ .del-confirm-field:focus { outline:none; border-color:#D92D20; box-shadow:0 0 0 3px rgba(217,45,32,.12); }
+ .del-confirm-field::placeholder { color:#B4BCCC; }
+ .del-opt { display:flex; gap:10px; align-items:flex-start; padding:10px 12px; border:1px solid #E4E7EC;
+   border-radius:10px; margin-bottom:8px; cursor:pointer; transition:border-color .12s, background .12s; }
+ .del-opt:hover { border-color:#C9D2E4; }
  /* Single scrollable axis: a dual-axis (x+y auto) scroll container silently
     disables position:sticky on the <th> header in Chromium. overflow-x:hidden
     keeps only the vertical scroll, so the header pins to THIS container. */
@@ -18,7 +30,10 @@
  /* Header must paint above rows sliding under it — opaque bg + high z-index.
     Rows get an explicit low stacking context so nothing bleeds through. */
  .reg-table thead th { position: sticky; top: 0; z-index: 20; background: #F8FAFD; }
- .reg-table tbody tr { position: relative; z-index: 0; }
+ /* Rows are solid white so the page's tinted background doesn't show through
+    the transparent cells (that washed periwinkle look). Hover/selected still
+    override via the Tailwind hover class and the inline selected style. */
+ .reg-table tbody tr { position: relative; z-index: 0; background: #ffffff; }
  /* Full-bleed header/rows: the container has no side padding, so the first and
     last cells provide the edge inset instead (overrides their inline padding). */
  .reg-table th:first-child, .reg-table td:first-child { padding-left: 26px !important; }
@@ -34,6 +49,14 @@
     (z-index:60) so the avatar no longer floats over the panel title/scrollbar.
     Set here, not inline — the Alpine :style width binding replaces inline style. */
  .doc-detail-panel { position: relative; z-index: 70; }
+ /* Filter-modal chips — geometry + colours in real CSS (not Tailwind arbitrary
+    classes, which aren't all compiled here). `.on` = selected, logo navy. */
+ .f-chip { display:inline-block; padding:6px 14px; border-radius:999px; border:1px solid #DCE0EA;
+   background:#fff; color:#475467; font-size:12px; font-weight:500; line-height:1; cursor:pointer;
+   white-space:nowrap; font-family:inherit; transition:background .12s, border-color .12s, color .12s; }
+ .f-chip:hover { background:#F4F6FB; border-color:#C7CEDB; }
+ .f-chip.on { background:#121676; border-color:#121676; color:#fff; }
+ .f-chip.on:hover { background:#0d1160; border-color:#0d1160; }
 </style>
 
  {# ── Main column ─────────────────────────────────────────────── #}
@@ -78,28 +101,76 @@
  <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
  </svg>
  <input x-model="search" type="text" placeholder="Search…"
- class="w-full pl-8 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-[#002583] focus:ring-2 focus:ring-[#002583]/20 bg-gray-50">
+ class="w-full pl-8 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-[#002583] focus:ring-2 focus:ring-[#002583]/20 bg-white">
  </div>
- {# Country filter #}
- <div class="flex items-center gap-1.5 flex-shrink-0">
- <template x-for="f in jurFilters" :key="f.val">
- <button @click="jurFilter = f.val; selectedDoc = null"
- :class="jurFilter === f.val ? 'bg-[#002583] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
- class="px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors whitespace-nowrap"
- x-text="f.label"></button>
- </template>
+ {# Filters — toggles an inline panel below the toolbar (no overlay) #}
+ <button @click="filtersOpen=!filtersOpen"
+   class="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-colors border"
+   :class="filtersOpen ? 'border-[#002583] text-[#002583] bg-[#EEF2FB]' : 'border-gray-200 text-gray-600 bg-white hover:bg-gray-50'">
+  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z"/></svg>
+  <span>Filters</span>
+  <span x-show="jurFilter!=='all' || typeFilter!=='all' || categoryFilter!=='all'" x-cloak
+    class="inline-flex items-center justify-center min-w-[15px] h-[15px] px-1 rounded-full text-[9px] font-bold text-white"
+    style="background:#002583;" x-text="(jurFilter!=='all'?1:0)+(typeFilter!=='all'?1:0)+(categoryFilter!=='all'?1:0)"></span>
+ </button>
  </div>
- {# Divider #}
- <div class="h-4 w-px bg-gray-200 flex-shrink-0"></div>
- {# Type filter #}
- <div class="flex items-center gap-1.5 flex-shrink-0">
- <template x-for="t in typeFilters" :key="t.val">
- <button @click="typeFilter = (typeFilter === t.val ? 'all' : t.val); selectedDoc = null"
- :class="typeFilter === t.val ? 'bg-[#002583] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
- class="px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors whitespace-nowrap"
- x-text="t.label"></button>
- </template>
- </div>
+
+ {# ── Filter modal — opens over the page; scales as jurisdictions/categories grow ── #}
+ <div x-show="filtersOpen" x-cloak class="cj-overlay"
+   style="z-index:70;background:rgba(15,23,42,.45);backdrop-filter:blur(2px);"
+   @click.self="filtersOpen=false" @keydown.escape.window="filtersOpen=false">
+  <div role="dialog" aria-modal="true" aria-label="Filters"
+    style="width:min(620px,94vw);max-height:86vh;background:#fff;border-radius:16px;box-shadow:0 24px 60px rgba(15,23,42,.28);display:flex;flex-direction:column;overflow:hidden;">
+
+   {# Header #}
+   <div style="padding:17px 22px 14px;border-bottom:1px solid #EEF1F7;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+    <p style="font-size:15px;font-weight:800;color:#0F172A;margin:0;">Filter documents</p>
+    <button @click="filtersOpen=false" aria-label="Close"
+      style="width:30px;height:30px;border-radius:8px;border:none;background:#F4F6FB;color:#5A6685;cursor:pointer;display:flex;align-items:center;justify-content:center;"
+      onmouseover="this.style.background='#E9EDF5'" onmouseout="this.style.background='#F4F6FB'">
+     <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+    </button>
+   </div>
+
+   {# Body — one section per filter dimension #}
+   <div style="flex:1;overflow-y:auto;padding:18px 22px;display:flex;flex-direction:column;gap:20px;">
+    <div>
+     <p style="font-size:10px;font-weight:800;color:#94A0B8;text-transform:uppercase;letter-spacing:.06em;margin:0 0 9px;">Jurisdiction</p>
+     <div style="display:flex;flex-wrap:wrap;gap:8px;">
+      <template x-for="f in jurFilters" :key="f.val">
+       <button @click="jurFilter = f.val; selectedDoc = null" class="f-chip" :class="jurFilter === f.val ? 'on' : ''" x-text="f.label"></button>
+      </template>
+     </div>
+    </div>
+    <div>
+     <p style="font-size:10px;font-weight:800;color:#94A0B8;text-transform:uppercase;letter-spacing:.06em;margin:0 0 9px;">Type</p>
+     <div style="display:flex;flex-wrap:wrap;gap:8px;">
+      <template x-for="t in typeFilters" :key="t.val">
+       <button @click="typeFilter = (typeFilter === t.val ? 'all' : t.val); selectedDoc = null" class="f-chip" :class="typeFilter === t.val ? 'on' : ''" x-text="t.label"></button>
+      </template>
+     </div>
+    </div>
+    <div x-show="categoryFilters.length > 1">
+     <p style="font-size:10px;font-weight:800;color:#94A0B8;text-transform:uppercase;letter-spacing:.06em;margin:0 0 9px;">Category</p>
+     <div style="display:flex;flex-wrap:wrap;gap:8px;">
+      <template x-for="cf in categoryFilters" :key="cf.val">
+       <button @click="categoryFilter = cf.val; selectedDoc = null" class="f-chip" :class="categoryFilter === cf.val ? 'on' : ''" x-text="cf.label"></button>
+      </template>
+     </div>
+    </div>
+   </div>
+
+   {# Footer #}
+   <div style="padding:13px 22px;border-top:1px solid #EEF1F7;display:flex;align-items:center;gap:10px;flex-shrink:0;">
+    <button x-show="jurFilter!=='all' || typeFilter!=='all' || categoryFilter!=='all'" x-cloak
+      @click="jurFilter='all'; typeFilter='all'; categoryFilter='all'; selectedDoc=null"
+      style="font-size:12px;font-weight:600;color:#64748B;background:none;border:none;cursor:pointer;"
+      onmouseover="this.style.color='#121676'" onmouseout="this.style.color='#64748B'">Clear all</button>
+    <button @click="filtersOpen=false"
+      style="margin-left:auto;padding:8px 20px;border-radius:9px;background:#121676;color:#fff;border:none;font-size:12.5px;font-weight:700;cursor:pointer;box-shadow:0 1px 2px rgba(18,22,118,.25);"
+      x-text="'Show ' + visibleCount + ' document' + (visibleCount===1?'':'s')"></button>
+   </div>
+  </div>
  </div>
 
  <div class="reg-scroll flex-1 min-w-0 min-h-0 overflow-y-auto pb-3">
@@ -123,7 +194,7 @@
    {# Document — icon (with status dot) + name + id #}
    <td style="padding:11px 14px;border-bottom:1px solid #F0F3F9;">
     <div style="display:flex;align-items:center;gap:11px;">
-     <div style="position:relative;width:32px;height:32px;border-radius:8px;background:#EEF2FB;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+     <div style="position:relative;width:32px;height:32px;border-radius:8px;background:#fff;border:1px solid #E9EDF5;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
       <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
       {# Status dot — replaces the STATUS column #}
       <span title="{% if doc.status == 'indexed' %}Ready{% elif doc.status == 'processing' %}Processing{% else %}Upload issue{% endif %}"
@@ -139,7 +210,7 @@
 
    {# Type #}
    <td style="padding:11px 12px;border-bottom:1px solid #F0F3F9;">
-    <span style="display:inline-block;padding:2px 9px;border-radius:6px;font-size:10.5px;font-weight:600;background:#F1F4FA;color:#4A5878;white-space:nowrap;">{% if 'ministerial' in doc.name|lower or 'order' in doc.name|lower %}Implementing Reg.{% elif 'act' in doc.name|lower or 'law' in doc.name|lower %}Primary Law{% elif 'guide' in doc.name|lower or 'circular' in doc.name|lower %}Guidance{% else %}Regulation{% endif %}</span>
+    <span style="display:inline-block;padding:2px 10px;border-radius:6px;font-size:10.5px;font-weight:700;white-space:nowrap;{% if 'ministerial' in doc.name|lower or 'order' in doc.name|lower %}background:#F79A2E;color:#fff;{% elif 'act' in doc.name|lower or 'law' in doc.name|lower %}background:#121676;color:#fff;{% elif 'guide' in doc.name|lower or 'circular' in doc.name|lower %}background:#F79A2E;color:#fff;{% else %}background:#121676;color:#fff;{% endif %}">{% if 'ministerial' in doc.name|lower or 'order' in doc.name|lower %}Implementing Reg.{% elif 'act' in doc.name|lower or 'law' in doc.name|lower %}Primary Law{% elif 'guide' in doc.name|lower or 'circular' in doc.name|lower %}Guidance{% else %}Regulation{% endif %}</span>
    </td>
 
    {# Jurisdiction — flag only #}
@@ -147,8 +218,8 @@
      {% if doc.jurisdiction == 'bahrain' %}<img src="https://flagcdn.com/40x30/bh.png" width="22" height="16" style="border-radius:2px;object-fit:cover;" alt="Bahrain">
      {% elif doc.jurisdiction == 'india' %}<img src="https://flagcdn.com/40x30/in.png" width="22" height="16" style="border-radius:2px;object-fit:cover;" alt="India">
      {% elif doc.jurisdiction == 'kuwait' %}<img src="https://flagcdn.com/40x30/kw.png" width="22" height="16" style="border-radius:2px;object-fit:cover;" alt="Kuwait">
-     {% elif doc.jurisdiction == 'bbk' %}<span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:16px;border-radius:2px;background:#EEF2FB;font-size:9px;font-weight:800;color:#002583;">BBK</span>
-     {% else %}<span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:16px;border-radius:2px;background:#EEF2FB;font-size:9px;font-weight:800;color:#002583;">{{ doc.jurisdiction|upper|slice:":3" }}</span>{% endif %}
+     {% elif doc.jurisdiction == 'bbk' %}<span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:17px;border-radius:3px;background:#fff;border:1px solid #E5E8EF;font-size:9px;font-weight:800;color:#002583;">BBK</span>
+     {% else %}<span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:17px;border-radius:3px;background:#fff;border:1px solid #E5E8EF;font-size:9px;font-weight:800;color:#002583;">{{ doc.jurisdiction|upper|slice:":3" }}</span>{% endif %}
    </td>
 
    {# Updated — hidden when the detail panel is open (date is shown in the panel) #}
@@ -202,6 +273,29 @@
 
  {# Metadata — single flex column owns vertical rhythm; children don't set their own margin-top #}
  <div style="padding:10px 14px;display:flex;flex-direction:column;gap:10px;">
+
+ {# Needs-attention card — pinned to top for failed docs: what's wrong + what to do #}
+ <template x-if="selectedDoc?.status === 'failed'">
+ <div style="padding:12px 13px;border-radius:10px;background:#FEF3F2;border:1px solid #FBCBC6;">
+ <div style="display:flex;align-items:flex-start;gap:8px;">
+ <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#D92D20" stroke-width="2" style="flex-shrink:0;margin-top:1px;"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+ <div style="min-width:0;flex:1;">
+ <p style="font-size:10px;font-weight:800;color:#B42318;text-transform:uppercase;letter-spacing:.05em;">Needs attention — upload issue</p>
+ <p style="font-size:11.5px;color:#7A271A;line-height:1.5;margin-top:3px;" x-text="selectedDoc?.attention?.summary"></p>
+ <p x-show="selectedDoc?.attention?.detail" x-cloak style="font-size:10px;color:#912018;line-height:1.45;margin-top:6px;background:#fff;border:1px solid #FBCBC6;border-radius:6px;padding:5px 7px;word-break:break-word;font-family:ui-monospace,monospace;" x-text="selectedDoc?.attention?.detail"></p>
+ <p style="font-size:9.5px;font-weight:800;color:#B42318;text-transform:uppercase;letter-spacing:.05em;margin-top:9px;">What to do</p>
+ <ul style="margin:4px 0 0;padding-left:15px;">
+ <template x-for="a in (selectedDoc?.attention?.actions || [])" :key="a">
+ <li style="font-size:11px;color:#7A271A;line-height:1.55;margin-bottom:2px;" x-text="a"></li>
+ </template>
+ </ul>
+ {% if is_admin %}
+ <button type="button" @click="openDeleteConfirm()" style="margin-top:10px;font-size:11px;font-weight:700;color:#fff;background:#D92D20;border:none;border-radius:7px;padding:6px 13px;cursor:pointer;">Delete &amp; re-upload</button>
+ {% endif %}
+ </div>
+ </div>
+ </div>
+ </template>
 
  {# Superseded badge — pin to top so analysts don't miss it #}
  <template x-if="selectedDoc?.superseded">
@@ -281,50 +375,6 @@
 
  </div>
 
- {# Tags section — now part of the shared scroll region #}
- <div style="padding:8px 14px;border-top:1px solid #E5E8EF;">
- <p style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#002583;margin-bottom:7px;">Tags</p>
-
- {% comment %}
- Tags are now objects: {label, by, by_name, at}. Render the label
- as the visible chip text and the author + timestamp as a tooltip
- (title attr) so analysts know who tagged what without clutter.
- {% endcomment %}
- <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:7px;">
- <template x-for="tag in currentTags" :key="tag.label">
- <span :title="tag.by_name ? ('Added by ' + tag.by_name + (tag.at ? ' · ' + tag.at.slice(0,10) : '')) : ''"
- style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:20px;background:#ffffff;font-size:10px;color:#002583;cursor:help;">
- <span x-text="tag.label"></span>
- <span x-show="tag.by_name" style="font-size:8.5px;color:#002583;font-weight:500;"
- x-text="'· ' + (tag.by_name || '').split(' ')[0]"></span>
- <button @click="removeTag(tag.label)" style="background:none;border:none;cursor:pointer;color:#002583;font-size:13px;line-height:1;padding:0;">&times;</button>
- </span>
- </template>
- <template x-if="currentTags.length === 0">
- <span style="font-size:10px;color:#ffffff;">No tags yet</span>
- </template>
- </div>
-
- {# Preset tags #}
- <div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px;">
- {% for tag in preset_tags %}
- <button @click="addTag('{{ tag }}')"
- style="padding:2px 7px;border-radius:20px;font-size:9px;border:1px dashed #E5E8EF;color:#002583;background:none;cursor:pointer;"
- onmouseover="this.style.borderColor='#002583';this.style.color='#002583';"
- onmouseout="this.style.borderColor='#ffffff';this.style.color='#002583';">
- + {{ tag }}
- </button>
- {% endfor %}
- </div>
-
- {# Custom tag input #}
- <div style="display:flex;gap:4px;">
- <input x-model="newTag" @keydown.enter="addTag(newTag)" type="text" placeholder="Custom tag…"
- style="flex:1;padding:4px 8px;border:1px solid #E5E8EF;border-radius:6px;font-size:10px;outline:none;"
- onfocus="this.style.borderColor='#002583';" onblur="this.style.borderColor='#ffffff';">
- <button @click="addTag(newTag)" style="padding:4px 8px;border-radius:6px;background:#002583;color:#fff;border:none;font-size:10px;cursor:pointer;">Add</button>
- </div>
- </div>
 
  </div>{# /scroll region — actions live below, pinned to panel bottom #}
 
@@ -348,7 +398,10 @@
  </button>
 
  {# Use in comparison #}
- <a :href="comparisonUrl"
+ <a :href="comparisonReady ? comparisonUrl : null"
+ :title="comparisonReady ? 'Open the comparison picker with this document as Regulation A' : 'Only indexed documents can be compared'"
+ {# object form, not a string: a string :style sets cssText and wipes the static style below #}
+ :style="comparisonReady ? {} : { opacity: '.5', pointerEvents: 'none' }"
  style="display:flex;align-items:center;justify-content:center;gap:6px;padding:7px;border-radius:7px;border:1px solid #E5E8EF;color:#002583;font-size:11px;font-weight:500;text-decoration:none;background:#fff;">
  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
  <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/>
@@ -367,114 +420,241 @@
  </a>
  </template>
 
- {# Delete — admin only #}
+ {# Delete — admin only; opens a styled confirmation (no native browser popup) #}
  {% if is_admin %}
- <form :action="selectedDoc?.delete_url" method="post"
- onsubmit="return confirm('Delete this regulation? This cannot be undone.')">
- {% csrf_token %}
- <button type="submit"
+ <button type="button" @click="openDeleteConfirm()"
  style="display:flex;align-items:center;justify-content:center;gap:6px;padding:7px;border-radius:7px;border:1px solid #E5E8EF;color:#002583;font-size:11px;font-weight:500;background:#fff;cursor:pointer;width:100%;">
  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
  <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/>
  </svg>
  Delete from library
  </button>
- </form>
  {% endif %}
 
- </div>
+  </div>
  </div>
  </div>
 
- {# ── Full details modal (the "more information" view) ────────────────────── #}
- <div x-show="fullDetails" x-cloak
-      style="position:fixed;inset:0;z-index:65;background:rgba(0,15,50,0.45);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:24px;"
-      @click.self="fullDetails = false" @keydown.escape.window="fullDetails = false">
-  <div style="width:min(680px,96vw);max-height:88vh;background:#fff;border-radius:16px;box-shadow:0 30px 80px rgba(0,0,0,0.35);display:flex;flex-direction:column;overflow:hidden;">
-
-   {# Modal header #}
-   <div style="padding:18px 22px;border-bottom:1px solid #EEF1F7;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-shrink:0;">
+ {# ── Delete confirmation modal — replaces the native browser confirm() popup ── #}
+ <div x-show="confirmDelete" x-cloak class="cj-overlay"
+   style="z-index:75;background:rgba(15,23,42,.5);backdrop-filter:blur(2px);"
+   @click.self="confirmDelete=false" @keydown.escape.window="confirmDelete=false">
+  <div role="dialog" aria-modal="true" aria-label="Delete document"
+    style="width:min(440px,94vw);background:#fff;border-radius:16px;box-shadow:0 24px 60px rgba(15,23,42,.3);overflow:hidden;">
+   <div style="padding:22px 22px 4px;display:flex;gap:13px;align-items:flex-start;">
+    <span style="flex-shrink:0;width:40px;height:40px;border-radius:50%;background:#FEE4E2;display:flex;align-items:center;justify-content:center;">
+     <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#D92D20" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/></svg>
+    </span>
     <div style="min-width:0;">
-     <p style="font-size:15px;font-weight:800;color:#14213D;margin:0;line-height:1.3;word-break:break-word;" x-text="selectedDoc?.name"></p>
-     <p style="font-size:11.5px;color:#7B8499;margin:3px 0 0;">
-      <span x-text="selectedDoc?.jurisdiction_display"></span><template x-if="selectedDoc?.document_id"><span> · <span x-text="selectedDoc?.document_id"></span></span></template>
+     <p style="font-size:15px;font-weight:800;color:#0F172A;margin:0;">Delete this document?</p>
+     <p style="font-size:12.5px;color:#667085;line-height:1.5;margin:6px 0 0;"><b style="color:#14213D;" x-text="selectedDoc?.name"></b> will be permanently removed from the library, along with its indexed content. This can’t be undone.</p>
+    </div>
+   </div>
+   {# Type-to-confirm: the name must be retyped, so a stray click can't destroy a document #}
+   <form :action="selectedDoc?.delete_url" method="post" style="margin:0;"
+     @submit="if(!deleteNameMatches) $event.preventDefault()">
+    {% csrf_token %}
+
+    <div style="padding:14px 22px 0;">
+     <p style="font-size:10px;font-weight:700;color:#94A0B8;text-transform:uppercase;letter-spacing:.07em;margin:0 0 8px;">What it learned from this document</p>
+     <label class="del-opt" :style="learningMode==='keep' ? { borderColor: '#002583', background: '#F5F7FE' } : {}">
+      <input type="radio" name="learning_mode" value="keep" x-model="learningMode" style="margin-top:2px;accent-color:#002583;">
+      <span>
+       <b style="font-size:12.5px;color:#14213D;">Keep what it learned</b>
+       <span style="display:block;font-size:11.5px;color:#667085;line-height:1.5;margin-top:2px;">
+        Approved exemplars keep steering future comparisons, and reviewer decisions stay in the audit trail, marked as coming from a deleted source.
+       </span>
+      </span>
+     </label>
+     <label class="del-opt" :style="learningMode==='purge' ? { borderColor: '#D92D20', background: '#FEF6F5' } : {}">
+      <input type="radio" name="learning_mode" value="purge" x-model="learningMode" style="margin-top:2px;accent-color:#D92D20;">
+      <span>
+       <b style="font-size:12.5px;color:#14213D;">Remove everything</b>
+       <span style="display:block;font-size:11.5px;color:#667085;line-height:1.5;margin-top:2px;">
+        Deletes
+        <b x-text="(selectedDoc?.learned_signals ?? 0) + ' reviewer decision' + ((selectedDoc?.learned_signals ?? 0) === 1 ? '' : 's')"></b>
+        and
+        <b x-text="(selectedDoc?.learned_gold ?? 0) + ' approved exemplar' + ((selectedDoc?.learned_gold ?? 0) === 1 ? '' : 's')"></b>
+        as well. Quality gained from this document is lost.
+       </span>
+      </span>
+     </label>
+     <p style="font-size:11px;color:#98A2B3;line-height:1.5;margin:8px 0 0;">
+      Either way, the document's indexed chunks are removed, so it stops being retrievable and can no longer be cited.
      </p>
     </div>
-    <button @click="fullDetails = false" style="flex-shrink:0;background:none;border:none;cursor:pointer;color:#9AA4BC;font-size:22px;line-height:1;">&times;</button>
+
+    <div style="padding:14px 22px 0;">
+     <label :for="'del-confirm-input'" style="display:block;font-size:11.5px;color:#667085;margin:0 0 6px;">
+      Type <b style="color:#14213D;font-weight:700;" x-text="selectedDoc?.name"></b> to confirm
+     </label>
+     <input id="del-confirm-input" type="text" x-ref="delConfirmInput" x-model="deleteTyped"
+       autocomplete="off" spellcheck="false" placeholder="Document name"
+       :aria-invalid="deleteTyped.length > 0 && !deleteNameMatches"
+       class="del-confirm-field"
+       :style="deleteTyped.length > 0 && !deleteNameMatches ? { borderColor: '#F0A19A' } : {}">
+    </div>
+    <div style="padding:16px 22px 18px;display:flex;justify-content:flex-end;gap:10px;">
+     <button @click="confirmDelete=false" type="button"
+       style="padding:8px 16px;border-radius:9px;border:1px solid #E4E7EC;background:#fff;color:#344054;font-size:12.5px;font-weight:600;cursor:pointer;">Cancel</button>
+     <button type="submit" :disabled="!deleteNameMatches"
+       :style="deleteNameMatches
+         ? { background: '#D92D20', cursor: 'pointer' }
+         : { background: '#FBD9D5', cursor: 'not-allowed' }"
+       style="padding:8px 18px;border-radius:9px;border:none;color:#fff;font-size:12.5px;font-weight:700;transition:background .15s;">Delete</button>
+    </div>
+   </form>
+  </div>
+ </div>
+
+ {# ── Document details modal ─────────────────────────── #}
+ <style>
+  .dm-pill{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;border-radius:999px;padding:3px 10px;}
+  .dm-sec{font-size:10px;font-weight:700;color:#94A0B8;text-transform:uppercase;letter-spacing:.07em;margin:0 0 10px;}
+  .dm-row{display:flex;justify-content:space-between;gap:16px;padding:8px 0;border-bottom:1px solid #F2F4F9;}
+  .dm-row:last-child{border-bottom:0;}
+  .dm-k{font-size:12px;color:#8A93AC;flex-shrink:0;}
+  .dm-v{font-size:12.5px;color:#14213D;margin:0;text-align:right;font-weight:500;}
+  .dm-select:focus{outline:none;border-color:#002583;box-shadow:0 0 0 3px rgba(0,37,131,.12);}
+  .dm-btn:focus-visible,.dm-close:focus-visible{outline:2px solid #002583;outline-offset:2px;}
+  .dm-primary{display:inline-flex;align-items:center;justify-content:center;gap:7px;background:#002583;color:#fff;border:none;padding:9px 18px;border-radius:10px;font-size:12.5px;font-weight:600;font-family:inherit;line-height:1;cursor:pointer;box-shadow:0 1px 2px rgba(0,37,131,.25);transition:background .15s,box-shadow .15s,transform .05s;}
+  .dm-primary:hover:not(:disabled){background:#001c66;box-shadow:0 4px 12px rgba(0,37,131,.28);}
+  .dm-primary:active:not(:disabled){transform:translateY(1px);}
+  .dm-primary:disabled{background:#EEF1F7;color:#9AA3B6;box-shadow:none;cursor:not-allowed;}
+  .dm-primary:focus-visible{outline:2px solid #002583;outline-offset:2px;}
+ </style>
+ <div x-show="fullDetails" x-cloak
+      class="cj-overlay" style="z-index:65;background:rgba(15,23,42,0.5);backdrop-filter:blur(3px);"
+      @click.self="fullDetails=false" @keydown.escape.window="fullDetails=false">
+  <div role="dialog" aria-modal="true" aria-label="Document details"
+       style="width:min(840px,94vw);max-height:90vh;background:#fff;border-radius:16px;box-shadow:0 24px 70px rgba(15,23,42,0.28);display:flex;flex-direction:column;overflow:hidden;">
+
+   {# Header — title, status, close #}
+   <div style="padding:20px 24px 16px;border-bottom:1px solid #EEF1F7;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-shrink:0;">
+    <div style="min-width:0;">
+     <p style="font-size:17px;font-weight:800;color:#0F172A;margin:0;line-height:1.25;word-break:break-word;" x-text="selectedDoc?.name"></p>
+     <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:7px;">
+      <span x-show="selectedDoc?.superseded" class="dm-pill" style="color:#B07A00;background:#FBF0D8;"><span style="width:6px;height:6px;border-radius:50%;background:#B07A00;"></span>Superseded</span>
+      <span x-show="!selectedDoc?.superseded && selectedDoc?.status==='indexed'" class="dm-pill" style="color:#1E7E48;background:#E7F4EC;"><span style="width:6px;height:6px;border-radius:50%;background:#1E7E48;"></span>In force</span>
+      <span style="font-size:12px;color:#7B8499;" x-text="selectedDoc?.jurisdiction_display"></span>
+      <template x-if="selectedDoc?.document_id"><span style="font-size:12px;color:#B8C0D0;">· <span x-text="selectedDoc?.document_id"></span></span></template>
+     </div>
+    </div>
+    <button @click="fullDetails=false" aria-label="Close" class="dm-close"
+      style="flex-shrink:0;width:32px;height:32px;border-radius:8px;border:none;background:#F4F6FB;color:#5A6685;cursor:pointer;display:flex;align-items:center;justify-content:center;"
+      onmouseover="this.style.background='#E9EDF5'" onmouseout="this.style.background='#F4F6FB'">
+     <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+    </button>
    </div>
 
-   <div style="flex:1;overflow-y:auto;padding:20px 22px;display:flex;flex-direction:column;gap:18px;">
+   {# Body — two balanced columns #}
+   <div style="flex:1;overflow-y:auto;padding:22px 24px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:26px;align-items:start;">
 
-    {# Full metadata — 2-column grid #}
-    <div>
-     <p style="font-size:10px;font-weight:700;color:#7B8499;text-transform:uppercase;letter-spacing:0.06em;margin:0 0 10px;">Details</p>
-     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:#EEF1F7;border:1px solid #EEF1F7;border-radius:10px;overflow:hidden;">
-      <template x-for="f in [
-        {k:'Status', v:(selectedDoc?.status === 'indexed' ? 'Ready to use' : selectedDoc?.status === 'processing' ? 'Getting ready' : 'Upload issue')},
-        {k:'Category', v:selectedDoc?.regulation_category},
-        {k:'Privacy relevance', v:selectedDoc?.privacy_relevance},
-        {k:'Sector', v:selectedDoc?.applicable_sector},
-        {k:'Issued by', v:selectedDoc?.issuing_authority},
-        {k:'Effective', v:selectedDoc?.effective_date},
-        {k:'Published', v:selectedDoc?.publication_date},
-        {k:'Last updated', v:selectedDoc?.last_updated},
-        {k:'Version', v:selectedDoc?.version},
-        {k:'Articles', v:selectedDoc?.section_identifiers},
-        {k:'Parent', v:selectedDoc?.parent_regulation},
-        {k:'Sections', v:selectedDoc?.chunk_count},
-        {k:'Added', v:selectedDoc?.upload_date}
-      ]" :key="f.k">
-       <div style="background:#fff;padding:9px 12px;">
-        <p style="font-size:9.5px;font-weight:600;color:#9AA4BC;text-transform:uppercase;letter-spacing:0.04em;margin:0 0 2px;" x-text="f.k"></p>
-        <p style="font-size:12px;margin:0;word-break:break-word;text-transform:capitalize;" :style="f.v ? 'color:#14213D;' : 'color:#B8C0D0;'" x-text="f.v || '—'"></p>
+    {# Left: facts + scope + concepts #}
+    <div style="min-width:0;display:flex;flex-direction:column;gap:22px;">
+     <div>
+      <p class="dm-sec">Details</p>
+      <dl style="margin:0;">
+       <template x-for="f in [
+         {k:'Category', v:selectedDoc?.regulation_category},
+         {k:'Issued by', v:selectedDoc?.issuing_authority},
+         {k:'Effective', v:selectedDoc?.effective_date},
+         {k:'Published', v:selectedDoc?.publication_date},
+         {k:'Last updated', v:selectedDoc?.last_updated},
+         {k:'Version', v:selectedDoc?.version},
+         {k:'Sections', v:selectedDoc?.chunk_count},
+         {k:'Added', v:selectedDoc?.upload_date}
+       ].filter(f => f.v)" :key="f.k">
+        <div class="dm-row"><dt class="dm-k" x-text="f.k"></dt><dd class="dm-v" style="text-transform:capitalize;" x-text="f.v"></dd></div>
+       </template>
+      </dl>
+     </div>
+     <div>
+      <p class="dm-sec">Scope</p>
+      <p style="font-size:12.5px;line-height:1.6;margin:0;" :style="selectedDoc?.full_name?'color:#3A4560;':'color:#B8C0D0;'" x-text="selectedDoc?.full_name || 'No scope description provided.'"></p>
+     </div>
+     <div x-show="selectedDoc?.concept_tags_csv && selectedDoc.concept_tags_csv.length">
+      <p class="dm-sec">Concepts</p>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;">
+       <template x-for="ct in (selectedDoc?.concept_tags_csv||[])" :key="ct"><span style="padding:4px 11px;border-radius:20px;font-size:11.5px;background:#EEF2FB;color:#002583;font-weight:500;" x-text="ct"></span></template>
+      </div>
+     </div>
+    </div>
+
+    {# Right: version management + refs/notes #}
+    <div style="min-width:0;display:flex;flex-direction:column;gap:22px;">
+     {% if is_admin %}
+     <div>
+      <p class="dm-sec">Version</p>
+      <template x-if="selectedDoc?.superseded">
+       <div style="background:#FBF7EC;border:1px solid #EAD9AE;border-radius:10px;padding:13px 14px;">
+        <p style="font-size:12.5px;font-weight:700;color:#B07A00;margin:0;">This version has been superseded</p>
+        <p x-show="selectedDoc?.superseded_by" style="font-size:12px;color:#7B6A45;margin:5px 0 0;line-height:1.5;">Replaced by <b x-text="selectedDoc?.superseded_by"></b>.</p>
+        <p style="font-size:11.5px;color:#9A8A63;margin:6px 0 0;line-height:1.5;">Kept for historical reference; excluded from new comparisons and mappings.</p>
+       </div>
+      </template>
+      <template x-if="!selectedDoc?.superseded">
+       <div>
+        {# Compact status line + subtle Replace toggle #}
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+         <span style="font-size:12.5px;color:#334066;">Current version is <b style="color:#1E7E48;">in force</b>.</span>
+         <button x-show="supersedeCandidates.length" @click="advancedOpen=!advancedOpen" class="dm-btn"
+           style="flex-shrink:0;background:none;border:none;padding:0;font-size:12px;font-weight:600;color:#33509F;cursor:pointer;">
+          <span x-show="!advancedOpen">Replace…</span><span x-show="advancedOpen">Cancel</span>
+         </button>
+        </div>
+        <p x-show="!supersedeCandidates.length" style="font-size:11.5px;color:#8A93AC;margin:6px 0 0;line-height:1.5;">No newer version has been uploaded to replace this one yet.</p>
+
+        {# Expanded picker — a contained panel, only when the admin chooses to replace #}
+        <div x-show="advancedOpen" x-cloak style="margin-top:12px;background:#F8FAFC;border:1px solid #E7ECF5;border-radius:11px;padding:15px;">
+         <label for="ver-select" style="display:block;font-size:11px;font-weight:600;color:#5A6685;text-transform:uppercase;letter-spacing:.04em;margin-bottom:7px;">Newer version</label>
+         <select id="ver-select" x-model="supersedeNewPk" class="dm-select"
+           style="width:100%;padding:10px 11px;border:1px solid #D9E0EF;border-radius:9px;font-size:12.5px;color:#14213D;background:#fff;font-family:inherit;cursor:pointer;">
+          <option value="">Select a regulation…</option>
+          <template x-for="c in supersedeCandidates" :key="c.id"><option :value="c.id" x-text="c.name"></option></template>
+         </select>
+         <p style="font-size:11px;color:#8A93AC;line-height:1.5;margin:9px 0 0;">This version is kept for history. Approved analyses that used it are flagged for re-review.</p>
+         <p x-show="supersedeMsg" x-text="supersedeMsg" role="status" style="font-size:11.5px;color:#1E7E48;font-weight:600;margin:10px 0 0;line-height:1.5;"></p>
+         <div style="margin-top:14px;padding-top:13px;border-top:1px solid #E7ECF5;display:flex;align-items:center;justify-content:flex-end;gap:12px;">
+          <span x-show="!supersedeNewPk" style="margin-right:auto;font-size:11px;color:#9AA3B6;">Choose a version to continue</span>
+          <button @click="supersede()" :disabled="supersedeBusy || !supersedeNewPk" class="dm-primary">
+           <span x-show="!supersedeBusy">Replace version</span>
+           <span x-show="supersedeBusy">Working…</span>
+          </button>
+         </div>
+        </div>
        </div>
       </template>
      </div>
-    </div>
-
-    {# Scope #}
-    <div>
-     <p style="font-size:10px;font-weight:700;color:#7B8499;text-transform:uppercase;letter-spacing:0.06em;margin:0 0 6px;">Scope</p>
-     <p style="font-size:12.5px;line-height:1.6;margin:0;" :style="selectedDoc?.full_name ? 'color:#14213D;' : 'color:#B8C0D0;'" x-text="selectedDoc?.full_name || 'No scope description provided.'"></p>
-    </div>
-
-    {# Concepts #}
-    <div>
-     <p style="font-size:10px;font-weight:700;color:#7B8499;text-transform:uppercase;letter-spacing:0.06em;margin:0 0 8px;">Concepts</p>
-     <div x-show="selectedDoc?.concept_tags_csv && selectedDoc.concept_tags_csv.length" style="display:flex;flex-wrap:wrap;gap:6px;">
-      <template x-for="ct in (selectedDoc?.concept_tags_csv || [])" :key="ct">
-       <span style="padding:4px 11px;border-radius:20px;font-size:11.5px;background:#EEF2FB;color:#002583;font-weight:500;" x-text="ct"></span>
-      </template>
+     {% endif %}
+     <div x-show="selectedDoc?.cross_references">
+      <p class="dm-sec">Cross-references</p>
+      <p style="font-size:12.5px;line-height:1.6;color:#3A4560;margin:0;" x-text="selectedDoc?.cross_references"></p>
      </div>
-     <p x-show="!(selectedDoc?.concept_tags_csv && selectedDoc.concept_tags_csv.length)" style="font-size:12.5px;color:#B8C0D0;margin:0;">None tagged.</p>
+     <div x-show="selectedDoc?.notes">
+      <p class="dm-sec">Notes</p>
+      <p style="font-size:12.5px;line-height:1.6;color:#3A4560;margin:0;" x-text="selectedDoc?.notes"></p>
+     </div>
     </div>
-
-    {# Cross-references #}
-    <div>
-     <p style="font-size:10px;font-weight:700;color:#7B8499;text-transform:uppercase;letter-spacing:0.06em;margin:0 0 6px;">Cross-references</p>
-     <p style="font-size:12.5px;line-height:1.6;margin:0;" :style="selectedDoc?.cross_references ? 'color:#14213D;' : 'color:#B8C0D0;'" x-text="selectedDoc?.cross_references || 'None.'"></p>
-    </div>
-
-    {# Internal notes #}
-    <div>
-     <p style="font-size:10px;font-weight:700;color:#7B8499;text-transform:uppercase;letter-spacing:0.06em;margin:0 0 6px;">Internal notes</p>
-     <p style="font-size:12.5px;line-height:1.6;margin:0;" :style="selectedDoc?.notes ? 'color:#14213D;' : 'color:#B8C0D0;'" x-text="selectedDoc?.notes || 'No notes.'"></p>
-    </div>
-
    </div>
 
-   {# Modal actions #}
-   <div style="padding:14px 22px;border-top:1px solid #EEF1F7;display:flex;gap:8px;flex-shrink:0;">
-    <button @click="openViewer(selectedDoc?.id); fullDetails = false" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border-radius:9px;background:#002583;color:#fff;font-size:12px;font-weight:600;border:none;cursor:pointer;">View document</button>
-    <button @click="openStructure(selectedDoc?.id); fullDetails = false" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border-radius:9px;border:1px solid #E5E8EF;background:#fff;color:#002583;font-size:12px;font-weight:600;cursor:pointer;">View structure</button>
+   {# Footer — primary + secondary actions #}
+   <div style="padding:14px 24px;border-top:1px solid #EEF1F7;display:flex;align-items:center;gap:10px;flex-shrink:0;">
+    <button @click="openViewer(selectedDoc?.id); fullDetails=false" class="dm-btn"
+      style="display:inline-flex;align-items:center;gap:7px;padding:9px 18px;border-radius:9px;background:#002583;color:#fff;font-size:12.5px;font-weight:600;border:none;cursor:pointer;">
+     <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><circle cx="12" cy="12" r="3"/></svg>
+     View document
+    </button>
+    <button @click="openStructure(selectedDoc?.id); fullDetails=false" class="dm-btn"
+      style="display:inline-flex;align-items:center;gap:7px;padding:9px 16px;border-radius:9px;border:1px solid #E5E8EF;background:#fff;color:#334066;font-size:12.5px;font-weight:600;cursor:pointer;">
+     View structure
+    </button>
     <template x-if="selectedDoc?.source_url">
-     <a :href="selectedDoc?.source_url" target="_blank" rel="noopener" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border-radius:9px;border:1px solid #E5E8EF;background:#fff;color:#002583;font-size:12px;font-weight:600;text-decoration:none;">Official source</a>
+     <a :href="selectedDoc?.source_url" target="_blank" rel="noopener" style="margin-left:auto;font-size:12px;color:#33509F;text-decoration:none;font-weight:600;">Official source ↗</a>
     </template>
    </div>
   </div>
  </div>
-
-</div>
 
 {# ── Document viewer modal ──────────────────────────────────────────────────── #}
 <div id="doc-viewer-modal"
@@ -570,23 +750,50 @@ function regsPage() {
 
  return {
  search: '',
+ filtersOpen: false,
+ confirmDelete: false,
+ deleteTyped: '',
+ learningMode: 'keep',
  statFilter: 'indexed',
  typeFilter: 'all',
  jurFilter: 'all',
+ categoryFilter: 'all',
  topicFilter: '',
  selectedDoc: null,
  currentTags: [],
  newTag: '',
  fullDetails: false,
 
+ // Delete stays disabled until the typed text matches the document name.
+ // Trimmed + case-insensitive: still a deliberate act, but not a spelling test.
+ get deleteNameMatches() {
+ const name = (this.selectedDoc?.name || '').trim().toLowerCase();
+ return name.length > 0 && this.deleteTyped.trim().toLowerCase() === name;
+ },
+
+ openDeleteConfirm() {
+ this.deleteTyped = '';
+ this.learningMode = 'keep';        // safe default: keep the learning
+ this.confirmDelete = true;
+ this.$nextTick(() => this.$refs.delConfirmInput?.focus());
+ },
+
+ // The picker takes ?reg_a_pk / ?reg_b_pk on /comparison/ and preselects that
+ // slot. Send every document straight there as Regulation A: the old routing
+ // only knew bahrain/india/kuwait and dropped anything else (GDPR, Qatar,
+ // Saudi, Oman, Egypt...) on a blank picker, so the document you clicked
+ // wasn't there. It also went via /comparison/<pair>/scope/, which is now
+ // just a redirect.
  get comparisonUrl() {
  if (!this.selectedDoc) return '/comparison/';
- const pk = this.selectedDoc.id;
- const jur = this.selectedDoc.jurisdiction;
- if (jur === 'bahrain') return `/comparison/bh_in/scope/?reg_a_pk=${pk}`;
- if (jur === 'india') return `/comparison/bh_in/scope/?reg_b_pk=${pk}`;
- if (jur === 'kuwait') return `/comparison/bh_kw/scope/?reg_b_pk=${pk}`;
- return '/comparison/';
+ return `/comparison/?reg_a_pk=${this.selectedDoc.id}`;
+ },
+
+ // The picker only offers INDEXED regulations, so a document that is still
+ // processing or failed can't be preselected. Say so instead of sending the
+ // user to a picker that silently ignores their choice.
+ get comparisonReady() {
+ return this.selectedDoc?.status === 'indexed';
  },
 
  statTabs: [
@@ -595,12 +802,29 @@ function regsPage() {
  { val:'failed', label:'Needs attention',sub:'Upload issue', color:'#002583', count: {{ stats.failed }} },
  ],
 
- jurFilters: [
- { val:'all', label:'All' },
- { val:'bahrain', label:'Bahrain' },
- { val:'india', label:'India' },
- { val:'kuwait', label:'Kuwait' },
- ],
+ // Jurisdiction + Category filters are DERIVED from the actual documents, so a
+ // newly-added country (e.g. Turkey) or category shows up automatically — no
+ // hardcoded list to keep in sync.
+ get jurFilters() {
+  const pretty = s => s.length <= 3 ? s.toUpperCase() : s.charAt(0).toUpperCase() + s.slice(1);
+  const m = new Map([['all', 'All']]);
+  allDocs.forEach(d => {
+   const v = (d.jurisdiction || '').trim();
+   if (v && !m.has(v)) { const disp = d.jurisdiction_display || v; m.set(v, disp === v ? pretty(v) : disp); }
+  });
+  return Array.from(m, ([val, label]) => ({ val, label }));
+ },
+ get categoryFilters() {
+  const m = new Map([['all', 'All']]);
+  allDocs.forEach(d => {
+   const v = (d.regulation_category || '').trim();
+   if (v && !m.has(v)) {
+    const pretty = v.replace(/[_-]+/g, ' ');           // drop underscores/hyphens
+    m.set(v, pretty.charAt(0).toUpperCase() + pretty.slice(1));
+   }
+  });
+  return Array.from(m, ([val, label]) => ({ val, label }));
+ },
 
  typeFilters: [
  { val:'Regulation', label:'Regulation' },
@@ -620,6 +844,10 @@ function regsPage() {
  if (this.statFilter !== 'all' && status !== this.statFilter) return false;
  if (this.jurFilter !== 'all' && jur !== this.jurFilter) return false;
  if (this.typeFilter !== 'all' && type !== this.typeFilter) return false;
+ if (this.categoryFilter !== 'all') {
+ const d = allDocs.find(x => x.id === docId);
+ if (!d || (d.regulation_category || '') !== this.categoryFilter) return false;
+ }
  if (this.search && !name.toLowerCase().includes(this.search.toLowerCase())) return false;
  if (this.topicFilter) {
  const doc = allDocs.find(d => d.id === docId);
@@ -634,6 +862,34 @@ function regsPage() {
  this.selectedDoc = (this.selectedDoc?.id === id) ? null : (doc || null);
  this.currentTags = this.selectedDoc ? [...(this.selectedDoc.tags || [])] : [];
  this.newTag = '';
+ this.advancedOpen = false; this.supersedeNewPk = ''; this.supersedeMsg = '';
+ },
+
+ // ── Version management: supersede this version with a newer one ──
+ advancedOpen: false,
+ supersedeNewPk: '',
+ supersedeMsg: '',
+ supersedeBusy: false,
+ get supersedeCandidates() {
+ if (!this.selectedDoc) return [];
+ // Only genuine versions of the SAME law — those the uploader linked into this
+ // document's version family (shared family_id) — not every reg in the jurisdiction.
+ return allDocs.filter(d => d.id !== this.selectedDoc.id
+ && d.family_id === this.selectedDoc.family_id && !d.superseded);
+ },
+ async supersede() {
+ if (!this.supersedeNewPk) { this.supersedeMsg = 'Pick the new version.'; return; }
+ this.supersedeBusy = true; this.supersedeMsg = '';
+ try {
+ const fd = new FormData();
+ fd.append('new_pk', this.supersedeNewPk);
+ const res = await fetch(`/library/${this.selectedDoc.id}/supersede/`, {
+ method: 'POST', headers: { 'X-CSRFToken': getCookie('csrftoken') }, body: fd });
+ const d = await res.json();
+ if (!res.ok || d.error) { this.supersedeMsg = d.error || 'Failed.'; this.supersedeBusy = false; return; }
+ this.supersedeMsg = `Done — ${d.affected_count} approved analysis/es flagged for re-review. Reloading…`;
+ setTimeout(() => window.location.reload(), 1500);
+ } catch (e) { this.supersedeMsg = 'Network error.'; this.supersedeBusy = false; }
  },
 
  async addTag(tag) {
