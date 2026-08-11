@@ -114,10 +114,17 @@ async def _comparison_draft(state: ComparisonState) -> dict:
     # Feedback loop: if a reviewer has already approved verdicts on this topic,
     # inject them as few-shot guidance. Empty on a cold start, so no behaviour change
     # until real approvals exist.
-    # Generation few-shot lever — OFF by default: the A/B eval showed injecting
-    # approved examples into the prompt does not reliably help (avg -0.027). The
-    # working lever is retrieval reranking (_apply_feedback). Kept behind a flag
-    # for future experiments only.
+    #
+    # Generation few-shot lever — EXPERIMENTAL / UNTRUSTED, OFF in production.
+    # An earlier A/B run recorded avg -0.027; a re-run on 2026-08-11 recorded
+    # avg +0.070 (3/3 topics). Neither number is trustworthy: `feedback_eval`
+    # injects the approved conclusion into the prompt and then measures embedding
+    # similarity TO THAT SAME CONCLUSION, so a positive delta is partly circular by
+    # construction. The +0.070 does NOT demonstrate usefulness. Until there is a
+    # non-circular metric (e.g. blind reviewer preference, or similarity to a
+    # held-out conclusion the prompt never saw), this lever stays OFF.
+    # The working, independently-verified lever is retrieval reranking
+    # (_apply_feedback), which is deterministic and measurable.
     gold_examples = ""
     try:
         from django.conf import settings
@@ -499,17 +506,23 @@ def _multi_query_mapping_retrieve(
     return {"regulation": list(seen_reg.values()), "policies": list(seen_pol.values())}
 
 
-def _apply_feedback(nodes):
+def _apply_feedback(nodes, topic=None):
     """Re-rank retrieved nodes by accumulated reviewer feedback — approved clauses
     move up, rejected ones move down. This is where the feedback loop closes on
     LIVE retrieval. Gated by settings.FEEDBACK_RERANK_ENABLED and a safe no-op on a
-    cold start (no feedback) or any error, so it never degrades base retrieval."""
+    cold start (no feedback) or any error, so it never degrades base retrieval.
+
+    `topic` is the taxonomy tag this retrieval is scoped to. It is forwarded so that
+    an explicitly topic-scoped retrieval only sees feedback recorded under the SAME
+    topic — an approval given for one regulatory topic must not re-rank that clause
+    for an unrelated one. When topic is None the caller is unscoped and the previous
+    global behaviour applies."""
     try:
         from django.conf import settings
         if not getattr(settings, "FEEDBACK_RERANK_ENABLED", True):
             return nodes
         from apps.feedback.services import feedback_rerank
-        return feedback_rerank(nodes)
+        return feedback_rerank(nodes, topic=topic)
     except Exception:
         return nodes
 
@@ -543,14 +556,15 @@ def _scoped_retrieve(
     """
     if not doc_titles:
         return _apply_feedback(hybrid_search(query, top_k=top_k, jurisdiction=jurisdiction,
-                                             topic=topic, subcategory=subcategory, rerank=rerank))
+                                             topic=topic, subcategory=subcategory, rerank=rerank),
+                               topic=topic)
 
     primary = hybrid_search(
         query, top_k=top_k, jurisdiction=jurisdiction,
         doc_titles=doc_titles, topic=topic, subcategory=subcategory, rerank=rerank,
     )
     if scope_mode != "open":
-        return _apply_feedback(primary)
+        return _apply_feedback(primary, topic=topic)
 
     # open mode: also pull from the broader corpus, dedupe by node_id.
     # taxonomy filter still applies — open scope means "wider doc set",
@@ -561,7 +575,7 @@ def _scoped_retrieve(
     )
     seen_ids = {n.node.metadata.get("node_id") for n in primary}
     extra = [n for n in secondary if n.node.metadata.get("node_id") not in seen_ids]
-    return _apply_feedback(primary + extra[:top_k])
+    return _apply_feedback(primary + extra[:top_k], topic=topic)
 
 
 # Strips a formatted context-header echo the local model sometimes copies

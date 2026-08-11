@@ -142,6 +142,18 @@ class ObligationMapping(models.Model):
     analysis          = models.ForeignKey(MappingAnalysis, on_delete=models.CASCADE,
                                           related_name='obligation_mappings')
     regulation        = models.ForeignKey('library.Document', on_delete=models.CASCADE)
+    # The canonical requirement this row is an observation OF. Nullable: legacy
+    # rows predate the store, and a row whose source chunk or evidence is
+    # missing is left unlinked rather than pointed at an invented requirement.
+    # PROTECT because a requirement cited by an approved finding must not be
+    # deletable out from under it.
+    requirement       = models.ForeignKey('library.Requirement', null=True, blank=True,
+                                          on_delete=models.PROTECT,
+                                          related_name='mappings')
+    # article_ref / obligation_title / obligation_text stay on the row even once
+    # `requirement` is set. They are the audit record of what a reviewer read and
+    # approved; rewriting them to canonical text would retroactively alter
+    # findings that people signed off on.
     article_ref       = models.CharField(max_length=100)
     obligation_title  = models.CharField(max_length=300)
     obligation_text   = models.TextField(blank=True)

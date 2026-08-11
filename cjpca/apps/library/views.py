@@ -1,6 +1,8 @@
+import collections
 import json
 import logging
 import re
+import threading
 
 from django.views.generic import TemplateView
 from django.views import View
@@ -845,32 +847,171 @@ class DocumentStructureView(View):
                       {'doc': doc, 'summary': summary, 'rtl': rtl})
 
 
-def _run_doc_intel(pdf_path, metadata_only=False):
-    """Local-LLM metadata (+ optional structure) inference on a document's first
-    pages. Returns (suggested_meta: dict, structure_html: str). Everything is a
+def _run_doc_intel(pdf_path, metadata_only=False, progress=None):
+    """Local-LLM metadata (+ optional structure) inference over the WHOLE document.
+
+    Both passes read every page: extract_metadata sweeps the full text window by
+    window (one model call per ~20k chars) and structure regex-scans all of it.
+    That makes analyze slower on a long regulation, deliberately — metadata
+    inferred from the first pages alone was wrong on documents that only name
+    their jurisdiction and governing law well past the opening.
+
+    Returns (suggested_meta: dict, structure_html: str). Everything is a
     suggestion the user confirms; fail-soft to ({}, '') so a model hiccup never
     blocks an upload."""
     try:
         from reasoning.doc_intel import (
             head_text, extract_metadata, infer_structure, structure_to_html,
+            metadata_steps, AnalysisCancelled,
         )
     except Exception:
         return {}, ''
     try:
-        text = head_text(pdf_path)          # ~6 pages — title/authority live up front
+        # Read the file ONCE, in full, and share it between both passes.
+        text = head_text(pdf_path, max_pages=1000)
         if not text:
             return {}, ''
-        meta = extract_metadata(text)
+        # The denominator is fixed BEFORE any work starts: the metadata calls
+        # (head + one per window) plus the single structure call. A total that
+        # grew as phases were discovered would make the bar slide backwards.
+        total = metadata_steps(text) + (0 if metadata_only else 1)
+        meta = extract_metadata(text, progress=progress, step_total=total)
+        scan = (meta or {}).get('scan') or {}
+        if scan:
+            logger.info('doc-intel %s: read %d/%d windows (%d chars), '
+                        'jurisdiction votes=%s', pdf_path,
+                        scan.get('windows_read'), scan.get('windows_total'),
+                        scan.get('chars_read'), scan.get('jurisdiction_votes'))
         if metadata_only:
             return meta, ''
-        # Structure reads the WHOLE document (headings are regex-scanned across
-        # the full text, not sampled), so pull essentially all pages.
-        deep = head_text(pdf_path, max_pages=1000)
-        structure = infer_structure(deep or text)
+        structure = infer_structure(text)
+        # Structure is the last model call, so this completes the count.
+        if progress:
+            try:
+                progress(total, total, 'Preparing your review')
+            except Exception:
+                logger.debug('progress callback failed', exc_info=True)
         return meta, structure_to_html(structure)
+    except AnalysisCancelled:
+        # Not a failure — the caller asked to stop because nobody is waiting for
+        # the answer any more. Propagate so it isn't logged as an error.
+        raise
     except Exception:
         logger.exception('doc-intel failed for %s', pdf_path)
         return {}, ''
+
+
+def _streaming_analysis(doc, lang):
+    """Run doc-intel and stream its progress as newline-delimited JSON.
+
+    A full-document analysis is many model calls — 43 on the largest document in
+    the corpus — and the wizard used to show a spinner for the whole of it with
+    no way to tell a working scan from a hung one. Progress is delivered on the
+    SAME request rather than by polling a status endpoint: the response body is
+    written incrementally as the work happens, so there is one request, one
+    source of truth, and nothing to reconcile between a job and its status.
+
+    Each line is a complete JSON object:
+        {"type": "progress", "done": 12, "total": 43, "label": "..."}
+        {"type": "result",   ...the payload the wizard already consumes...}
+        {"type": "error",    "error": "..."}
+    The final line is always a result or an error, so the client can treat the
+    last object exactly as it treated the old single JSON response.
+    """
+    from django.http import StreamingHttpResponse
+    from reasoning.doc_intel import AnalysisCancelled
+
+    def stream():
+        # Progress events are produced deep inside doc-intel and consumed here,
+        # so they are handed over through a queue the callback appends to and
+        # the generator drains — the callback cannot yield on its own. Every
+        # name here is created per call, so two concurrent analyses share
+        # nothing; there is no module-level progress state anywhere.
+        # deque.append/popleft are individually atomic, which is the only
+        # synchronisation needed between the worker and this generator.
+        pending: "collections.deque" = collections.deque()
+        cancelled = threading.Event()
+
+        def on_progress(done, total, label=''):
+            # Checked here because progress is reported between model calls —
+            # the one place it is safe to abandon the work. Raising unwinds the
+            # scan; a thread cannot be killed from outside, so cancellation has
+            # to be cooperative.
+            if cancelled.is_set():
+                raise AnalysisCancelled()
+            pending.append({'type': 'progress', 'done': int(done),
+                            'total': int(total), 'label': str(label)})
+
+        def drain():
+            while pending:
+                yield json.dumps(pending.popleft()) + '\n'
+
+        # doc-intel blocks, so run it off-thread and flush whatever the callback
+        # has queued while it works. Without this the queue would only be
+        # readable after the analysis had already finished.
+        box: dict = {}
+
+        def work():
+            try:
+                box['out'] = _run_doc_intel(doc.file.path, progress=on_progress)
+            except AnalysisCancelled:
+                box['cancelled'] = True
+                logger.info('analysis cancelled for %s — client disconnected', doc.pk)
+            except BaseException as exc:     # noqa: BLE001 — see 'unfinished' below
+                logger.exception('analysis failed for %s', doc.pk)
+                box['exc'] = exc
+
+        t = threading.Thread(target=work, daemon=True,
+                             name=f'doc-intel-{doc.pk}')
+        t.start()
+        try:
+            while t.is_alive():
+                yield from drain()
+                t.join(timeout=0.25)
+            yield from drain()                          # anything queued at the end
+        finally:
+            # Reached on normal completion AND when the client goes away, which
+            # closes this generator and raises GeneratorExit at the yield above.
+            # Without this the worker would keep running model calls — minutes
+            # of GPU time — for an upload nobody is waiting for.
+            cancelled.set()
+
+        if box.get('cancelled'):
+            return
+
+        # Neither a result nor an exception means the worker died in a way it
+        # could not report. Emitting the default empty result here would look
+        # like a successful analysis that simply found nothing, and the wizard
+        # would walk the user straight on to indexing.
+        if 'exc' not in box and 'out' not in box:
+            box['exc'] = RuntimeError('analysis worker exited without a result')
+
+        if 'exc' in box:
+            doc.status = Document.FAILED
+            doc.status_detail = str(box['exc'])[:500]
+            doc.save(update_fields=['status', 'status_detail'])
+            yield json.dumps({'type': 'error',
+                              'error': f'Analysis failed: {box["exc"]}'}) + '\n'
+            return
+
+        meta, tree_html = box['out']
+        yield json.dumps({
+            'type': 'result',
+            'pk': doc.pk, 'language': lang,
+            # Route to the review step whenever the LLM produced anything.
+            'structured': bool(tree_html or meta),
+            'suggested_meta': meta,
+            'suggested_type': (meta.get('doc_type') or 'regulation').capitalize(),
+            'tree_html': tree_html,
+            'ai_suggested': True,
+        }) + '\n'
+
+    resp = StreamingHttpResponse(stream(), content_type='application/x-ndjson')
+    # Without this a reverse proxy may buffer the whole body and deliver it in
+    # one piece at the end, which is exactly the behaviour being fixed.
+    resp['X-Accel-Buffering'] = 'no'
+    resp['Cache-Control'] = 'no-cache'
+    return resp
 
 
 class AnalyzeView(View):
@@ -923,16 +1064,7 @@ class AnalyzeView(View):
         # (b) infer the document's own hierarchy. Both are suggestions — the
         # user reviews them in step 3 before anything is indexed.
         if lang != Document.ARABIC:
-            meta, tree_html = _run_doc_intel(doc.file.path)
-            return JsonResponse({
-                'pk': doc.pk, 'language': lang,
-                # Route to the review step whenever the LLM produced anything.
-                'structured': bool(tree_html or meta),
-                'suggested_meta': meta,
-                'suggested_type': (meta.get('doc_type') or 'regulation').capitalize(),
-                'tree_html': tree_html,
-                'ai_suggested': True,
-            })
+            return _streaming_analysis(doc, lang)
 
         try:
             from arabic.analyze import analyze
@@ -993,8 +1125,10 @@ class FinalizeView(View):
         # self-link or an obviously invalid target.
         vof = (request.POST.get('version_of') or '').strip()
         if vof.isdigit() and int(vof) != doc.pk:
+            # Same kind of document only: a policy supersedes a policy, a
+            # regulation a regulation. Anything else would build a nonsense family.
             parent = Document.objects.filter(
-                pk=int(vof), doc_type=Document.REGULATION).first()
+                pk=int(vof), doc_type=doc.doc_type).first()
             if parent and parent.family_root_id != doc.pk:   # no cycle
                 # What happens to the version being replaced is the uploader's
                 # choice in the wizard. Default keeps it: an audit trail usually

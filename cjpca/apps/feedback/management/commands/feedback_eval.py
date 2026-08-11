@@ -11,6 +11,17 @@ and the AVERAGE across topics, so the judgement is statistical, not anecdotal.
 
 Temperature is 0, so the ONLY variable between cold and warm is the feedback.
 
+!! KNOWN METHODOLOGICAL FLAW — THIS EVAL IS CIRCULAR.
+   The WARM run has the approved conclusion injected into its prompt, and the
+   metric is similarity TO THAT SAME CONCLUSION. A model that merely echoes its
+   context scores well without reasoning any better. A positive delta therefore
+   does NOT establish that few-shot feedback improves output quality, and a
+   negative one does not disprove it. Recorded results: avg -0.027 (early run),
+   avg +0.070 (2026-08-11 re-run) — neither is trustworthy evidence.
+   FEEDBACK_FEWSHOT_ENABLED stays False in production on this basis.
+   A trustworthy replacement would score against a HELD-OUT conclusion the prompt
+   never saw, or use blind reviewer preference between cold/warm outputs.
+
 Run:  python manage.py feedback_eval
 """
 
@@ -78,14 +89,27 @@ class Command(BaseCommand):
             approved = APPROVED.get(tag, '')
             if not approved:
                 continue
-            GoldExemplar.objects.filter(topic__iexact=tag).delete()
 
-            cold = run_once(tag, label)
-            promote_to_gold(topic=tag, reg_a='GDPR', reg_b='Bahrain PDPL',
-                            payload={'equivalence': 'Equivalent', 'practical_conclusion': approved},
-                            source_id=None)
-            warm = run_once(tag, label)
-            GoldExemplar.objects.filter(topic__iexact=tag).delete()
+            # The cold run must see no gold for this topic, but REAL analyst-approved
+            # exemplars live in the same table. Deactivate them for the duration and
+            # restore in `finally` — never delete: an earlier version of this command
+            # ran `.filter(topic__iexact=tag).delete()` and destroyed a production
+            # GoldExemplar whose topic happened to match an eval topic.
+            pre = list(GoldExemplar.objects.filter(topic__iexact=tag, active=True)
+                       .values_list('pk', flat=True))
+            GoldExemplar.objects.filter(pk__in=pre).update(active=False)
+            mine = None
+            try:
+                cold = run_once(tag, label)
+                mine = promote_to_gold(
+                    topic=tag, reg_a='GDPR', reg_b='Bahrain PDPL',
+                    payload={'equivalence': 'Equivalent', 'practical_conclusion': approved},
+                    source_id=None)
+                warm = run_once(tag, label)
+            finally:
+                if mine is not None:
+                    GoldExemplar.objects.filter(pk=mine.pk).delete()   # only our own row
+                GoldExemplar.objects.filter(pk__in=pre).update(active=True)
 
             if not cold or not warm:
                 w(f'  {label:34s}  (skipped — no obligations)')

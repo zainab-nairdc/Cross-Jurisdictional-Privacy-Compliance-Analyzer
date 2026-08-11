@@ -64,13 +64,18 @@
     <div x-show="step===2" x-cloak style="padding:24px 0;text-align:center;">
      <div style="width:44px;height:44px;border:3px solid #EEF1F7;border-top-color:#002583;border-radius:50%;animation:viewer-spin .8s linear infinite;margin:0 auto 14px;"></div>
      <p style="font-size:14px;font-weight:700;color:#002583;margin:0;">Analysing document…</p>
-     <p style="font-size:11.5px;color:#9AA4BC;margin:6px auto 18px;max-width:330px;line-height:1.5;">Reading the document and detecting its language, metadata and structure — all locally. Scanned or broken-font pages are OCR'd, which can take a little longer.</p>
-     <div style="max-width:240px;margin:0 auto;text-align:left;">
-      <template x-for="s in ['Reading the document','Detecting metadata','Detecting structure','Preparing your review']" :key="s">
-       <div style="display:flex;align-items:center;gap:9px;padding:4px 0;font-size:12px;color:#3A4560;">
-        <span style="width:6px;height:6px;border-radius:50%;background:#3B6FE0;flex-shrink:0;"></span><span x-text="s"></span>
-       </div>
-      </template>
+     {# Generic copy stands in until the first progress line reports the job size #}
+     <p x-show="!prog.total" style="font-size:11.5px;color:#9AA4BC;margin:6px auto 18px;max-width:330px;line-height:1.5;">Reading the document and detecting its language, metadata and structure — all locally. Scanned or broken-font pages are OCR'd, which can take a little longer.</p>
+     <p x-show="prog.total>0" x-cloak x-text="prog.label" style="font-size:11.5px;color:#3A4560;margin:6px auto 14px;max-width:330px;line-height:1.5;font-weight:600;"></p>
+     {# Denominator is fixed before the run starts, so the bar never slides backwards #}
+     <div x-show="prog.total>0" x-cloak style="max-width:280px;margin:0 auto;">
+      <div style="height:6px;background:#EEF1F7;border-radius:99px;overflow:hidden;">
+       <div :style="'width:'+progPct()+'%'" style="height:100%;background:#002583;border-radius:99px;transition:width .28s ease;"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:7px;font-size:11px;color:#9AA4BC;">
+       <span x-text="prog.done+' / '+prog.total+' steps'"></span>
+       <span x-text="progPct()+'%'"></span>
+      </div>
      </div>
     </div>
 
@@ -149,7 +154,7 @@
         <label class="wz-lbl">Confirm document type</label>
         <div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:6px;">
          <template x-for="t in ['Law','Regulation','Policy','Circular','Contract','Court Judgment','Other']" :key="t">
-          <button type="button" class="wz-pill" :class="meta.confirmed_type===t ? 'on' : ''" @click="meta.confirmed_type=t" x-text="t"></button>
+          <button type="button" class="wz-pill" :class="meta.confirmed_type===t ? 'on' : ''" @click="meta.confirmed_type=t; onTypeChanged()" x-text="t"></button>
          </template>
         </div>
        </div>
@@ -182,45 +187,39 @@
      <p style="font-size:13px;font-weight:700;color:#14213D;margin:0 0 3px;">Version &amp; lineage</p>
      <p style="font-size:11.5px;color:#7B8499;margin:0 0 16px;">Is this a newer version of something already in the library, and what should happen to the old one?</p>
 
-     <template x-if="isPolicyType()">
-      <div style="padding:16px 18px;border:1px solid #E5E8EF;border-radius:12px;background:#FAFBFE;font-size:12px;color:#7B8499;line-height:1.5;">
-       This is an internal policy, so there is no regulation lineage to set. Continue to indexing.
-      </div>
-     </template>
-
-     <template x-if="!isPolicyType()">
+     <template x-if="true">
       <div>
        <div style="display:flex;align-items:center;gap:14px;padding:14px 16px;border:1px solid #E5E8EF;border-radius:12px;background:#FAFBFE;">
         <span style="flex-shrink:0;width:34px;height:34px;border-radius:9px;background:#EEF2FB;display:flex;align-items:center;justify-content:center;">
          <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4M16 17H4m0 0l4 4m-4-4l4-4"/></svg>
         </span>
         <div style="flex:1;min-width:0;">
-         <p style="font-size:12.5px;font-weight:700;color:#14213D;margin:0;">Newer version of an existing regulation?</p>
-         <p x-show="!topSuggestion() && !versionLinkedToSuggestion()" style="font-size:11px;color:#8A93A8;margin:2px 0 0;line-height:1.45;">Link it to the law it replaces so they're tracked as one history.</p>
+         <p style="font-size:12.5px;font-weight:700;color:#14213D;margin:0;">Newer version of an existing <span x-text="versionNoun()"></span>?</p>
+         <p x-show="!topSuggestion() && !versionLinkedToSuggestion()" style="font-size:11px;color:#8A93A8;margin:2px 0 0;line-height:1.45;">Link it to the <span x-text="versionNoun()"></span> it replaces so they're tracked as one history.</p>
          <p x-show="versionLinkedToSuggestion()" x-cloak style="font-size:11px;color:#1E7E48;margin:2px 0 0;line-height:1.45;font-weight:600;">Linked to <span x-text="versionAutoLinked && prettyReg(versionAutoLinked.name)"></span>. Change it if that's wrong.</p>
          <p x-show="topSuggestion() && !versionLinkedToSuggestion()" x-cloak style="font-size:11px;color:#002583;margin:2px 0 0;line-height:1.45;font-weight:600;">Looks like a newer version of <span x-text="topSuggestion() && prettyReg(topSuggestion().name)"></span>.</p>
         </div>
         <template x-if="hasReg()">
          <div style="flex:0 0 300px;display:flex;flex-direction:column;gap:4px;">
           <select class="wz-in" x-model="meta.version_of" style="width:100%;">
-           <option value="">No, this is a separate law</option>
+           <option value="">No, this is a new document</option>
            <template x-if="versionRanked().likely.length">
             <optgroup label="Likely matches">
              <template x-for="r in versionRanked().likely" :key="'L'+r.id"><option :value="r.id" x-text="prettyReg(r.name)"></option></template>
             </optgroup>
            </template>
            <template x-if="versionRanked().other.length">
-            <optgroup label="All other regulations">
+            <optgroup :label="'All other ' + versionNoun() + 's'">
              <template x-for="r in versionRanked().other" :key="'O'+r.id"><option :value="r.id" x-text="prettyReg(r.name)"></option></template>
             </optgroup>
            </template>
           </select>
           <span style="align-self:flex-end;font-size:10px;color:#9AA4BC;"
-                x-text="regCount() + ' regulation' + (regCount()===1?'':'s') + ' in the library'"></span>
+                x-text="regCount() + ' ' + versionNoun() + (regCount()===1?'':'s') + ' in the library'"></span>
          </div>
         </template>
         <template x-if="!hasReg()">
-         <span style="flex:0 0 300px;font-size:11px;color:#9AA4BC;font-style:italic;line-height:1.45;text-align:right;">No other regulations in the library yet, so this will be its first version.</span>
+         <span style="flex:0 0 300px;font-size:11px;color:#9AA4BC;font-style:italic;line-height:1.45;text-align:right;">No other <span x-text="versionNoun()"></span>s in the library yet, so this will be its first version.</span>
         </template>
        </div>
 
@@ -397,6 +396,17 @@
     Toggling only the .is-dragging modifier keeps max-width/padding/border intact. */
  .wz-drop { width:100%; margin:0 0 22px; border:2px dashed #C4D0E8; border-radius:12px; padding:16px 24px; text-align:center; cursor:pointer; transition:border-color .15s, background .15s; background:#F8FAFF; }
  .wz-drop.is-dragging { border-color:#3B6FE0; background:#F0F5FF; }
+ /* The wizard's spinners animate with this. It has to be declared HERE, in the
+    partial that uses it: the wizard is included from base.html on every page,
+    but the keyframe used to exist only inside pages/regulations.html and
+    pages/policies.html. Anywhere else — the Add-document page especially — the
+    animation name resolved to nothing and the spinner sat frozen mid-analysis,
+    which reads as a hung upload rather than a working one. */
+ @keyframes viewer-spin { to { transform:rotate(360deg); } }
+ /* Respect a reduced-motion preference: stop rotating rather than spin fast. */
+ @media (prefers-reduced-motion: reduce) {
+   [style*="viewer-spin"] { animation-duration:2.4s !important; }
+ }
  /* Pill toggle — geometry in the class so Alpine's :class colour toggle can't
     wipe it (an inline :style binding used to collapse these to plain text). */
  .wz-pill { padding:6px 14px; border-radius:20px; border:1px solid #E5E8EF; background:#fff; color:#4A5878; font-size:11.5px; font-weight:600; cursor:pointer; font-family:inherit; transition:background .12s,border-color .12s,color .12s; white-space:nowrap; }
@@ -438,6 +448,11 @@ function uploadWizard() {
    scope_summary:'', key_topics:'', version_of:'', old_version_action:'supersede',
    chunk_strategy:'auto', citation_format:'short', citation_abbr:'', citation_template:'',
    classify:true, jurisdiction_is_new:false, category_is_new:false, ai_suggested:false });
+ // Live analysis progress, fed by the NDJSON the analyze request streams back.
+ // total stays 0 until the server reports the size of the job, which is what
+ // keeps the bar hidden (rather than showing a false 0%) on a document whose
+ // step count isn't known yet.
+ const PROG0 = () => ({ done:0, total:0, label:'' });
  // In-force regulations this document could be a newer version of (from the server).
  let EXISTING_REGS = [];
  try { EXISTING_REGS = JSON.parse('{{ existing_regulations_json|default:"[]"|escapejs }}') || []; } catch(e) { EXISTING_REGS = []; }
@@ -459,6 +474,7 @@ function uploadWizard() {
  const POL_URL = '{% url "library-policies" %}';
  return {
   open:false, step:1, file:null, dragging:false, analysis:null, errorMsg:'', meta:DEF(),
+  prog:PROG0(),
   filedLabel:'', filedUrl:'',
   jurOptions: KNOWN_JURS.slice(),
   versionAutoLinked: null,   // the regulation autoLinkVersion() picked, for the hint
@@ -493,15 +509,48 @@ function uploadWizard() {
      .replace(/{doc}/g,abbr).replace(/{num}/g,num).replace(/{year}/g,yr).replace(/{article}/g,art);
    return abbr+', '+art;
   },
+  // Percentage for the analysis bar. Guarded against total 0 — that is the
+  // normal state before the first progress line lands, not an error.
+  progPct() { return this.prog.total>0
+    ? Math.min(100, Math.round(100*this.prog.done/this.prog.total)) : 0; },
+  // Read the analyze response. The server streams newline-delimited JSON: each
+  // "progress" line moves the bar as it arrives, and the LAST non-progress
+  // object is the result (or an error). A plain single-object JSON body — an
+  // early 400, or the non-streaming Arabic path — has no newline and falls out
+  // of the same tail parse, so both response shapes take one code path.
+  async _readAnalysis(r) {
+   if(!r.body || !r.body.getReader) return await r.json();   // no stream support
+   const reader=r.body.getReader(), dec=new TextDecoder();
+   let buf='', last=null;
+   const take=(line)=>{
+    if(!line) return;
+    let o; try{ o=JSON.parse(line); }catch(e){ return; }   // ignore partial junk
+    if(o.type==='progress'){ this.prog={done:o.done, total:o.total, label:o.label||''}; }
+    else last=o;
+   };
+   for(;;){
+    const {value,done}=await reader.read();
+    if(done) break;
+    buf+=dec.decode(value,{stream:true});
+    let nl;
+    while((nl=buf.indexOf('\n'))>=0){ take(buf.slice(0,nl).trim()); buf=buf.slice(nl+1); }
+   }
+   take(buf.trim());              // last line, if the body didn't end in a newline
+   return last;
+  },
   async analyze() {
    if(!this.file){ this.errorMsg='Please choose a file first.'; return; }
-   this.errorMsg=''; this.step=2;
+   this.errorMsg=''; this.step=2; this.prog=PROG0();
    const fd=new FormData(); fd.append('file', this.file);
    // Only the (optional) name is sent — language + jurisdiction are detected.
    if(this.meta.name) fd.append('name', this.meta.name);
    try {
     const r=await fetch('{% url "library-analyze" %}',{method:'POST',body:fd,headers:{'X-CSRFToken':CSRF}});
-    const d=await r.json();
+    const d=await this._readAnalysis(r);
+    // A stream that ended without a result line means the analysis died
+    // mid-flight; fall through to the same error state as an explicit failure
+    // rather than leaving the progress bar frozen on screen.
+    if(!d){ this.errorMsg='Analysis failed — check the server logs.'; this.step=1; return; }
     if(d.error){ this.errorMsg=d.error; this.step=1; return; }
     this.analysis=d;
     if(d.language) this.meta.language=d.language;   // detected language
@@ -558,7 +607,16 @@ function uploadWizard() {
     this.$nextTick(()=>{ if(this.$refs.newJurIn) this.$refs.newJurIn.focus(); }); },
   isNewCat() { const c=(this.meta.regulation_category||'').toLowerCase(); return !!c && !KNOWN_CATS.includes(c); },
   isPolicyType() { return (this.meta.confirmed_type||'').toLowerCase().includes('policy'); },
-  hasReg() { return EXISTING_REGS.length > 0; },
+  // Candidate parents are always the SAME kind of document: a policy is a new
+  // version of a policy, a regulation of a regulation. Older rows have no
+  // doc_type recorded — treat those as regulations, which is what they were.
+  versionCandidates() {
+   const want = this.isPolicyType() ? 'policy' : 'regulation';
+   return EXISTING_REGS.filter(r => (r.doc_type || 'regulation') === want);
+  },
+  // Wording follows the type so a policy isn't asked about "laws".
+  versionNoun() { return this.isPolicyType() ? 'policy' : 'regulation'; },
+  hasReg() { return this.versionCandidates().length > 0; },
   // Existing in-force regulations in the SAME jurisdiction that this document
   // could be a newer version of. Scoped by jurisdiction so the list is relevant.
   // Significant tokens of a name for similarity — drop years, version words and
@@ -592,17 +650,24 @@ function uploadWizard() {
   // All in-force regs, RANKED (not filtered) — never hides a candidate behind a
   // brittle jurisdiction-string match. Split into likely vs. the rest.
   versionRanked() {
-   const scored = EXISTING_REGS.map(r => ({r, s:this._regScore(r)}))
+   const scored = this.versionCandidates().map(r => ({r, s:this._regScore(r)}))
      .sort((a,b) => b.s - a.s);
    return {
     likely: scored.filter(x => x.s >= 40).map(x => x.r),
     other:  scored.filter(x => x.s <  40).map(x => x.r),
    };
   },
-  regCount() { return EXISTING_REGS.length; },
+  regCount() { return this.versionCandidates().length; },
   selectedParentName() {
    const r = EXISTING_REGS.find(x => String(x.id) === String(this.meta.version_of));
    return r ? this.prettyReg(r.name) : 'the old version';
+  },
+  // Clearing the link when the type flips: a parent picked as a regulation is not
+  // a valid parent once the document is re-typed as a policy (and vice versa).
+  onTypeChanged() {
+   if(!this.meta.version_of) return;
+   const ok = this.versionCandidates().some(r => String(r.id) === String(this.meta.version_of));
+   if(!ok){ this.meta.version_of=''; this.versionAutoLinked=null; }
   },
   // True while the auto-linked suggestion is still the chosen one. Goes false the
   // moment the user picks something else, so the hint follows the dropdown.
@@ -614,7 +679,7 @@ function uploadWizard() {
   // has been chosen yet — drives the inline "looks like a newer version of X" nudge.
   topSuggestion() {
    if(this.meta.version_of) return null;
-   const scored = EXISTING_REGS.map(r => ({r, s:this._regScore(r)}))
+   const scored = this.versionCandidates().map(r => ({r, s:this._regScore(r)}))
      .sort((a,b) => b.s - a.s)[0];
    return (scored && scored.s >= 100) ? scored.r : null;
   },
@@ -679,7 +744,7 @@ function uploadWizard() {
    // fetch ever fired and left the wizard sitting on "Processing document…".
    const isPolicy = (this.meta.confirmed_type||'').toLowerCase().includes('policy');
    // Version lineage — only for regulations, and only when a parent was chosen.
-   if(!isPolicy && this.meta.version_of){
+   if(this.meta.version_of){
     fd.append('version_of', this.meta.version_of);
     fd.append('old_version_action', this.meta.old_version_action || 'supersede');
    }

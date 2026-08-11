@@ -446,6 +446,33 @@ def get_chunk_provision(node_id: str) -> dict | None:
     return dict(row) if row else None
 
 
+def chunks_for_doc(doc_title: str) -> list[dict]:
+    """Every indexed chunk of one document, WITH its text, in stored order.
+
+    The other readers here either return metadata without content
+    (get_chunk_provision, tagged_chunks_for_docs) or answer a query
+    (search_bm25). Requirement extraction needs neither: it has to walk one
+    regulation's provisions exhaustively, so it needs the whole document's
+    text, keyed by the same node_id everything else cites.
+
+    Returns [] when the document has no indexed chunks — an unindexed
+    regulation has no provisions to extract, which is not an error.
+    """
+    if not doc_title or not BM25_DB_PATH.exists():
+        return []
+    try:
+        with _connect() as conn:
+            rows = conn.execute(
+                "SELECT node_id, content, article_ref, regulation_name, "
+                "       doc_title, jurisdiction, doc_type "
+                "FROM bm25_index WHERE doc_title = ? ORDER BY rowid",
+                (doc_title,),
+            ).fetchall()
+    except sqlite3.OperationalError:
+        return []
+    return [dict(r) for r in rows]
+
+
 def tagged_chunks_for_docs(
     doc_titles:       list[str] | None = None,
     doc_type:         str | None = None,

@@ -66,10 +66,15 @@ class Command(BaseCommand):
         w('   ' + (block.replace('\n', '\n   ') if block else '(empty)'))
 
         ok = sigs.count() == 2 and gold.count() == 1 and bool(block)
-        w(self.style.SUCCESS('\n✓ FEEDBACK LOOP OK') if ok else self.style.ERROR('\n✗ loop incomplete'))
-
-        if not opts['keep']:
-            FeedbackSignal.objects.filter(source_id__in=[approved.pk, rejected.pk]).delete()
-            GoldExemplar.objects.filter(source_id=approved.pk).delete()
-            run.delete()   # cascades to the results
-            w('\n(cleaned up demo rows — pass --keep to retain them)')
+        try:
+            # ASCII only: a non-cp1252 glyph here raises UnicodeEncodeError on a
+            # Windows console, which previously aborted the command BEFORE the
+            # cleanup below and left demo rows in the real database.
+            w(self.style.SUCCESS('\n[PASS] FEEDBACK LOOP OK') if ok
+              else self.style.ERROR('\n[FAIL] loop incomplete'))
+        finally:
+            if not opts['keep']:
+                FeedbackSignal.objects.filter(source_id__in=[approved.pk, rejected.pk]).delete()
+                GoldExemplar.objects.filter(source_id=approved.pk).delete()
+                run.delete()   # cascades to the results
+                w('\n(cleaned up demo rows — pass --keep to retain them)')

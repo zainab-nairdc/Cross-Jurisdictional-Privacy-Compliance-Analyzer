@@ -399,3 +399,100 @@ class TaxonomyNode(models.Model):
         for c in self.children.all():
             n += 1 + c.descendant_count()
         return n
+
+
+# ── Requirement — canonical, regulation-level knowledge ──────────────────────
+
+class Requirement(models.Model):
+    """One regulatory requirement, owned by a REGULATION rather than by a run.
+
+    The distinction this model exists to make:
+
+      a Requirement is persistent canonical knowledge — what a regulation
+      demands, extracted once and reused;
+      an ObligationMapping is a run-specific observation — whether one policy
+      satisfied that demand on one occasion.
+
+    Before this, obligations existed only as rows hanging off a MappingAnalysis,
+    so analysing the same regulation twice produced two unrelated obligation
+    sets with no way to say they were about the same thing. Requirements are
+    keyed per regulation VERSION: a new version is a separate Document and gets
+    its own extraction, because asserting that v2's obligations equal v1's is a
+    judgement no code should make silently (see `carried_from`).
+    """
+
+    MIGRATED = 'migrated'
+    LLM      = 'llm'
+    HUMAN    = 'human'
+    SOURCE_CHOICES = [
+        (MIGRATED, 'Migrated from legacy analysis rows'),
+        (LLM,      'Extracted by the local model'),
+        (HUMAN,    'Written or corrected by a person'),
+    ]
+
+    CRITICAL = 'critical'
+    HIGH     = 'high'
+    MEDIUM   = 'medium'
+    LOW      = 'low'
+    SEVERITY_CHOICES = [
+        (CRITICAL, 'Critical'), (HIGH, 'High'),
+        (MEDIUM,   'Medium'),   (LOW,  'Low'),
+    ]
+
+    regulation      = models.ForeignKey('library.Document', on_delete=models.CASCADE,
+                                        related_name='requirements')
+    # Identity. Deterministic (see apps.library.requirements.make_key) so the
+    # same source yields the same key on every run — that is what makes both the
+    # backfill and ensure_requirements idempotent.
+    key             = models.CharField(max_length=40, db_index=True)
+
+    text            = models.TextField()
+    title           = models.CharField(max_length=300, blank=True)
+
+    # ── Provenance, NOT identity ──
+    # A chunk is not permanently equivalent to one requirement: a single
+    # provision can impose several obligations, and a later extraction must be
+    # free to record them separately. So this is indexed but deliberately NOT
+    # unique — uniqueness lives on (regulation, key).
+    article_ref     = models.CharField(max_length=100, blank=True)
+    source_chunk_id = models.CharField(max_length=64, blank=True, db_index=True)
+    source_quote    = models.TextField(blank=True)
+
+    topics            = models.JSONField(default=list, blank=True)
+    # The seriousness of the OBLIGATION itself. Distinct from
+    # ObligationMapping.severity, which grades a run's coverage verdict and is
+    # left exactly as it was.
+    inherent_severity = models.CharField(max_length=10, choices=SEVERITY_CHOICES,
+                                         null=True, blank=True)
+    applicability     = models.CharField(max_length=200, blank=True)
+    scope_note        = models.TextField(blank=True)
+
+    # Version lineage. Set only when someone establishes that this requirement
+    # continues one from an earlier version — never inferred.
+    carried_from      = models.ForeignKey('self', null=True, blank=True,
+                                          on_delete=models.SET_NULL,
+                                          related_name='carried_to')
+
+    extraction_source = models.CharField(max_length=12, choices=SOURCE_CHOICES,
+                                         default=LLM, db_index=True)
+    extraction_model  = models.CharField(max_length=64, blank=True)
+
+    created_at        = models.DateTimeField(auto_now_add=True)
+    updated_at        = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['regulation_id', 'article_ref', 'id']
+        constraints = [
+            models.UniqueConstraint(fields=['regulation', 'key'],
+                                    name='uniq_requirement_key_per_regulation'),
+        ]
+
+    def __str__(self):
+        return f'{self.article_ref or "?"} — {(self.title or self.text)[:60]}'
+
+    @property
+    def is_migrated(self) -> bool:
+        """Migrated rows are a grounded baseline rebuilt from what past runs
+        cited, not output of the extraction pipeline. Kept distinguishable so
+        they are never mistaken for a native extraction."""
+        return self.extraction_source == self.MIGRATED

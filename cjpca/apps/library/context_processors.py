@@ -19,15 +19,19 @@ def upload_taxonomy(request):
     try:
         import json
         from apps.library.models import Document, TaxonomyNode
-        # In-force regulations the wizard can offer as "this is a newer version of…".
-        # Only active regulations (not superseded, not drafts) are valid parents.
+        # Documents the wizard can offer as "this is a newer version of…".
+        # Regulations AND internal policies: a policy gets reissued just as often
+        # as a law, and the wizard matches candidates to the type being uploaded.
+        # Only active documents (not superseded, not drafts) are valid parents.
         existing_regs = [
             {"id": d.pk, "name": d.name, "jurisdiction": d.jurisdiction or "",
-             "category": d.regulation_category or "", "full_name": d.full_name or ""}
+             "category": d.regulation_category or "", "full_name": d.full_name or "",
+             "doc_type": d.doc_type or ""}
             for d in Document.objects.filter(
-                doc_type=Document.REGULATION, superseded=False, status='indexed'
-            ).order_by("jurisdiction", "name").only(
-                "id", "name", "jurisdiction", "regulation_category", "full_name")
+                doc_type__in=[Document.REGULATION, Document.POLICY],
+                superseded=False, status='indexed',
+            ).order_by("doc_type", "jurisdiction", "name").only(
+                "id", "name", "jurisdiction", "regulation_category", "full_name", "doc_type")
         ]
         return {
             "custom_jurisdictions": list(

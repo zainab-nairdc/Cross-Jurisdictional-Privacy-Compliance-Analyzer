@@ -223,7 +223,11 @@ if not DEBUG:
 # Retrieval reranking from reviewer feedback (approved clauses up, rejected down).
 # Safe no-op until approvals exist; this is the lever the eval showed works.
 FEEDBACK_RERANK_ENABLED = True
-# Generation few-shot lever — OFF: the A/B eval showed it does not reliably help.
+# Generation few-shot lever — EXPERIMENTAL / UNTRUSTED. Keep OFF in production.
+# `feedback_eval` is circular: it injects the approved conclusion into the prompt
+# and then scores similarity to that same conclusion, so its delta (-0.027 in an
+# early run, +0.070 on 2026-08-11) does not establish usefulness either way.
+# Do not enable without a non-circular evaluation.
 FEEDBACK_FEWSHOT_ENABLED = False
 
 # ── Structure-aware retrieval (navigator-lite) ───────────────────────────────

@@ -96,17 +96,53 @@ def build_fewshot(topic, k=3) -> str:
     return '\n'.join(lines)
 
 
-def chunk_feedback_scores():
-    """Net feedback per chunk_id, aggregated from all signals:
-    approve -> +1 on the row's chunks, reject -> -1. This is the retrieval lever's
-    memory — which chunks reviewers have blessed or rejected."""
+# Signals carrying this marker in `before` are retained for audit but are
+# EXCLUDED from retrieval scoring (see purge_document_learning(mode='keep')).
+RETIRED_KEY = '_retired'
+
+
+def chunk_feedback_scores(topic=None, version_scope=True):
+    """Net feedback per chunk_id: approve -> +1 on the row's chunks, reject -> -1.
+    This is the retrieval lever's memory — which chunks reviewers blessed or rejected.
+
+    Scoping (all three matter for regulatory defensibility):
+
+    `topic`   — when the retrieval path is EXPLICITLY topic-scoped, only feedback
+                recorded under that same taxonomy topic counts. Without this, an
+                approval given for 'cross_border' also re-ranks that clause for an
+                unrelated 'data_subject_rights' query. Signals with a blank topic
+                are excluded from a topic-scoped call: relevance can't be
+                established, so they are not assumed relevant. When `topic` is None
+                the caller is not scoped and the historical global behaviour is
+                preserved.
+
+    `version_scope` — feedback is only actionable under the taxonomy + model it was
+                gathered on. Stale rows are IGNORED for retrieval but never deleted;
+                they remain queryable for audit and history.
+
+    Retired signals (see RETIRED_KEY) are skipped: retained for audit, inert for
+    retrieval.
+
+    NOTE (known limitation): only 'approve' and 'reject' carry weight. A 'modify'
+    signal is stored with full before/after detail but contributes 0 here — a
+    reviewer CORRECTING an answer currently teaches the retrieval layer nothing.
+    Left unchanged deliberately; weighting it needs a product/evaluation decision.
+    """
     from .models import FeedbackSignal
+    qs = FeedbackSignal.objects.all()
+    if version_scope:
+        tax, model = _versions()
+        qs = qs.filter(taxonomy_version=tax, model_version=model)
+    if topic:
+        qs = qs.filter(topic__iexact=topic)
     scores: dict[str, int] = {}
-    for s in FeedbackSignal.objects.all().only('kind', 'before'):
+    for s in qs.only('kind', 'before'):
         w = 1 if s.kind == 'approve' else (-1 if s.kind == 'reject' else 0)
         if not w:
             continue
         b = s.before or {}
+        if b.get(RETIRED_KEY):
+            continue
         for key in ('chunk_id_a', 'chunk_id_b'):
             cid = b.get(key)
             if cid:
@@ -121,13 +157,23 @@ def _node_chunk_id(n):
             or getattr(node, 'node_id', None) or getattr(node, 'id_', None))
 
 
-def feedback_rerank(nodes, alpha=0.5, scores=None):
-    """Re-order retrieved nodes by (normalised base score) + alpha * net-feedback.
+def feedback_rerank(nodes, alpha=0.5, scores=None, topic=None):
+    """Re-order retrieved nodes by (normalised base score) + alpha * bounded-feedback.
+
     Base scores are min-max normalised to 0..1 within the candidate set so the
-    feedback boost is meaningful regardless of the reranker's score scale, and
-    bounded so it can't run away. Deterministic: a reviewer-approved chunk moves
-    up, a rejected one moves down. Unchanged when there's no feedback (cold start)."""
-    scores = chunk_feedback_scores() if scores is None else scores
+    feedback term is meaningful regardless of the reranker's score scale.
+
+    The feedback term is CLAMPED to [-1, +1] before scaling, so a chunk's total
+    feedback advantage can never exceed `alpha` (0.5) — half the base range. One
+    approval and fifty approvals move a chunk by exactly the same amount. Without
+    the clamp, three approvals (0.5 * 3 = 1.5) exceeded the entire base score range
+    and pinned a chunk at rank 1 permanently, regardless of relevance to the query.
+
+    `topic` is forwarded to chunk_feedback_scores() so an explicitly topic-scoped
+    retrieval only sees feedback from that topic. Deterministic: a reviewer-approved
+    chunk moves up, a rejected one moves down. Exact no-op on a cold start.
+    """
+    scores = chunk_feedback_scores(topic=topic) if scores is None else scores
     if not scores or not nodes:
         return nodes
     bases = [float(getattr(n, 'score', 0) or 0) for n in nodes]
@@ -136,7 +182,8 @@ def feedback_rerank(nodes, alpha=0.5, scores=None):
 
     def adjusted(n):
         base = (float(getattr(n, 'score', 0) or 0) - lo) / rng
-        return base + alpha * scores.get(_node_chunk_id(n), 0)
+        net = scores.get(_node_chunk_id(n), 0)
+        return base + alpha * max(-1, min(1, net))
 
     return sorted(nodes, key=adjusted, reverse=True)
 
@@ -178,14 +225,20 @@ def document_learning_footprint(doc):
 def purge_document_learning(doc, mode='keep'):
     """Apply the reviewer's choice for a document about to be deleted.
 
-    mode='keep':  retain the reviewer decisions and approved exemplars. Their
-                   source rows are about to vanish, so each row is tombstoned
-                   with the document name: without that marker the dangling
-                   source_id could later be re-matched to an unrelated row (pks
-                   are reused after deletion on SQLite), silently attributing
-                   old feedback to new work. Gold stays active, so approved
-                   conclusions keep steering generation. The document's chunks
-                   are purged either way, so its retrieval boosts go inert.
+    mode='keep':  RETAIN the reviewer decisions and approved exemplars for audit,
+                   but make them INERT for retrieval and generation:
+                     - each signal is tombstoned in `note` with the document name,
+                       and flagged RETIRED_KEY in `before` so chunk_feedback_scores()
+                       skips it while the original chunk ids stay readable for audit;
+                     - each exemplar is deactivated (active=False), which the
+                       existing gold_for_topic() filter already respects.
+                   Retiring is REQUIRED, not cosmetic: chunk ids are a deterministic
+                   hash of (doc_title, chunk_id, index) — see ingestion.chunker._node_id
+                   — so re-ingesting the same document title regenerates byte-identical
+                   chunk ids. Without retiring, deleted-document feedback would silently
+                   reattach on re-ingest, possibly to different text under the same id.
+                   The dangling source_id is also why the tombstone matters: pks are
+                   reused after deletion on SQLite.
     mode='purge': delete the signals and exemplars too, so nothing this document
                   taught the system survives it.
 
@@ -208,10 +261,14 @@ def purge_document_learning(doc, mode='keep'):
             marker = f'[source document deleted: {doc.name}]'
             out['signals'] = signals.count()
             out['gold'] = gold.count()
-            for s in signals.only('pk', 'note'):
+            for s in signals.only('pk', 'note', 'before'):
                 if marker not in (s.note or ''):
                     s.note = f'{s.note}\n{marker}'.strip()
-                    s.save(update_fields=['note'])
+                b = s.before or {}
+                b[RETIRED_KEY] = True
+                s.before = b
+                s.save(update_fields=['note', 'before'])
+            gold.update(active=False)
     except Exception:
         import logging
         logging.getLogger(__name__).exception('purge_document_learning failed')
@@ -224,12 +281,19 @@ def capture_comparison_transition(result, new_lifecycle, actor=None):
     the review flow."""
     try:
         kind = {'approved': 'approve', 'rejected': 'reject'}.get(new_lifecycle, 'modify')
-        # Topic key: prefer a taxonomy tag if present, else the run's topic, else blank.
+        # Topic key — MUST match the topic the retrieval was scoped by, because
+        # chunk_feedback_scores(topic=...) filters on equality with it.
+        # ComparisonRun.topics holds the analyst-selected taxonomy tags that were
+        # pushed down into _scoped_retrieve, so it is authoritative. principle_ids
+        # is only a fuzzy text probe (_detect_principles) that can match several
+        # unrelated tags and return them in TAXONOMY dict order — using it first
+        # would file feedback under a topic the run never retrieved against.
+        # Falls back to it for full-scope runs, which carry no selected topic.
         topic = ''
-        if getattr(result, 'principle_ids', None):
-            topic = str(result.principle_ids[0])
-        elif result.run_id and getattr(result.run, 'topics', None):
+        if result.run_id and getattr(result.run, 'topics', None):
             topic = str(result.run.topics[0])
+        elif getattr(result, 'principle_ids', None):
+            topic = str(result.principle_ids[0])
         reg_a = result.run.reg_a.name if result.run_id else ''
         reg_b = result.run.reg_b.name if result.run_id else ''
         query = f'{result.citation_a} vs {result.citation_b or "—"}'
