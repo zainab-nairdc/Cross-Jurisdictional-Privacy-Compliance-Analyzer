@@ -160,7 +160,7 @@ class PipelineTests(TestCase):
     def _chat(self, spans, rule):
         """Stub answering stage 1 then stage 2 by prompt shape."""
         def chat(prompt, model=None):
-            if 'marking up' in prompt:
+            if '"spans"' in prompt:
                 return {'spans': [{'source_quote': s} for s in spans
                                   if s in prompt]}
             return dict(rule)
@@ -174,11 +174,11 @@ class PipelineTests(TestCase):
         seen = {'n': 0}
 
         def chat(prompt, model=None):
-            if 'marking up' in prompt:
+            if '"spans"' in prompt:
                 return {'spans': [{'source_quote': s} for s in spans if s in prompt]}
             seen['n'] += 1
-            return {'requirement_text': f'The Guardian must perform duty number {seen["n"]} '
-                                        f'as set out by the Authority.',
+            return {'requirement_text': f'The Data Protection Guardian must carry out '
+                                        f'duty {seen["n"]}: {spans[seen["n"]-1][:70]}.',
                     'title': f'duty {seen["n"]}', 'applicability': 'Data Controller',
                     'topics': ['governance']}
 
@@ -191,7 +191,8 @@ class PipelineTests(TestCase):
     def test_severity_is_never_populated(self):
         chat = self._chat(
             ['Assisting the data controller in exercising his rights and adhering to his duties'],
-            {'requirement_text': 'The Guardian must assist the controller with its duties.',
+            {'requirement_text': 'The Guardian must help the data controller exercise '
+                                 'his rights and adhere to his duties.',
              'title': 'assist', 'applicability': '', 'topics': []})
         got, _ = extract_from_chunk(CHUNK, chat=chat)
         self.assertTrue(got)
@@ -201,7 +202,8 @@ class PipelineTests(TestCase):
     def test_extractor_version_is_stamped(self):
         chat = self._chat(
             ['Assisting the data controller in exercising his rights and adhering to his duties'],
-            {'requirement_text': 'The Guardian must assist the controller with its duties.',
+            {'requirement_text': 'The Guardian must help the data controller exercise '
+                                 'his rights and adhere to his duties.',
              'title': 'assist', 'applicability': '', 'topics': []})
         got, _ = extract_from_chunk(CHUNK, chat=chat)
         self.assertEqual(got[0]['extraction_model'], EXTRACTOR_VERSION)
@@ -235,7 +237,7 @@ class ExceptionHandlingTests(TestCase):
         for stem in ("Processing is prohibited without consent, unless necessary for:",
                      'The controller may process data except where the subject objects.',
                      'This applies provided that adequate safeguards exist.',
-                     'Records are kept subject to the retention schedule.'):
+                     'subject to the conditions prescribed by the Board,'):
             self.assertTrue(stem_introduces_exceptions(stem), stem)
 
     def test_duty_stems_are_not_treated_as_exceptions(self):
@@ -249,7 +251,7 @@ class ExceptionHandlingTests(TestCase):
 
         def chat(prompt, model=None):
             prompts.append(prompt)
-            if 'marking up' in prompt:
+            if '"spans"' in prompt:
                 stem = "Processing Personal data is prohibited without the data subject's consent"
                 return {'spans': [{'source_quote': stem}] if stem in prompt else []}
             return {'requirement_text': 'The data controller may process personal data '
@@ -262,7 +264,7 @@ class ExceptionHandlingTests(TestCase):
 
         self.assertEqual(len(got), 1, 'exceptions were extracted as separate rules')
         # No prompt should ever have asked stage 1 about an exception item alone.
-        stage1 = [p for p in prompts if 'marking up' in p]
+        stage1 = [p for p in prompts if '"spans"' in p]
         self.assertEqual(len(stage1), 1)
         self.assertNotIn('taking steps at the request', stage1[0])
         # The exception text is offered to stage 2 as CONDITIONS instead.
@@ -387,9 +389,10 @@ class SubjectPositionActorTests(TestCase):
             self.assertFalse(ok, bad)
             self.assertIn('subject', why)
 
-    def test_passive_without_an_agent_is_rejected(self):
+    def test_impersonal_subject_without_an_agent_is_accepted(self):
+        # 'record' is a legal instrument; this is a real impersonal provision.
         ok, why = self._v('The record shall be published in the Official Gazette.')
-        self.assertFalse(ok)
+        self.assertTrue(ok, why)
 
     def test_non_actor_subject_is_rejected(self):
         ok, why = self._v('Processing must be necessary for the performance of a contract.')
@@ -445,11 +448,17 @@ class StageOneFragmentTests(TestCase):
     PASSAGE = ('the data controller shall: 1. keep records; '
                '2. shall be published in the Official Gazette.')
 
-    def test_empty_span_reported_as_such(self):
+    def test_all_empty_spans_are_a_technical_failure_not_a_judgement(self):
+        # A reply carrying span objects with no quotes is malformed output.
+        # It is retried, and if it fails again it is classified as technical
+        # rather than being mistaken for 'the model found nothing'.
+        from reasoning.requirement_extract_v2 import STAGE1_TECHNICAL
         chat = lambda p, m=None: {'spans': [{'source_quote': ''}, {'source_quote': '   '}]}
-        spans, bad = find_spans(self.PASSAGE, chat=chat)
+        diag = {}
+        spans, bad = find_spans(self.PASSAGE, chat=chat, diag=diag)
         self.assertEqual(spans, [])
-        self.assertTrue(all('had no quote' in b for b in bad))
+        self.assertEqual(diag['category'], STAGE1_TECHNICAL)
+        self.assertTrue(any('technical failure' in b for b in bad))
 
     def test_list_lead_in_is_not_a_provision(self):
         chat = lambda p, m=None: {'spans': [{'source_quote': 'the data controller shall:'}]}
@@ -468,6 +477,170 @@ class StageOneFragmentTests(TestCase):
         spans, bad = find_spans(self.PASSAGE, chat=chat)
         self.assertEqual(spans, [])
         self.assertIn('too short', bad[0])
+
+
+class PluralActorTests(TestCase):
+    """'party' is not a substring of 'parties' — that cost real requirements."""
+
+    CHUNK = ('The parties shall keep records. The authorities shall publish '
+             'guidance. Companies must appoint a representative. '
+             'Data processors shall assist the controller.')
+    QUOTE = 'The parties shall keep records of every processing activity'
+
+    def _v(self, text, chunk=None):
+        return verify({'requirement_text': text, 'applicability': '', 'topics': [],
+                       'title': 't'}, self.QUOTE, chunk or (self.CHUNK + ' ' + self.QUOTE))
+
+    def test_singulariser(self):
+        from reasoning.requirement_extract_v2 import _singular
+        for plural, singular in (('parties', 'party'), ('authorities', 'authority'),
+                                 ('companies', 'company'), ('persons', 'person'),
+                                 ('banks', 'bank'), ('processors', 'processor'),
+                                 ('controller', 'controller')):
+            self.assertEqual(_singular(plural), singular)
+
+    def test_plural_actors_are_accepted(self):
+        for text in ('The parties must retain records of each processing activity.',
+                     'The authorities must publish guidance on the new rules.',
+                     'Companies must appoint a representative in the Kingdom.',
+                     'Data processors must assist the controller with its duties.'):
+            ok, why = self._v(text)
+            self.assertTrue(ok, f'{text} -> {why}')
+
+    def test_an_actor_absent_from_the_source_is_still_rejected(self):
+        ok, why = self._v('The licensees must submit an annual return to the regulator.')
+        self.assertFalse(ok)
+        self.assertIn('not named in the source', why)
+
+
+class ImpersonalProvisionTests(TestCase):
+    """Real rules that bind an instrument rather than a party."""
+
+    CHUNK = ('A fee shall be imposed on an application to record under the register. '
+             'The register shall comprise, at least, the prescribed information. '
+             'Notifications shall be promptly recorded upon receipt. '
+             'The Authority shall prescribe the information required.')
+
+    def _v(self, text, quote):
+        return verify({'requirement_text': text, 'applicability': '', 'topics': [],
+                       'title': 't'}, quote, self.CHUNK)
+
+    def test_impersonal_provisions_are_accepted(self):
+        cases = [
+            ('A fee must be charged on every application to record in the register.',
+             'A fee shall be imposed on an application to record under the register'),
+            ('The register must contain at least the information prescribed by the Authority.',
+             'The register shall comprise, at least, the prescribed information'),
+            ('Notifications must be recorded without delay once they are received.',
+             'Notifications shall be promptly recorded upon receipt'),
+        ]
+        for text, quote in cases:
+            ok, why = self._v(text, quote)
+            self.assertTrue(ok, f'{text} -> {why}')
+
+    def test_arbitrary_subjectless_output_is_still_rejected(self):
+        # The impersonal path must not become a hole for fragments.
+        for bad in ('shall be imposed on an application to record in the register',
+                    'must be recorded without any undue delay whatsoever'):
+            ok, why = self._v(bad, 'A fee shall be imposed on an application to record')
+            self.assertFalse(ok, bad)
+            self.assertIn('subject', why)
+
+    def test_an_abstraction_is_not_an_impersonal_provision(self):
+        ok, why = self._v('Processing must be necessary for the performance of a contract.',
+                          'A fee shall be imposed on an application to record')
+        self.assertFalse(ok)
+        self.assertIn('not a legal actor', why)
+
+
+class SubjectToTests(TestCase):
+    """'subject to penalties' is a consequence, not an exception."""
+
+    def test_consequence_phrasing_is_not_an_exception(self):
+        from reasoning.requirement_extract_v2 import stem_introduces_exceptions
+        for stem in ('a legal person shall be subject to penalties being double the fines',
+                     'the offender shall be subject to imprisonment'):
+            self.assertFalse(stem_introduces_exceptions(stem), stem)
+
+    def test_genuine_exception_phrasing_still_detected(self):
+        from reasoning.requirement_extract_v2 import stem_introduces_exceptions
+        for stem in ('subject to the provisions of Article (5) of this Law,',
+                     'subject to prior approval by the Authority,',
+                     'Processing is prohibited unless necessary for:',
+                     'This shall not apply to the following:',
+                     'except where the data subject objects,'):
+            self.assertTrue(stem_introduces_exceptions(stem), stem)
+
+    def test_article_59_keeps_its_clauses(self):
+        # Previously "shall be subject to penalties" made the whole chunk get
+        # treated as an exception stem, discarding its sub-clauses.
+        from reasoning.requirement_extract_v2 import stem_introduces_exceptions
+        art59 = ('Without prejudice to criminal liability of a natural person, a legal '
+                 'person shall be subject to penalties double the amounts prescribed.')
+        self.assertFalse(stem_introduces_exceptions(art59))
+
+
+class TruncationTests(TestCase):
+    """Stage 2 must not reduce a provision to its opening phrase."""
+
+    ART11 = ('The Board shall pass a resolution prescribing the conditions to be '
+             'considered when creating the registers as referred to in Paragraph (1).')
+
+    def _v(self, text):
+        return verify({'requirement_text': text, 'applicability': '', 'topics': [],
+                       'title': 't'}, self.ART11, self.ART11)
+
+    def test_opening_clause_only_is_rejected_as_truncation(self):
+        ok, why = self._v('The Board shall pass a resolution.')
+        self.assertFalse(ok)
+        self.assertIn('substance', why)
+
+    def test_a_complete_restatement_is_accepted(self):
+        ok, why = self._v('The Board must issue a resolution setting the conditions '
+                          'that apply when registers are created.')
+        self.assertTrue(ok, why)
+
+    def test_short_provisions_are_not_penalised(self):
+        short = 'The Authority shall maintain the register'
+        ok, why = verify({'requirement_text': 'The Authority must keep the register current.',
+                          'applicability': '', 'topics': [], 'title': 't'},
+                         short, short + ' of notifications and authorisations')
+        self.assertTrue(ok, why)
+
+
+class StageOneRetryTests(TestCase):
+    PASSAGE = 'The Authority shall carry out its duties efficiently and transparently.'
+
+    def test_all_empty_spans_trigger_one_retry(self):
+        calls = {'n': 0}
+
+        def chat(prompt, model=None):
+            calls['n'] += 1
+            if calls['n'] == 1:
+                return {'spans': [{'source_quote': ''}, {'source_quote': '  '}]}
+            return {'spans': [{'source_quote':
+                               'The Authority shall carry out its duties efficiently'}]}
+
+        spans, bad = find_spans(self.PASSAGE, chat=chat)
+        self.assertEqual(calls['n'], 2, 'no retry was attempted')
+        self.assertEqual(len(spans), 1, bad)
+
+    def test_a_retry_that_is_also_empty_gives_up_cleanly(self):
+        chat = lambda p, m=None: {'spans': [{'source_quote': ''}]}
+        spans, bad = find_spans(self.PASSAGE, chat=chat)
+        self.assertEqual(spans, [])
+        self.assertIn('technical failure', bad[0])
+
+    def test_a_good_first_reply_is_not_retried(self):
+        calls = {'n': 0}
+
+        def chat(prompt, model=None):
+            calls['n'] += 1
+            return {'spans': [{'source_quote':
+                               'The Authority shall carry out its duties efficiently'}]}
+
+        find_spans(self.PASSAGE, chat=chat)
+        self.assertEqual(calls['n'], 1)
 
 
 class CoexistenceTests(TestCase):

@@ -29,9 +29,11 @@ two can coexist in the store.
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 import sys
+import time
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
@@ -67,9 +69,18 @@ _VERDICT_RE = re.compile(
 # extracting them separately produced "Data subjects must take steps to enter
 # into a contract", a duty on the wrong party that the law does not impose.
 _EXCEPTION_STEM_RE = re.compile(
-    r'\b(?:unless|except\s+where|except\s+in|other\s+than|'
-    r'provided\s+that|subject\s+to|save\s+where|save\s+in|'
+    r'\b(?:unless|except\s+where|except\s+in|except\s+for|other\s+than|'
+    r'provided\s+that|save\s+where|save\s+in|'
     r'shall\s+not\s+apply\s+to|is\s+not\s+required)\b', re.IGNORECASE)
+
+# "subject to" is only an exception marker when it governs a cross-reference or
+# a condition ("subject to the provisions of Article 5", "subject to prior
+# approval"). Bare "subject to penalties" is a consequence, and reading it as an
+# exception made Article (59) discard its own sub-clauses.
+_QUALIFIED_SUBJECT_TO_RE = re.compile(
+    r'\bsubject\s+to\s+(?:the\s+|any\s+)?'
+    r'(?:provision|article|paragraph|section|clause|condition|approval|'
+    r'prior|exception|limitation|requirement)', re.IGNORECASE)
 
 # The Stage 2 instruction is "WHO + must/shall + ACTION + CONDITION or
 # DEADLINE". The model has been observed emitting that skeleton verbatim —
@@ -104,9 +115,57 @@ _ACTOR_NOUNS = (
 )
 
 
+# Subjects that are not a party but still carry a rule. "A fee shall be
+# imposed", "The register shall comprise ...", "Notifications shall be promptly
+# recorded" are real obligations written impersonally — the law acts on an
+# instrument rather than naming who acts. Deliberately concrete: 'processing'
+# and similar abstractions are excluded, because "Processing must be necessary
+# for ..." is an exception fragment, not a rule.
+_INSTRUMENT_NOUNS = (
+    'fee', 'register', 'notification', 'notice', 'record', 'report',
+    'application', 'decision', 'resolution', 'penalty', 'fine', 'authorisation',
+    'authorization', 'request', 'complaint', 'licence', 'license', 'certificate',
+    'decree', 'order', 'budget', 'data', 'appointment', 'register',
+)
+
+
+def _singular(word: str) -> str:
+    """Crude morphological singulariser — enough for legal actor nouns.
+
+    Replaces a substring test that could not see "parties" as "party", because
+    'party' is not a substring of 'parties'. The same blindness hit
+    "authorities" and "companies", and each cost real requirements.
+    """
+    w = (word or '').lower()
+    for suf, rep in (('ies', 'y'), ('sses', 'ss'), ('ches', 'ch'),
+                     ('shes', 'sh'), ('xes', 'x'), ('ses', 's'), ('s', '')):
+        if w.endswith(suf) and len(w) > len(suf) + 1:
+            return w[:-len(suf)] + rep
+    return w
+
+
+def _head_noun(phrase: str, vocabulary: tuple) -> str:
+    """First word of `phrase` whose singular form is in `vocabulary`."""
+    for tok in re.findall(r'[A-Za-z]+', phrase or ''):
+        s = _singular(tok)
+        if s in vocabulary:
+            return s
+    return ''
+
+
 def stem_introduces_exceptions(stem: str) -> bool:
-    """Does this lead-in introduce exceptions rather than a list of duties?"""
-    return bool(stem) and bool(_EXCEPTION_STEM_RE.search(stem))
+    """Does this lead-in introduce exceptions rather than a list of duties?
+
+    "subject to" alone is not enough: "shall be subject to penalties" is an
+    ordinary consequence clause, not an exception, and treating it as one made
+    Article (59) drop its sub-clauses. The phrase only marks an exception when
+    it governs a cross-reference or a condition.
+    """
+    if not stem:
+        return False
+    if _EXCEPTION_STEM_RE.search(stem):
+        return True
+    return bool(_QUALIFIED_SUBJECT_TO_RE.search(stem))
 
 
 def actor_of(text: str) -> str:
@@ -148,19 +207,35 @@ def has_grounded_actor(text: str, *sources: str) -> tuple[bool, str]:
         return False, 'requirement has no grammatical subject'
 
     src = _norm(' '.join(sources))
-    head = next((n for n in _ACTOR_NOUNS if n in subject.lower()), '')
+    src_tokens = {_singular(t) for t in re.findall(r'[A-Za-z]+', src)}
+
+    # 1. A named legal actor in the subject. Matched by singularised token, so
+    #    "parties" resolves to "party".
+    head = _head_noun(subject, _ACTOR_NOUNS)
     if head:
-        if head not in src:
+        if head not in src_tokens:
             return False, f'actor {head!r} is not named in the source'
         return True, ''
 
-    # Passive with a named agent: the subject is the thing acted on, so the
-    # actor is whoever the `by` phrase names.
+    # 2. Passive with a named agent: the subject is the thing acted on, so the
+    #    actor is whoever the `by` phrase names.
+    # An ungrounded agent is not fatal on its own — the rule may still be a
+    # valid impersonal provision, checked next — so this falls through rather
+    # than returning.
     pm = _PASSIVE_AGENT_RE.search(body[m.end():])
-    if pm:
-        agent = pm.group(1).lower()
-        if agent not in src:
-            return False, f'passive agent {agent!r} is not named in the source'
+    if pm and _singular(pm.group(1)) in src_tokens:
+        return True, ''
+
+    # 3. Impersonal provision. The law can bind an instrument rather than a
+    #    party — "A fee shall be imposed", "The register shall comprise". These
+    #    are real requirements, so they get their own path rather than the actor
+    #    gate being loosened for everyone: the subject must still be a concrete
+    #    legal instrument named in the source, which an arbitrary subject-less
+    #    or invented output cannot satisfy.
+    inst = _head_noun(subject, _INSTRUMENT_NOUNS)
+    if inst:
+        if inst not in src_tokens:
+            return False, f'impersonal subject {inst!r} is not named in the source'
         return True, ''
 
     return False, f'subject {subject[:40]!r} is not a legal actor'
@@ -172,6 +247,48 @@ _CLAUSE_MARKER = re.compile(
     r'(?:(?<=^)|(?<=[.;:])|(?<=\n))\s*'
     r'(\(?\d{1,2}\)?[.)]|\([a-z]\))\s+',
     re.MULTILINE)
+
+
+# Prepended when a first Stage 1 reply came back with span objects but no
+# quotes in any of them.
+_STAGE1_RETRY_NOTE = (
+    'Your previous answer returned spans with an EMPTY "source_quote". That is '
+    'never acceptable. Every element must carry words copied from the passage. '
+    'If the passage imposes no obligation, return {"spans": []}.\n\n')
+
+# Content words carried by a provision. A normalised rule that keeps almost none
+# of them has thrown the substance away — see _keeps_substance.
+_STOPWORDS = {
+    'the', 'and', 'or', 'of', 'to', 'in', 'for', 'a', 'an', 'shall', 'must',
+    'may', 'be', 'is', 'are', 'this', 'that', 'which', 'with', 'by', 'on',
+    'at', 'as', 'from', 'any', 'such', 'not', 'his', 'her', 'its',
+    'their', 'it', 'he', 'she', 'they', 'under', 'upon', 'been',
+}
+# Only applied to substantial provisions; a short one legitimately normalises to
+# something of similar length.
+_SUBSTANCE_MIN_QUOTE = 80
+_SUBSTANCE_MIN_KEPT = 0.35
+
+
+def _content_words(text: str) -> set:
+    return {_singular(t) for t in re.findall(r'[A-Za-z]{3,}', (text or '').lower())
+            if t.lower() not in _STOPWORDS}
+
+
+def _keeps_substance(text: str, quote: str) -> tuple[bool, float]:
+    """Does the rule still carry what the provision was about?
+
+    Article (11) showed the failure this catches: "The Board shall pass a
+    resolution prescribing the conditions to be considered when creating the
+    registers" was normalised to "The board shall pass a resolution", dropping
+    the entire purpose. That is not a rephrasing, it is a truncation, and it
+    reached the anti-copy gate disguised as a copy.
+    """
+    qw = _content_words(quote)
+    if len(quote) < _SUBSTANCE_MIN_QUOTE or not qw:
+        return True, 1.0
+    kept = len(qw & _content_words(text)) / len(qw)
+    return kept >= _SUBSTANCE_MIN_KEPT, kept
 
 
 def _norm(s: str) -> str:
@@ -245,33 +362,43 @@ def segment_clauses(chunk_text: str) -> list[dict]:
     return merged
 
 
-_STAGE1_PROMPT = """You are marking up ONE passage of a regulation. Find every
-span that imposes an obligation.
+_STAGE1_PROMPT = """Mark the spans of this passage that impose a legal obligation.
 
-An obligation is something a party MUST do, MUST NOT do, or MAY do subject to
-conditions. Include ALL of these forms — they are commonly missed:
-- prohibition with exceptions: "X is prohibited unless ..."
-- passive obligation: "the report shall be submitted", "employees shall be recruited"
-- deadline-bearing duty: "shall notify ... within ten working days"
-- conditional duty: "where processing is necessary, the controller shall ..."
-- each item of a numbered list of duties is a SEPARATE obligation
+Stage 1 does ONE job: point at the exact words. Do not rewrite, summarise,
+classify or judge anything.
 
-Definitions, scope statements and recitals impose nothing — return an empty list
-for those.
+An obligation binds someone to act, to refrain, or to exercise a function.
+Include all of these — each has been missed before:
+- a duty on a party:            "the controller shall notify the Authority"
+- a prohibition:                "processing is prohibited without consent"
+- a passive duty:               "the report shall be submitted to the Board"
+- an institutional or statutory duty, including general ones:
+                                "the Authority shall carry out its duties
+                                 efficiently and transparently"
+                                "the Board shall elect a Deputy Chairman"
+- an impersonal duty:           "a fee shall be imposed on an application"
+- a duty with a deadline or condition:
+                                "shall reply within ten working days"
 
-DO NOT rewrite, summarise or explain anything at this stage. Your only job is to
-COPY the exact spans.
+A provision does not need a concrete transaction to be an obligation. A duty to
+exercise a function, or to act in a particular manner, counts.
 
-Return a JSON object with one key "spans", an array. Each element:
-- "source_quote": the span copied CHARACTER FOR CHARACTER from the passage
-  below. It must be long enough to state the obligation on its own.
-- "marker": the clause number/letter it came from if the passage shows one, else ""
+Exclude definitions, scope statements ("this Law shall apply to ..."), recitals,
+and descriptions of what something contains.
+
+Copy each span EXACTLY from the passage. Never return an element whose
+"source_quote" is empty — leave it out instead. If nothing qualifies, return
+{"spans": []}, which is a correct answer.
+
+Return JSON: {"spans": [{"source_quote": "...", "reason": "..."}]}
 
 Passage{ref}:
 ---
 {body}
 ---
 JSON:"""
+
+
 
 
 _STAGE2_PROMPT = """Restate ONE regulatory provision as a single normalised rule.
@@ -281,14 +408,21 @@ The provision:
 {quote}
 ---
 
-Write it in this shape:
-    WHO + must/shall/may + ACTION + CONDITION or DEADLINE
+Write it as: the bound party, then must/shall/may, then the COMPLETE action,
+then every condition, deadline, limit and qualification the provision attaches.
 
 Rules:
-- ONE sentence. Concise. State the rule, not a description of the text.
-- Do NOT copy the provision word for word. Rephrase it into the shape above.
-- If the provision names no actor, use the actor the text implies ONLY if it is
-  stated in the provision; otherwise write the rule impersonally.
+- ONE sentence, but a COMPLETE one. Rephrase — do not copy word for word.
+- Keep EVERYTHING the provision makes legally operative: what must be done, to
+  what or to whom, by when, under what conditions, subject to what limits.
+- Do NOT stop at the opening clause. A provision reading "The Board shall pass a
+  resolution prescribing the conditions to be considered when creating the
+  registers" becomes "The Board must issue a resolution setting the conditions
+  that apply when registers are created" — NOT "The Board shall pass a
+  resolution", which discards what the resolution is for.
+- Add nothing the provision does not say.
+- If the provision names no party, keep the rule impersonal ("A fee must be
+  imposed on an application to record in the register"). Do not invent a party.
 - Never state whether anyone complies with it.
 
 Return a JSON object:
@@ -301,8 +435,68 @@ Return a JSON object:
 JSON:"""
 
 
+# Stage 1 outcome categories. The distinction that matters is whether the model
+# FAILED to answer or DECIDED there was nothing — those were previously
+# indistinguishable, because doc_intel._chat_json returns {} for both a timeout
+# and a well-formed reply, so 20 "no spans array" rejections could not be told
+# apart from genuine judgements.
+STAGE1_TECHNICAL = 'TECHNICAL_FAILURE'
+STAGE1_EMPTY     = 'EMPTY_SPANS'
+STAGE1_VALID     = 'VALID_SPANS'
+
+_STAGE1_MAX_ATTEMPTS = 2      # bounded: one retry, never a loop
+
+
+def _call_model(prompt: str, *, model: str = MODEL, timeout: int = 120) -> tuple:
+    """One model call that classifies its own failure. Never raises.
+
+    Deliberately not doc_intel._chat_json: that is shared with v1 and collapses
+    every failure into {}. This keeps v1 untouched while making the failure mode
+    observable — which is the whole point of the exercise.
+
+    Returns (data|None, diagnostic). The diagnostic never contains document text.
+    """
+    t0 = time.perf_counter()
+    try:
+        import ollama
+        from config import OLLAMA_URL
+        resp = ollama.Client(host=OLLAMA_URL, timeout=timeout).chat(
+            model=model, messages=[{'role': 'user', 'content': prompt}],
+            format='json', options={'temperature': 0, 'num_ctx': 8192})
+        raw = (resp.get('message', {}) or {}).get('content', '') or ''
+    except Exception as exc:
+        name = type(exc).__name__
+        status = 'timeout' if 'timeout' in name.lower() or 'timeout' in str(exc).lower() \
+            else 'call_failed'
+        return None, {'status': status, 'error': name, 'detail': str(exc)[:120],
+                      'elapsed': round(time.perf_counter() - t0, 1),
+                      'response_chars': 0, 'prompt_chars': len(prompt)}
+
+    elapsed = round(time.perf_counter() - t0, 1)
+    base = {'elapsed': elapsed, 'response_chars': len(raw), 'prompt_chars': len(prompt)}
+    if not raw.strip():
+        return None, {'status': 'empty_response', **base}
+    try:
+        data = json.loads(raw)
+    except Exception as exc:
+        return None, {'status': 'parse_failed', 'error': type(exc).__name__, **base}
+    if not isinstance(data, dict):
+        return None, {'status': 'shape_failed', **base}
+    return data, {'status': 'ok', **base}
+
+
+def _spans_of(data) -> list | None:
+    """The spans array from a reply, or None when the field is absent/ill-typed."""
+    if not isinstance(data, dict):
+        return None
+    spans = data.get('spans')
+    if isinstance(spans, dict):
+        spans = [spans]
+    return spans if isinstance(spans, list) else None
+
+
 def find_spans(segment_text: str, article_ref: str = '', *, context: str = '',
-               chat=None) -> tuple[list[dict], list[str]]:
+               chat=None, diag: dict | None = None) -> tuple[list[dict], list[str]]:
     """Stage 1 — locate obligation-bearing spans. No rewriting happens here.
 
     `context` is the enclosing stem ("The Guardian is responsible for the
@@ -310,21 +504,58 @@ def find_spans(segment_text: str, article_ref: str = '', *, context: str = '',
     still come from the passage, so a quote can never span the two.
     """
     body = (segment_text or '').strip()
+    if diag is None:
+        diag = {}
+    diag.update({'category': STAGE1_TECHNICAL, 'attempts': 0, 'elapsed': 0.0,
+                 'statuses': [], 'article_ref': article_ref})
     if not body:
+        diag['category'] = STAGE1_EMPTY
         return [], []
-    chat = chat or _chat_json
-    prefix = (f'Context (for meaning only — do NOT quote from this):\n{context}\n\n'
-              if context else '')
-    data = chat(prefix + _STAGE1_PROMPT.replace('{body}', body)
-                .replace('{ref}', f' ({article_ref})' if article_ref else ''), MODEL)
-    if not isinstance(data, dict):
-        return [], ['stage1: non-object reply']
-    spans = data.get('spans')
-    if isinstance(spans, dict):
-        spans = [spans]
-    if not isinstance(spans, list):
-        return [], ['stage1: no "spans" array']
 
+    prompt = (f'Context (for meaning only — do NOT quote from this):\n{context}\n\n'
+              if context else '') + _STAGE1_PROMPT.replace('{body}', body) \
+        .replace('{ref}', f' ({article_ref})' if article_ref else '')
+
+    spans = None
+    for attempt in range(1, _STAGE1_MAX_ATTEMPTS + 1):
+        diag['attempts'] = attempt
+        text = prompt if attempt == 1 else (_STAGE1_RETRY_NOTE + prompt)
+        if chat is not None:                      # injected stub (tests)
+            data, d = chat(text, MODEL), {'status': 'ok', 'elapsed': 0.0}
+        else:
+            data, d = _call_model(text)
+        diag['statuses'].append(d['status'])
+        diag['elapsed'] = round(diag['elapsed'] + d.get('elapsed', 0.0), 1)
+        for k in ('error', 'detail', 'response_chars', 'prompt_chars'):
+            if k in d:
+                diag[k] = d[k]
+
+        candidate = _spans_of(data)
+        if candidate is None:
+            continue                              # technical: no usable spans field
+        if candidate == []:
+            spans = []                            # a judgement: nothing here
+            break
+        # An array of span objects that all lack a quote is a malformed answer,
+        # not a judgement — leave `spans` unset so this retries and, if it fails
+        # again, is reported as the technical failure it is.
+        if all(not (s.get('source_quote') or '').strip()
+               for s in candidate if isinstance(s, dict)):
+            continue
+        spans = candidate
+        break
+
+    if spans is None:
+        diag['category'] = STAGE1_TECHNICAL
+        return [], [f'stage1: technical failure ({",".join(diag["statuses"])})']
+    if not spans:
+        # The model answered cleanly and found nothing. Distinct from a failure,
+        # and deliberately NOT retried further — that is a judgement to evaluate,
+        # not an error to paper over.
+        diag['category'] = STAGE1_EMPTY
+        return [], []
+
+    diag['category'] = STAGE1_VALID
     ok, bad = [], []
     seen: set = set()
     for s in spans:
@@ -427,11 +658,18 @@ def verify(rule: dict, quote: str, chunk_text: str, *, stem: str = '') -> tuple[
     j = jaccard(text, quote)
     if j >= _MAX_COPY_JACCARD:
         return False, f'requirement is a near-copy of the quote (jaccard {j:.2f})'
-    # Actor last: it is the most specific diagnosis, and running it earlier made
-    # a copied quote report "names no actor" instead of "is a copy".
+    # Actor before substance: a rule with no valid subject is defective in a more
+    # fundamental way than one that is merely short, and diagnosing it as a
+    # truncation would hide that.
     ok_actor, why = has_grounded_actor(text, chunk_text, stem)
     if not ok_actor:
         return False, why
+    # Truncation: a rule that keeps almost none of the provision's content words
+    # is not a shorter statement of it, it is a different and smaller claim.
+    kept_ok, kept = _keeps_substance(text, quote)
+    if not kept_ok:
+        return False, (f"requirement drops the provision's substance "
+                       f"({kept:.0%} of content retained)")
     # NEW — an actor the provision does not name is an inference, not evidence.
     if appl:
         head = appl.lower().replace('the ', '').split()
