@@ -13,8 +13,9 @@ from django.views import View
 from django.views.generic.edit import CreateView
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import login
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import render
+from django.urls import reverse
 from django import forms as django_forms
 from django.utils.decorators import method_decorator
 
@@ -956,3 +957,60 @@ class DocViewerView(View):
             'sections': sections,
             'article_id': target,
         })
+
+
+# ── Site settings (management configuration) ─────────────────────────────────
+
+@method_decorator(role_required('admin'), name='dispatch')
+class SiteSettingsView(View):
+    """GET/POST /settings/ — administrator-facing configuration for the site.
+
+    Deliberately a plain form post rather than an HTMX fragment: these are
+    infrequent, deployment-wide changes, and a full reload is the clearest
+    confirmation that the new setting took effect everywhere.
+    """
+
+    template_name = 'pages/site_settings.html'
+
+    def get(self, request):
+        from .models import SiteSetting
+        return render(request, self.template_name, {
+            'setting': SiteSetting.load(),
+            'jurisdiction_choices': SiteSetting.JURISDICTION_DISPLAY_CHOICES,
+            'saved': request.GET.get('saved') == '1',
+        })
+
+    def post(self, request):
+        from .models import SiteSetting
+
+        setting = SiteSetting.load()
+        mode = (request.POST.get('jurisdiction_display') or '').strip()
+        valid = {c[0] for c in SiteSetting.JURISDICTION_DISPLAY_CHOICES}
+        if mode not in valid:
+            # Unknown value — re-render with an error rather than silently
+            # writing junk into a column every page reads.
+            return render(request, self.template_name, {
+                'setting': setting,
+                'jurisdiction_choices': SiteSetting.JURISDICTION_DISPLAY_CHOICES,
+                'error': 'Pick one of the listed display options.',
+            }, status=400)
+
+        previous = setting.jurisdiction_display
+        setting.jurisdiction_display = mode
+        setting.updated_by = request.user if request.user.is_authenticated else None
+        setting.save()
+
+        if previous != mode:
+            try:
+                from apps.history.audit import log_event
+                log_event(
+                    request.user, 'settings.updated', request=request,
+                    target_type='core.SiteSetting', target_id=setting.pk,
+                    metadata={'field': 'jurisdiction_display',
+                              'from': previous, 'to': mode},
+                    description=f'Changed jurisdiction display from {previous} to {mode}',
+                )
+            except Exception:
+                pass
+
+        return HttpResponseRedirect(f"{reverse('site-settings')}?saved=1")

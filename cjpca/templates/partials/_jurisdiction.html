@@ -1,0 +1,35 @@
+{% load static %}{% comment %}
+Renders a document's jurisdiction the way the administrator configured it in
+Settings → Display. The mode arrives from apps.core.context_processors as
+`jurisdiction_mode` ('name' | 'flag' | 'both'), so every call site stays in
+sync without passing it around.
+
+    {% include 'partials/_jurisdiction.html' with code=doc.jurisdiction label=doc.get_jurisdiction_display %}
+
+Params
+  code   required — the lowercase jurisdiction key ('bahrain', 'india', …)
+  label  optional — display name; falls back to a title-cased code
+  size   optional — 'sm' (17×11) or default (22×16)
+
+Flags are local SVGs under static/img/flags/, NOT a remote CDN: the target
+deployment is air-gapped, where an external <img> renders as a broken box.
+Jurisdictions with no flag asset fall back to a 3-letter chip, so flag-only
+mode is never blank.
+{% endcomment %}{% with mode=jurisdiction_mode|default:"name" %}
+<span style="display:inline-flex;align-items:center;gap:7px;min-width:0;">
+ {% if mode != 'name' %}
+  {% if size == 'sm' %}
+   {% if code == 'bahrain' %}<img src="{% static 'img/flags/bh.svg' %}" width="17" height="11" alt="Bahrain" style="border-radius:2px;object-fit:cover;flex-shrink:0;border:1px solid #E5E8EF;">
+   {% elif code == 'india' %}<img src="{% static 'img/flags/in.svg' %}" width="17" height="11" alt="India" style="border-radius:2px;object-fit:cover;flex-shrink:0;border:1px solid #E5E8EF;">
+   {% elif code == 'kuwait' %}<img src="{% static 'img/flags/kw.svg' %}" width="17" height="11" alt="Kuwait" style="border-radius:2px;object-fit:cover;flex-shrink:0;border:1px solid #E5E8EF;">
+   {% else %}<span style="display:inline-flex;align-items:center;justify-content:center;width:21px;height:13px;border-radius:2px;background:#fff;border:1px solid #E5E8EF;font-size:8px;font-weight:800;color:#002583;flex-shrink:0;">{{ code|upper|slice:":3" }}</span>{% endif %}
+  {% else %}
+   {% if code == 'bahrain' %}<img src="{% static 'img/flags/bh.svg' %}" width="22" height="16" alt="Bahrain" style="border-radius:2px;object-fit:cover;flex-shrink:0;border:1px solid #E5E8EF;">
+   {% elif code == 'india' %}<img src="{% static 'img/flags/in.svg' %}" width="22" height="16" alt="India" style="border-radius:2px;object-fit:cover;flex-shrink:0;border:1px solid #E5E8EF;">
+   {% elif code == 'kuwait' %}<img src="{% static 'img/flags/kw.svg' %}" width="22" height="16" alt="Kuwait" style="border-radius:2px;object-fit:cover;flex-shrink:0;border:1px solid #E5E8EF;">
+   {% else %}<span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:17px;border-radius:3px;background:#fff;border:1px solid #E5E8EF;font-size:9px;font-weight:800;color:#002583;flex-shrink:0;">{{ code|upper|slice:":3" }}</span>{% endif %}
+  {% endif %}
+ {% endif %}
+ {% if mode != 'flag' %}<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;">{% firstof label code|title %}</span>{% endif %}
+</span>
+{% endwith %}

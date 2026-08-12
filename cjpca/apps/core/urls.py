@@ -14,6 +14,8 @@ urlpatterns = [
     path('copilot/scope/preferences/', views.ScopePreferencesView.as_view(), name='copilot-scope-preferences'),
     # GET /viewer/<doc_id>/<article_id>/
     path('viewer/<str:doc_id>/<str:article_id>/', views.DocViewerView.as_view(), name='doc-viewer'),
+    # GET/POST /settings/ — site-wide display configuration (admin)
+    path('settings/', views.SiteSettingsView.as_view(), name='site-settings'),
     # self-signup is intentionally NOT wired. accounts are created by an
     # admin via /accounts/users/new/ and the new user receives a temp
     # password by email. uncomment only if the deployment needs open

@@ -283,9 +283,8 @@
          {% for group in reg_groups %}
          <button type="button" class="jur-tab {% if forloop.first %}is-active{% endif %}"
                  data-jur="{{ group.jur }}" onclick="setJurTab('{{ group.jur|escapejs }}')" role="tab">
-           {% if group.flag %}
-             <img src="https://flagcdn.com/24x18/{{ group.flag }}.png" width="16" height="12" alt="{{ group.label }}">
-           {% endif %}
+           {# Flag alone: the tab already carries the country name. #}
+           {% if jurisdiction_mode != 'name' %}{% include 'partials/_jurisdiction.html' with code=group.jur jurisdiction_mode='flag' size='sm' %}{% endif %}
            <span>{{ group.label }}</span>
            <span class="count" title="Indexed regulation documents in this jurisdiction">{{ group.regs|length }} reg{{ group.regs|length|pluralize }}</span>
          </button>

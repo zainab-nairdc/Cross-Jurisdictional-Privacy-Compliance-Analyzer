@@ -83,7 +83,8 @@ def nav_counts(request):
         return {**counts,
                 'scope_state':          scope_state,
                 'copilot_doc_options':  copilot_doc_options,
-                'copilot_jurisdictions': copilot_jurisdictions}
+                'copilot_jurisdictions': copilot_jurisdictions,
+                'jurisdiction_mode':    _jurisdiction_mode()}
     except Exception:
         return {
             'nav_pending_review':       0,
@@ -94,4 +95,18 @@ def nav_counts(request):
             'scope_state':              None,
             'copilot_doc_options':      [],
             'copilot_jurisdictions':    [],
+            'jurisdiction_mode':        'name',
         }
+
+
+def _jurisdiction_mode():
+    """Admin-chosen jurisdiction display mode ('name' | 'flag' | 'both').
+
+    Read through SiteSetting's own short-lived cache, so this costs nothing on
+    the vast majority of requests. Defaults to 'name' if core isn't migrated.
+    """
+    try:
+        from .models import SiteSetting
+        return SiteSetting.jurisdiction_mode()
+    except Exception:
+        return 'name'

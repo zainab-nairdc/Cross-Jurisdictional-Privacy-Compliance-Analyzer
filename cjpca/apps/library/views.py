@@ -237,6 +237,11 @@ class RegulationsView(TemplateView):
         # AND the JSON blob Alpine consumes.
         for d in regs_list:
             d.topics = _enrich_topics(d)
+            # get_jurisdiction_display() returns the raw lowercase key for
+            # jurisdictions added after the model's choices were fixed ('ksa',
+            # 'qatar', ...). The rendered table needs the same tidy label the
+            # JSON payload gets, so attach it here.
+            d.jur_label = _jur_label(d)
 
         _learned = _learning_counts(regs_list)
 
@@ -1212,6 +1217,14 @@ class FinalizeView(View):
             from arabic.chunk import embed_text, restrategize
             from arabic.embed import embed_texts
             chunks = restrategize(chunks, doc.chunk_strategy)
+            # arabic.analyze chunks under the placeholder source '_analyze_' —
+            # it only receives a file path, so it can't know the title. Stamp the
+            # real one before storing. Without this the chunks are invisible to
+            # every source-filtered query (the doc reads as indexed but returns
+            # nothing) AND survive delete_source(), which filters on the real
+            # title — the ghost-chunk bug, on the Arabic side.
+            for c in chunks:
+                c['source'] = doc.chunk_doc_title
             vecs = embed_texts([embed_text(c) for c in chunks])
             ar_store.delete_source(doc.chunk_doc_title)
             ar_store.add([f'{doc.chunk_doc_title}::{i}' for i in range(len(chunks))],

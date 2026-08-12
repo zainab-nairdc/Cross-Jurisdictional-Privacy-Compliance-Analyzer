@@ -92,7 +92,8 @@
  {# Reg A card #}
  <div style="border:1.5px solid #002583;border-radius:11px;background:#ffffff;padding:12px 14px;margin-bottom:8px;">
  <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
- {% if flag_a %}<img src="https://flagcdn.com/w40/{{ flag_a }}.png" style="width:20px;height:14px;border-radius:2px;object-fit:cover;border:1px solid #E5E8EF;">{% endif %}
+ {# Flag alone: the country name already appears below the title. #}
+ {% if jurisdiction_mode != 'name' %}{% include 'partials/_jurisdiction.html' with code=reg_a.jurisdiction jurisdiction_mode='flag' size='sm' %}{% endif %}
  <span style="font-size:9px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#002583;">Regulation A</span>
  </div>
  {% if all_regs_a|length > 1 %}
@@ -116,7 +117,7 @@
  {# Reg B card #}
  <div style="border:1.5px solid #002583;border-radius:11px;background:#ffffff;padding:12px 14px;margin-top:8px;">
  <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
- {% if flag_b %}<img src="https://flagcdn.com/w40/{{ flag_b }}.png" style="width:20px;height:14px;border-radius:2px;object-fit:cover;border:1px solid #E5E8EF;">{% endif %}
+ {% if jurisdiction_mode != 'name' %}{% include 'partials/_jurisdiction.html' with code=reg_b.jurisdiction jurisdiction_mode='flag' size='sm' %}{% endif %}
  <span style="font-size:9px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#002583;">Regulation B</span>
  </div>
  {% if all_regs_b|length > 1 %}

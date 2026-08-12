@@ -27,3 +27,6 @@ htmlcov/
 .deepeval/
 # pytest last-run cache — regenerated on each test run
 .pytest_cache/
+
+# SQLite anywhere, not just at cjpca/ - a nested cjpca/cjpca/db.sqlite3 slipped past the anchored rule.
+**/db.sqlite3

@@ -1,0 +1,99 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Settings — CJPCA{% endblock %}
+
+{% comment %}
+Management configuration for the website. One card per setting; each card
+shows a live preview of what the choice produces, because the wording of a
+radio ("Flag only") is less clear than seeing the row it renders.
+{% endcomment %}
+
+{% block content %}
+<div class="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden bg-gray-50">
+
+ {# Top bar #}
+ <div class="bg-white border-b border-gray-100 px-6 py-2.5 flex-shrink-0">
+  <h1 style="font-size:14px;font-weight:700;color:#002583;">Settings</h1>
+  <p style="font-size:11px;color:#002583;margin-top:1px;">Site-wide configuration. Changes apply to every user immediately.</p>
+ </div>
+
+ <div style="flex:1;min-height:0;overflow-y:auto;padding:22px 26px 60px;">
+  <div style="max-width:720px;">
+
+   {% if saved %}
+   <div style="display:flex;align-items:center;gap:9px;padding:10px 14px;border-radius:10px;background:#ECFDF3;border:1px solid #ABEFC6;margin-bottom:18px;">
+    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#067647" stroke-width="2" style="flex-shrink:0;"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    <p style="font-size:12px;font-weight:600;color:#067647;margin:0;">Settings saved.</p>
+   </div>
+   {% endif %}
+
+   {% if error %}
+   <div style="display:flex;align-items:center;gap:9px;padding:10px 14px;border-radius:10px;background:#FEF3F2;border:1px solid #FBCBC6;margin-bottom:18px;">
+    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#B42318" stroke-width="2" style="flex-shrink:0;"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
+    <p style="font-size:12px;font-weight:600;color:#B42318;margin:0;">{{ error }}</p>
+   </div>
+   {% endif %}
+
+   <form method="post" action="{% url 'site-settings' %}">
+    {% csrf_token %}
+
+    {# ── Jurisdiction display ───────────────────────────────────────────── #}
+    <div style="background:#fff;border:1px solid #E5E8EF;border-radius:14px;overflow:hidden;">
+
+     <div style="padding:16px 20px 14px;border-bottom:1px solid #EEF1F7;">
+      <p style="font-size:13px;font-weight:700;color:#002583;margin:0;">Jurisdiction display</p>
+      <p style="font-size:11.5px;color:#7B8499;line-height:1.55;margin:4px 0 0;">
+       How a document&rsquo;s country is shown in the regulations library, comparison scope,
+       policy mapping and the Copilot document picker.
+      </p>
+     </div>
+
+     <div style="padding:14px 20px 18px;display:flex;flex-direction:column;gap:9px;">
+      {% for value, label in jurisdiction_choices %}
+      <label class="set-opt"
+             style="display:flex;align-items:center;gap:13px;padding:12px 14px;border:1px solid #E5E8EF;border-radius:11px;cursor:pointer;{% if setting.jurisdiction_display == value %}border-color:#002583;background:#F8FAFD;{% endif %}">
+       <input type="radio" name="jurisdiction_display" value="{{ value }}"
+              {% if setting.jurisdiction_display == value %}checked{% endif %}
+              style="accent-color:#002583;width:15px;height:15px;flex-shrink:0;margin:0;">
+       <span style="flex:1;min-width:0;">
+        <span style="display:block;font-size:12.5px;font-weight:600;color:#14213D;">{{ label }}</span>
+        <span style="display:block;font-size:11px;color:#7B8499;margin-top:2px;">
+         {% if value == 'name' %}Text only — the plainest option, and the one that reads best in exports.
+         {% elif value == 'flag' %}Flag only — compact, best when the country column is narrow.
+         {% else %}Flag next to the country name.{% endif %}
+        </span>
+       </span>
+       {# Live preview of this exact option, rendered by the real partial. #}
+       <span style="flex-shrink:0;display:flex;align-items:center;gap:14px;padding:7px 12px;border-radius:8px;background:#F4F6FB;font-size:11px;color:#14213D;">
+        {% include 'partials/_jurisdiction.html' with code='bahrain' label='Bahrain' jurisdiction_mode=value %}
+        {% include 'partials/_jurisdiction.html' with code='india' label='India' jurisdiction_mode=value %}
+       </span>
+      </label>
+      {% endfor %}
+     </div>
+
+     <div style="padding:13px 20px;border-top:1px solid #EEF1F7;background:#FBFCFE;display:flex;align-items:center;justify-content:space-between;gap:14px;">
+      <p style="font-size:10.5px;color:#98A2B3;margin:0;">
+       {% if setting.updated_at %}Last changed {{ setting.updated_at|date:"j M Y, H:i" }}{% if setting.updated_by %} by {{ setting.updated_by.username }}{% endif %}.{% endif %}
+      </p>
+      <button type="submit"
+              style="flex-shrink:0;padding:8px 20px;border-radius:9px;background:#002583;color:#fff;font-size:12px;font-weight:600;border:none;cursor:pointer;font-family:inherit;">
+       Save changes
+      </button>
+     </div>
+
+    </div>
+   </form>
+
+  </div>
+ </div>
+</div>
+
+<style>
+ /* Radio cards: the whole row is the hit target, and the selected one is
+    outlined in the logo navy (set inline above so it survives a reload). */
+ .set-opt:hover { border-color:#C9D2E4; }
+ .set-opt:has(input:checked) { border-color:#002583; background:#F8FAFD; }
+</style>
+{% endblock %}

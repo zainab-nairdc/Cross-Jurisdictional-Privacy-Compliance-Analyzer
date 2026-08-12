@@ -71,7 +71,7 @@
       {% for a in available %}
       <div @click="toggleJur('{{ a.code }}')" style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;border-bottom:1px solid #F4F6FB;"
            onmouseover="this.style.background='#F8FAFC'" onmouseout="this.style.background='#fff'">
-       <span style="font-size:16px;">{{ a.flag }}</span>
+       {% if jurisdiction_mode != 'name' %}{% include 'partials/_jurisdiction.html' with code=a.code jurisdiction_mode='flag' size='sm' %}{% endif %}
        <span style="flex:1;font-size:13px;font-weight:600;">{{ a.label }}</span>
        <span x-show="sel.includes('{{ a.code }}')" style="color:#002583;">✓</span>
       </div>
@@ -116,8 +116,9 @@
     <div class="gc-col-head" style="display:grid;grid-template-columns:repeat({{ columns|length }},1fr);border-bottom:1px solid #E5E7EB;">
      {% for c in columns %}
      <div style="padding:16px 22px;{% if not forloop.last %}border-right:1px solid #F1F5F9;{% endif %}">
-      <p style="font-size:15px;font-weight:700;color:#002583;margin:0;display:flex;align-items:center;gap:9px;"><span class="gc-jflag">{{ c.flag }}</span> {{ c.label }}</p>
-      <p style="font-size:11.5px;color:#94A3B8;margin:6px 0 0 35px;">{{ c.reg_count }} indexed regulation{{ c.reg_count|pluralize }}</p>
+      <p style="font-size:15px;font-weight:700;color:#002583;margin:0;display:flex;align-items:center;gap:9px;">{% if jurisdiction_mode != 'name' %}<span class="gc-jflag">{% include 'partials/_jurisdiction.html' with code=c.code jurisdiction_mode='flag' %}</span>{% endif %}{{ c.label }}</p>
+      {# Sub-line indents under the label — only when a flag is actually there. #}
+      <p style="font-size:11.5px;color:#94A3B8;margin:6px 0 0 {% if jurisdiction_mode != 'name' %}35px{% else %}0{% endif %};">{{ c.reg_count }} indexed regulation{{ c.reg_count|pluralize }}</p>
      </div>
      {% endfor %}
     </div>

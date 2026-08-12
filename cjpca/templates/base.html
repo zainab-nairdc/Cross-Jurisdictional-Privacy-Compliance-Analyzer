@@ -41,7 +41,13 @@
 <body class="h-full font-sans text-sm bg-gray-50 text-gray-900"
  x-data="{ copilotOpen: false, docViewerOpen: false, docViewerDoc: '', docViewerArt: '', docViewerChunkId: '', sidebarOpen: localStorage.getItem('sidebarOpen') !== 'false' }">
 
- <div class="flex h-screen overflow-hidden">
+ {% comment %}App shell — pinned to the viewport rather than relying on being the
+ first in-flow block. It is already exactly viewport-sized (h-screen +
+ overflow-hidden); anchoring it means nothing above it in the body flow can
+ push the sidebar and main column down. Safe for the fixed overlays inside it:
+ a position:fixed ancestor does not become a containing block for fixed
+ descendants (only transform / filter / will-change / contain do).{% endcomment %}
+ <div class="flex h-screen overflow-hidden" style="position:fixed;inset:0;">
 
  {# Fixed 192px sidebar — always visible #}
  {% include 'partials/_sidebar.html' %}

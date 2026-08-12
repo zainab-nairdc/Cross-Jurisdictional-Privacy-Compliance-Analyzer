@@ -161,7 +161,7 @@
  <div style="position:relative;margin-bottom:10px;" id="wrap-a">
  <button type="button" id="trig-a" class="rpick-trig{% if reg_a %} a-sel{% endif %}" onclick="toggleDrop('a')">
  {% if reg_a %}
- {% if flag_a %}<img src="https://flagcdn.com/w40/{{ flag_a }}.png" style="width:20px;height:14px;border-radius:2px;object-fit:cover;flex-shrink:0;border:1px solid #E5E8EF;">{% endif %}
+ {% if jurisdiction_mode != 'name' %}{% include 'partials/_jurisdiction.html' with code=reg_a.jurisdiction jurisdiction_mode='flag' size='sm' %}{% endif %}
  <div style="flex:1;min-width:0;">
  <p style="font-size:11px;font-weight:700;color:#002583;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.3;">{{ reg_a.name }}</p>
  <p style="font-size:9px;color:#002583;margin:1px 0 0;">{{ reg_a.chunk_count }} sections</p>
@@ -194,7 +194,7 @@
  <div style="position:relative;" id="wrap-b">
  <button type="button" id="trig-b" class="rpick-trig{% if reg_b %} b-sel{% endif %}" onclick="toggleDrop('b')">
  {% if reg_b %}
- {% if flag_b %}<img src="https://flagcdn.com/w40/{{ flag_b }}.png" style="width:20px;height:14px;border-radius:2px;object-fit:cover;flex-shrink:0;border:1px solid #E5E8EF;">{% endif %}
+ {% if jurisdiction_mode != 'name' %}{% include 'partials/_jurisdiction.html' with code=reg_b.jurisdiction jurisdiction_mode='flag' size='sm' %}{% endif %}
  <div style="flex:1;min-width:0;">
  <p style="font-size:11px;font-weight:700;color:#002583;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.3;">{{ reg_b.name }}</p>
  <p style="font-size:9px;color:#002583;margin:1px 0 0;">{{ reg_b.chunk_count }} sections</p>
@@ -385,15 +385,25 @@ const ALL_REGS = [
  { id:"{{ r.pk }}", name:"{{ r.name|escapejs }}", jur:"{{ r.get_jurisdiction_display|escapejs }}", jurCode:"{{ r.jurisdiction }}", chunks:{{ r.chunk_count }} }{% if not forloop.last %},{% endif %}
  {% endfor %}
 ];
-const FLAG_CDN = { bahrain:'bh', india:'in', kuwait:'kw', saudi:'sa', uae:'ae', eu:'eu', bbk:'bh' };
+// Local flag assets, not a CDN — the deployment is air-gapped. Only the
+// jurisdictions with a vendored SVG appear here; anything else renders
+// without a flag. JUR_MODE mirrors Settings → Jurisdiction display.
+const FLAG_SRC = {
+ bahrain: "{% static 'img/flags/bh.svg' %}",
+ india:   "{% static 'img/flags/in.svg' %}",
+ kuwait:  "{% static 'img/flags/kw.svg' %}",
+ bbk:     "{% static 'img/flags/bh.svg' %}",
+};
+const JUR_MODE = "{{ jurisdiction_mode|default:'name' }}";
 const CUR_A = "{{ reg_a_pk }}";
 const CUR_B = "{{ reg_b_pk }}";
 let dropOpen = { a:false, b:false };
 
 function flagTag(jurCode) {
- const code = FLAG_CDN[jurCode];
- if (!code) return '';
- return `<img src="https://flagcdn.com/w40/${code}.png" style="width:17px;height:11px;border-radius:2px;object-fit:cover;flex-shrink:0;border:1px solid #E5E8EF;" onerror="this.style.display='none'">`;
+ if (JUR_MODE === 'name') return '';
+ const src = FLAG_SRC[jurCode];
+ if (!src) return '';
+ return `<img src="${src}" style="width:17px;height:11px;border-radius:2px;object-fit:cover;flex-shrink:0;border:1px solid #E5E8EF;" onerror="this.style.display='none'">`;
 }
 function buildDropList(side) {
  const q = (document.getElementById(`search-${side}`)?.value || '').toLowerCase().trim();

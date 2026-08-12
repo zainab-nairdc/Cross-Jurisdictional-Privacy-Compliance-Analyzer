@@ -4,7 +4,7 @@
 {% block title %}Internal Policies — CJPCA{% endblock %}
 
 {% block content %}
-<div x-data="policiesPage()" class="flex h-full bg-gray-50 overflow-hidden">
+<div x-data="policiesPage()" class="flex h-full bg-white overflow-hidden">
 
  {# ── Main column ───────────────────────────────────────────────── #}
  <div class="flex flex-col flex-1 min-w-0 overflow-hidden">
@@ -44,101 +44,69 @@
  <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
  </svg>
  <input x-model="search" type="text" placeholder="Search policies…"
- class="w-full pl-8 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-[#002583] focus:ring-2 focus:ring-[#002583]/20 bg-gray-50">
+ class="w-full pl-8 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-[#002583] focus:ring-2 focus:ring-[#002583]/20 bg-white">
  </div>
- {# Type filter #}
- <div class="flex items-center gap-1.5 flex-shrink-0">
- <template x-for="t in typeFilters" :key="t.val">
- <button @click="typeFilter = (typeFilter === t.val ? 'all' : t.val); selectedDoc = null"
- :class="typeFilter === t.val ? 'bg-[#002583] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
- class="px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors whitespace-nowrap"
- x-text="t.label"></button>
- </template>
- </div>
+ {# Filters — same control as the regulations library #}
+ <button @click="filtersOpen=!filtersOpen"
+   class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors flex-shrink-0"
+   :class="filtersOpen ? 'border-[#002583] text-[#002583] bg-[#EEF2FB]' : 'border-gray-200 text-gray-600 bg-white hover:bg-gray-50'">
+  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+  Filters
+ </button>
  </div>
 
- {# Card grid #}
- <div class="flex-1 overflow-y-auto px-6 py-3">
- <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;align-items:start;">
- {% for doc in policies %}
- <div x-show="cardVisible('{{ doc.status }}', '{{ doc.name|escapejs }}', '{% if 'sop' in doc.name|lower or 'procedure' in doc.name|lower %}SOP{% elif 'guideline' in doc.name|lower or 'guide' in doc.name|lower %}Guideline{% elif 'standard' in doc.name|lower %}Standard{% else %}Policy{% endif %}')"
- @click="selectDoc({{ doc.pk }})"
- class="bg-white rounded-xl flex flex-col cursor-pointer transition-all"
- style="overflow:hidden;border:1px solid #E5E8EF;"
- :style="{{ doc.pk }} === selectedDoc?.id
- ? {borderColor:'#002583', boxShadow:'0 0 0 2px rgba(244,121,32,0.18)', transform:'translateY(-1px)'}
- : {borderColor:'#E5E8EF', boxShadow:'', transform:''}"
- onmouseenter="if(this.style.borderColor !== 'rgb(244, 121, 32)'){this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 16px rgba(0,0,0,0.08)';}"
- onmouseleave="if(this.style.borderColor !== 'rgb(244, 121, 32)'){this.style.transform='';this.style.boxShadow='';}">
+ {# Document table — same layout as the regulations library #}
+ <div class="reg-scroll flex-1 min-w-0 min-h-0 overflow-y-auto pb-3">
+ <table class="reg-table" style="width:100%;min-width:0;border-collapse:separate;border-spacing:0;table-layout:fixed;">
+  <thead>
+   <tr>
+    <th style="position:sticky;top:0;z-index:20;text-align:left;padding:9px 14px;background:#F8FAFD;font-size:10px;font-weight:800;color:#7B8499;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #E5E8EF;">Document</th>
+    <th style="position:sticky;top:0;z-index:20;width:132px;text-align:left;padding:9px 12px;background:#F8FAFD;font-size:10px;font-weight:800;color:#7B8499;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #E5E8EF;">Type</th>
+    <th style="position:sticky;top:0;z-index:20;width:124px;text-align:left;padding:9px 12px;background:#F8FAFD;font-size:10px;font-weight:800;color:#7B8499;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #E5E8EF;">Category</th>
+    <th x-show="!selectedDoc" style="position:sticky;top:0;z-index:20;width:110px;text-align:left;padding:9px 12px;background:#F8FAFD;font-size:10px;font-weight:800;color:#7B8499;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #E5E8EF;">Updated</th>
+    <th style="position:sticky;top:0;z-index:20;width:92px;text-align:right;padding:9px 14px;background:#F8FAFD;font-size:10px;font-weight:800;color:#7B8499;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #E5E8EF;">Sections</th>
+   </tr>
+  </thead>
+  <tbody>
+  {% for doc in policies %}
+  <tr x-show="cardVisible('{{ doc.status }}', '{{ doc.name|escapejs }}', '{% if 'sop' in doc.name|lower or 'procedure' in doc.name|lower %}SOP{% elif 'guideline' in doc.name|lower or 'guide' in doc.name|lower %}Guideline{% elif 'standard' in doc.name|lower %}Standard{% else %}Policy{% endif %}')"
+      @click="selectDoc({{ doc.pk }})"
+      class="cursor-pointer transition-colors hover:bg-[#F5F8FD]"
+      :style="{{ doc.pk }} === selectedDoc?.id ? 'background:#EEF2FB;' : ''">
 
- <div style="padding:14px 14px 10px;">
- {# Type badge + status #}
- <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;">
- <span style="display:inline-flex;align-items:center;justify-content:center;padding:2px 7px;border-radius:4px;background:#ffffff;font-size:10px;font-weight:700;color:#002583;">
- {% if 'sop' in doc.name|lower or 'procedure' in doc.name|lower %}SOP
- {% elif 'guideline' in doc.name|lower or 'guide' in doc.name|lower %}Guideline
- {% elif 'standard' in doc.name|lower %}Standard
- {% else %}Policy{% endif %}
- </span>
- {% if doc.status == 'failed' %}
- <span style="padding:3px 9px;border-radius:20px;font-size:10px;font-weight:600;background:#ffffff;color:#002583;">Upload issue</span>
- {% endif %}
- </div>
+   {# Document — icon (with status dot) + name + full name #}
+   <td style="padding:11px 14px;border-bottom:1px solid #F0F3F9;">
+    <div style="display:flex;align-items:center;gap:11px;">
+     <div style="position:relative;width:32px;height:32px;border-radius:8px;background:#fff;border:1px solid #E9EDF5;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
+      <span title="{% if doc.status == 'indexed' %}Ready{% elif doc.status == 'processing' %}Processing{% else %}Upload issue{% endif %}"
+            style="position:absolute;bottom:-2px;right:-2px;width:10px;height:10px;border-radius:50%;border:2px solid #fff;background:{% if doc.status == 'indexed' %}#1B7F3A{% elif doc.status == 'processing' %}#FFB800{% else %}#D93939{% endif %};"></span>
+     </div>
+     <div style="min-width:0;">
+      <p style="font-size:12.5px;font-weight:700;color:#002583;margin:0;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ doc.name }}</p>
+      {% if doc.full_name and doc.full_name != doc.name %}<p style="font-size:10.5px;color:#9AA4BC;margin:1px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:280px;">{{ doc.full_name|truncatechars:56 }}</p>{% endif %}
+     </div>
+    </div>
+   </td>
 
- {# Name #}
- <p style="font-size:13px;font-weight:700;color:#002583;line-height:1.3;margin-bottom:3px;">{{ doc.name }}</p>
- {% if doc.full_name and doc.full_name != doc.name %}
- <p style="font-size:11px;color:#002583;line-height:1.4;margin-bottom:6px;">{{ doc.full_name|truncatechars:80 }}</p>
- {% else %}<div style="margin-bottom:6px;"></div>{% endif %}
+   {# Type #}
+   <td style="padding:11px 12px;border-bottom:1px solid #F0F3F9;">
+    <span style="display:inline-block;padding:2px 10px;border-radius:6px;font-size:10.5px;font-weight:700;white-space:nowrap;{% if 'sop' in doc.name|lower or 'procedure' in doc.name|lower %}background:#F79A2E;color:#fff;{% elif 'guideline' in doc.name|lower or 'guide' in doc.name|lower %}background:#F79A2E;color:#fff;{% elif 'standard' in doc.name|lower %}background:#121676;color:#fff;{% else %}background:#121676;color:#fff;{% endif %}">{% if 'sop' in doc.name|lower or 'procedure' in doc.name|lower %}SOP{% elif 'guideline' in doc.name|lower or 'guide' in doc.name|lower %}Guideline{% elif 'standard' in doc.name|lower %}Standard{% else %}Policy{% endif %}</span>
+   </td>
 
- {# Topic stickers — LLM-classified per doc (manage.py classify_doc_topics) #}
- {% if doc.topics %}
- <div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px;">
- {% for topic in doc.topics %}
- <span style="padding:1px 7px;border-radius:10px;font-size:9px;font-weight:600;border:1px solid #E5E8EF;background:#ffffff;color:#002583;">{{ topic.label }}</span>
- {% endfor %}
- </div>
- {% endif %}
+   {# Category — the policy equivalent of the regulations jurisdiction column #}
+   <td style="padding:11px 12px;border-bottom:1px solid #F0F3F9;white-space:nowrap;font-size:11.5px;color:#4A5878;overflow:hidden;text-overflow:ellipsis;">{{ doc.category|default:doc.regulation_category|default:"—" }}</td>
 
- {# User-added tags #}
- {% if doc.tags %}
- <div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:2px;">
- {% for tag in doc.tags|slice:":3" %}
- <span style="padding:1px 6px;border-radius:10px;font-size:9px;font-weight:500;background:#ffffff;color:#002583;"
- title="{% if tag.by_name %}Added by {{ tag.by_name }}{% if tag.at %} · {{ tag.at|slice:':10' }}{% endif %}{% endif %}">{{ tag.label|default:tag }}</span>
- {% endfor %}
- </div>
- {% endif %}
- </div>
+   {# Updated #}
+   <td x-show="!selectedDoc" style="padding:11px 12px;border-bottom:1px solid #F0F3F9;font-size:11.5px;color:#4A5878;white-space:nowrap;">{% if doc.effective_date %}{{ doc.effective_date }}{% else %}{{ doc.upload_date|date:"d M Y" }}{% endif %}</td>
 
- <div style="height:1px;background:#E5E8EF;margin:0 14px;"></div>
+   {# Sections #}
+   <td style="padding:11px 14px;border-bottom:1px solid #F0F3F9;text-align:right;font-size:11.5px;font-weight:700;color:#002583;white-space:nowrap;">{% if doc.status == 'indexed' %}{{ doc.chunk_count }}{% else %}<span style="color:#C5CCDB;">—</span>{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+ </table>
 
- {% if doc.status == 'indexed' %}
- <div style="padding:9px 14px;display:flex;align-items:center;justify-content:space-between;gap:6px;">
- {% if doc.effective_date %}
- <span style="font-size:11px;color:#002583;">{{ doc.effective_date|date:"d M Y" }}</span>
- {% else %}
- <span></span>
- {% endif %}
- <span style="font-size:11px;font-family:'Satoshi',sans-serif;color:#002583;font-weight:600;flex-shrink:0;">{{ doc.chunk_count }} sections</span>
- </div>
- {% elif doc.status == 'processing' %}
- <div style="padding:10px 14px;display:flex;align-items:center;justify-content:space-between;">
- <p style="font-size:11px;color:#002583;">Processing…</p>
- <div style="display:flex;align-items:center;gap:3px;">
- <span style="width:5px;height:5px;border-radius:50%;background:#002583;display:inline-block;animation:dot-bounce 1.2s ease-in-out infinite;"></span>
- <span style="width:5px;height:5px;border-radius:50%;background:#002583;display:inline-block;animation:dot-bounce 1.2s ease-in-out 0.2s infinite;"></span>
- <span style="width:5px;height:5px;border-radius:50%;background:#002583;display:inline-block;animation:dot-bounce 1.2s ease-in-out 0.4s infinite;"></span>
- </div>
- </div>
- {% else %}
- <div style="padding:10px 14px;">
- <p style="font-size:11px;color:#002583;">We couldn't read this file. It may be scanned or have a formatting issue.</p>
- </div>
- {% endif %}
- </div>
- {% endfor %}
- </div>
 
  {# Empty state #}
  <div x-show="visibleCount === 0" class="flex flex-col items-center justify-center py-20">
@@ -222,21 +190,8 @@
  </tr>
  </template>
  <template x-if="selectedDoc?.privacy_relevance">
- <tr style="border-bottom:1px solid #E5E8EF;">
- <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;">Privacy relevance</td>
- <td style="padding:5px 0;line-height:1;vertical-align:middle;">
- <span :class="'rel-pill rel-pill-' + (selectedDoc?.privacy_relevance || 'none')">
- <span class="rel-dot"></span>
- <span x-text="selectedDoc?.privacy_relevance"></span>
- </span>
- </td>
- </tr>
  </template>
  <template x-if="selectedDoc?.applicable_sector">
- <tr style="border-bottom:1px solid #E5E8EF;">
- <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;">Sector</td>
- <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;word-break:break-word;text-transform:capitalize;" x-text="selectedDoc?.applicable_sector"></td>
- </tr>
  </template>
  <template x-if="selectedDoc?.issuing_authority">
  <tr style="border-bottom:1px solid #E5E8EF;">
@@ -251,22 +206,10 @@
  </tr>
  </template>
  <template x-if="selectedDoc?.publication_date">
- <tr style="border-bottom:1px solid #E5E8EF;">
- <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;">Approved</td>
- <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;" x-text="selectedDoc?.publication_date"></td>
- </tr>
  </template>
  <template x-if="selectedDoc?.last_updated">
- <tr style="border-bottom:1px solid #E5E8EF;">
- <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;">Last updated</td>
- <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;" x-text="selectedDoc?.last_updated"></td>
- </tr>
  </template>
  <template x-if="selectedDoc?.version">
- <tr style="border-bottom:1px solid #E5E8EF;">
- <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;">Version</td>
- <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;word-break:break-word;" x-text="selectedDoc?.version"></td>
- </tr>
  </template>
  <template x-if="selectedDoc?.section_identifiers">
  <tr style="border-bottom:1px solid #E5E8EF;">
@@ -280,52 +223,18 @@
  <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;word-break:break-word;font-family:'Satoshi',sans-serif;" x-text="selectedDoc?.parent_regulation"></td>
  </tr>
  </template>
- <tr style="border-bottom:1px solid #E5E8EF;" x-show="selectedDoc?.chunk_count">
- <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;">Chunks</td>
- <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;" x-text="selectedDoc?.chunk_count"></td>
- </tr>
- <tr>
- <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;">Added</td>
- <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;" x-text="selectedDoc?.upload_date"></td>
- </tr>
  </tbody>
  </table>
 
- {# Scope — margin-top removed; parent flex gap owns vertical spacing #}
- <template x-if="selectedDoc?.full_name">
- <div style="padding:10px;border-radius:8px;background:#ffffff;border:1px solid #E5E8EF;">
- <p style="font-size:10px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Scope</p>
- <p style="font-size:10px;color:#002583;line-height:1.55;" x-text="selectedDoc?.full_name"></p>
- </div>
- </template>
+ {# Full details opens the roomy modal (Scope, Concepts, Cross-references, Notes) #}
+ <button @click="fullDetails = true"
+ style="display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:8px;border-radius:8px;border:1px solid #E5E8EF;background:#F8FAFD;color:#002583;font-size:11px;font-weight:600;cursor:pointer;"
+ onmouseover="this.style.background='#EEF2FB';" onmouseout="this.style.background='#F8FAFD';">
+ <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15"/></svg>
+ View full details
+ </button>
 
- {# Concept tags from CSV #}
- <template x-if="selectedDoc?.concept_tags_csv && selectedDoc.concept_tags_csv.length">
- <div>
- <p style="font-size:10px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px;">Concepts</p>
- <div style="display:flex;flex-wrap:wrap;gap:3px;">
- <template x-for="ct in selectedDoc.concept_tags_csv" :key="ct">
- <span style="padding:2px 7px;border-radius:10px;font-size:10px;background:#ffffff;color:#002583;font-weight:500;" x-text="ct"></span>
- </template>
- </div>
- </div>
- </template>
 
- {# Cross references #}
- <template x-if="selectedDoc?.cross_references">
- <div style="padding:10px;border-radius:8px;background:#ffffff;border:1px solid #E5E8EF;">
- <p style="font-size:10px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Cross-references</p>
- <p style="font-size:10px;color:#002583;line-height:1.55;font-family:'Satoshi',sans-serif;" x-text="selectedDoc?.cross_references"></p>
- </div>
- </template>
-
- {# Notes #}
- <template x-if="selectedDoc?.notes">
- <div style="padding:10px;border-radius:8px;background:#ffffff;border:1px solid #002583;">
- <p style="font-size:10px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Internal notes</p>
- <p style="font-size:10px;color:#002583;line-height:1.55;" x-text="selectedDoc?.notes"></p>
- </div>
- </template>
 
  {# Source link — relevant for policies that reference an internal portal #}
  <template x-if="selectedDoc?.source_url">
@@ -340,46 +249,6 @@
 
  </div>
 
- {# Tags section #}
- <div style="padding:8px 14px;border-top:1px solid #E5E8EF;">
- <p style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#002583;margin-bottom:7px;">Tags</p>
-
- {# Current tags — shared across all users; tooltip shows author. #}
- <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:7px;">
- <template x-for="tag in currentTags" :key="tag.label">
- <span :title="tag.by_name ? ('Added by ' + tag.by_name + (tag.at ? ' · ' + tag.at.slice(0,10) : '')) : ''"
- style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:20px;background:#ffffff;font-size:10px;color:#002583;cursor:help;">
- <span x-text="tag.label"></span>
- <span x-show="tag.by_name" style="font-size:8.5px;color:#002583;font-weight:500;"
- x-text="'· ' + (tag.by_name || '').split(' ')[0]"></span>
- <button @click="removeTag(tag.label)" style="background:none;border:none;cursor:pointer;color:#002583;font-size:13px;line-height:1;padding:0;">&times;</button>
- </span>
- </template>
- <template x-if="currentTags.length === 0">
- <span style="font-size:10px;color:#ffffff;">No tags yet</span>
- </template>
- </div>
-
- {# Preset tags #}
- <div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px;">
- {% for tag in preset_tags %}
- <button @click="addTag('{{ tag }}')"
- style="padding:2px 7px;border-radius:20px;font-size:9px;border:1px dashed #E5E8EF;color:#002583;background:none;cursor:pointer;"
- onmouseover="this.style.borderColor='#002583';this.style.color='#002583';"
- onmouseout="this.style.borderColor='#ffffff';this.style.color='#002583';">
- + {{ tag }}
- </button>
- {% endfor %}
- </div>
-
- {# Custom tag input #}
- <div style="display:flex;gap:4px;">
- <input x-model="newTag" @keydown.enter="addTag(newTag)" type="text" placeholder="Custom tag…"
- style="flex:1;padding:4px 8px;border:1px solid #E5E8EF;border-radius:6px;font-size:10px;outline:none;"
- onfocus="this.style.borderColor='#002583';" onblur="this.style.borderColor='#ffffff';">
- <button @click="addTag(newTag)" style="padding:4px 8px;border-radius:6px;background:#002583;color:#fff;border:none;font-size:10px;cursor:pointer;">Add</button>
- </div>
- </div>
 
  </div>{# /scroll region — actions live below, pinned to panel bottom #}
 
@@ -441,6 +310,141 @@
 
  </div>
  </div>
+ </div>
+
+
+ {# Full-details modal — must live INSIDE x-data or fullDetails is out of scope #}
+ <div x-show="fullDetails" x-cloak
+      class="cj-overlay" style="z-index:80;background:rgba(15,23,42,0.5);backdrop-filter:blur(3px);"
+      @click.self="fullDetails=false" @keydown.escape.window="fullDetails=false">
+  <div role="dialog" aria-modal="true" aria-label="Document details"
+       style="width:min(840px,94vw);max-height:90vh;background:#fff;border-radius:16px;box-shadow:0 24px 70px rgba(15,23,42,0.28);display:flex;flex-direction:column;overflow:hidden;">
+
+   {# Header — title, status, close #}
+   <div style="padding:20px 24px 16px;border-bottom:1px solid #EEF1F7;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-shrink:0;">
+    <div style="min-width:0;">
+     <p style="font-size:17px;font-weight:800;color:#0F172A;margin:0;line-height:1.25;word-break:break-word;" x-text="selectedDoc?.name"></p>
+     <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:7px;">
+      <span x-show="selectedDoc?.superseded" class="dm-pill" style="color:#B07A00;background:#FBF0D8;"><span style="width:6px;height:6px;border-radius:50%;background:#B07A00;"></span>Superseded</span>
+      <span x-show="!selectedDoc?.superseded && selectedDoc?.status==='indexed'" class="dm-pill" style="color:#1E7E48;background:#E7F4EC;"><span style="width:6px;height:6px;border-radius:50%;background:#1E7E48;"></span>In force</span>
+      <span style="font-size:12px;color:#7B8499;" x-text="selectedDoc?.jurisdiction_display"></span>
+      <template x-if="selectedDoc?.document_id"><span style="font-size:12px;color:#B8C0D0;">· <span x-text="selectedDoc?.document_id"></span></span></template>
+     </div>
+    </div>
+    <button @click="fullDetails=false" aria-label="Close" class="dm-close"
+      style="flex-shrink:0;width:32px;height:32px;border-radius:8px;border:none;background:#F4F6FB;color:#5A6685;cursor:pointer;display:flex;align-items:center;justify-content:center;"
+      onmouseover="this.style.background='#E9EDF5'" onmouseout="this.style.background='#F4F6FB'">
+     <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+    </button>
+   </div>
+
+   {# Body — two balanced columns #}
+   <div style="flex:1;overflow-y:auto;padding:22px 24px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:26px;align-items:start;">
+
+    {# Left: facts + scope + concepts #}
+    <div style="min-width:0;display:flex;flex-direction:column;gap:22px;">
+     <div>
+      <p class="dm-sec">Details</p>
+      <dl style="margin:0;">
+       <template x-for="f in [
+         {k:'Category', v:selectedDoc?.regulation_category},
+         {k:'Issued by', v:selectedDoc?.issuing_authority},
+         {k:'Effective', v:selectedDoc?.effective_date},
+         {k:'Published', v:selectedDoc?.publication_date},
+         {k:'Last updated', v:selectedDoc?.last_updated},
+         {k:'Version', v:selectedDoc?.version},
+         {k:'Sections', v:selectedDoc?.chunk_count},
+         {k:'Added', v:selectedDoc?.upload_date}
+       ].filter(f => f.v)" :key="f.k">
+        <div class="dm-row"><dt class="dm-k" x-text="f.k"></dt><dd class="dm-v" style="text-transform:capitalize;" x-text="f.v"></dd></div>
+       </template>
+      </dl>
+     </div>
+     <div>
+      <p class="dm-sec">Scope</p>
+      <p style="font-size:12.5px;line-height:1.6;margin:0;" :style="selectedDoc?.full_name?'color:#3A4560;':'color:#B8C0D0;'" x-text="selectedDoc?.full_name || 'No scope description provided.'"></p>
+     </div>
+     <div x-show="selectedDoc?.concept_tags_csv && selectedDoc.concept_tags_csv.length">
+      <p class="dm-sec">Concepts</p>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;">
+       <template x-for="ct in (selectedDoc?.concept_tags_csv||[])" :key="ct"><span style="padding:4px 11px;border-radius:20px;font-size:11.5px;background:#EEF2FB;color:#002583;font-weight:500;" x-text="ct"></span></template>
+      </div>
+     </div>
+    </div>
+
+    {# Right: version management + refs/notes #}
+    <div style="min-width:0;display:flex;flex-direction:column;gap:22px;">
+     {% if is_admin %}
+     <div>
+      <p class="dm-sec">Version</p>
+      <template x-if="selectedDoc?.superseded">
+       <div style="background:#FBF7EC;border:1px solid #EAD9AE;border-radius:10px;padding:13px 14px;">
+        <p style="font-size:12.5px;font-weight:700;color:#B07A00;margin:0;">This version has been superseded</p>
+        <p x-show="selectedDoc?.superseded_by" style="font-size:12px;color:#7B6A45;margin:5px 0 0;line-height:1.5;">Replaced by <b x-text="selectedDoc?.superseded_by"></b>.</p>
+        <p style="font-size:11.5px;color:#9A8A63;margin:6px 0 0;line-height:1.5;">Kept for historical reference; excluded from new comparisons and mappings.</p>
+       </div>
+      </template>
+      <template x-if="!selectedDoc?.superseded">
+       <div>
+        {# Compact status line + subtle Replace toggle #}
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+         <span style="font-size:12.5px;color:#334066;">Current version is <b style="color:#1E7E48;">in force</b>.</span>
+         <button x-show="supersedeCandidates.length" @click="advancedOpen=!advancedOpen" class="dm-btn"
+           style="flex-shrink:0;background:none;border:none;padding:0;font-size:12px;font-weight:600;color:#33509F;cursor:pointer;">
+          <span x-show="!advancedOpen">Replace…</span><span x-show="advancedOpen">Cancel</span>
+         </button>
+        </div>
+        <p x-show="!supersedeCandidates.length" style="font-size:11.5px;color:#8A93AC;margin:6px 0 0;line-height:1.5;">No newer version has been uploaded to replace this one yet.</p>
+
+        {# Expanded picker — a contained panel, only when the admin chooses to replace #}
+        <div x-show="advancedOpen" x-cloak style="margin-top:12px;background:#F8FAFC;border:1px solid #E7ECF5;border-radius:11px;padding:15px;">
+         <label for="ver-select" style="display:block;font-size:11px;font-weight:600;color:#5A6685;text-transform:uppercase;letter-spacing:.04em;margin-bottom:7px;">Newer version</label>
+         <select id="ver-select" x-model="supersedeNewPk" class="dm-select"
+           style="width:100%;padding:10px 11px;border:1px solid #D9E0EF;border-radius:9px;font-size:12.5px;color:#14213D;background:#fff;font-family:inherit;cursor:pointer;">
+          <option value="">Select a regulation…</option>
+          <template x-for="c in supersedeCandidates" :key="c.id"><option :value="c.id" x-text="c.name"></option></template>
+         </select>
+         <p style="font-size:11px;color:#8A93AC;line-height:1.5;margin:9px 0 0;">This version is kept for history. Approved analyses that used it are flagged for re-review.</p>
+         <p x-show="supersedeMsg" x-text="supersedeMsg" role="status" style="font-size:11.5px;color:#1E7E48;font-weight:600;margin:10px 0 0;line-height:1.5;"></p>
+         <div style="margin-top:14px;padding-top:13px;border-top:1px solid #E7ECF5;display:flex;align-items:center;justify-content:flex-end;gap:12px;">
+          <span x-show="!supersedeNewPk" style="margin-right:auto;font-size:11px;color:#9AA3B6;">Choose a version to continue</span>
+          <button @click="supersede()" :disabled="supersedeBusy || !supersedeNewPk" class="dm-primary">
+           <span x-show="!supersedeBusy">Replace version</span>
+           <span x-show="supersedeBusy">Working…</span>
+          </button>
+         </div>
+        </div>
+       </div>
+      </template>
+     </div>
+     {% endif %}
+     <div x-show="selectedDoc?.cross_references">
+      <p class="dm-sec">Cross-references</p>
+      <p style="font-size:12.5px;line-height:1.6;color:#3A4560;margin:0;" x-text="selectedDoc?.cross_references"></p>
+     </div>
+     <div x-show="selectedDoc?.notes">
+      <p class="dm-sec">Notes</p>
+      <p style="font-size:12.5px;line-height:1.6;color:#3A4560;margin:0;" x-text="selectedDoc?.notes"></p>
+     </div>
+    </div>
+   </div>
+
+   {# Footer — primary + secondary actions #}
+   <div style="padding:14px 24px;border-top:1px solid #EEF1F7;display:flex;align-items:center;gap:10px;flex-shrink:0;">
+    <button @click="openViewer(selectedDoc?.id); fullDetails=false" class="dm-btn"
+      style="display:inline-flex;align-items:center;gap:7px;padding:9px 18px;border-radius:9px;background:#002583;color:#fff;font-size:12.5px;font-weight:600;border:none;cursor:pointer;">
+     <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><circle cx="12" cy="12" r="3"/></svg>
+     View document
+    </button>
+    <button @click="openStructure(selectedDoc?.id); fullDetails=false" class="dm-btn"
+      style="display:inline-flex;align-items:center;gap:7px;padding:9px 16px;border-radius:9px;border:1px solid #E5E8EF;background:#fff;color:#334066;font-size:12.5px;font-weight:600;cursor:pointer;">
+     View structure
+    </button>
+    <template x-if="selectedDoc?.source_url">
+     <a :href="selectedDoc?.source_url" target="_blank" rel="noopener" style="margin-left:auto;font-size:12px;color:#33509F;text-decoration:none;font-weight:600;">Official source ↗</a>
+    </template>
+   </div>
+  </div>
  </div>
 
 </div>
@@ -520,6 +524,9 @@ function policiesPage() {
  search: '',
  statFilter: 'indexed',
  typeFilter: 'all',
+ // Drives the toolbar Filters control, matching the regulations library.
+ filtersOpen: false,
+ fullDetails: false,
  selectedDoc: null,
  currentTags: [],
  newTag: '',
@@ -611,5 +618,26 @@ function closePolicyViewer() {
  '<span style="font-size:11px;">Loading\u2026</span></div>';
 }
 </script>
+
+ <style>
+  .dm-pill{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;border-radius:999px;padding:3px 10px;}
+  .dm-sec{font-size:10px;font-weight:700;color:#94A0B8;text-transform:uppercase;letter-spacing:.07em;margin:0 0 10px;}
+  .dm-row{display:flex;justify-content:space-between;gap:16px;padding:8px 0;border-bottom:1px solid #F2F4F9;}
+  .dm-row:last-child{border-bottom:0;}
+  .dm-k{font-size:12px;color:#8A93AC;flex-shrink:0;}
+  .dm-v{font-size:12.5px;color:#14213D;margin:0;text-align:right;font-weight:500;}
+  /* Centres the full-details modal over the page. Defined here because the
+     class travelled with the modal but its rule lived in regulations.html,
+     so without it the overlay had no positioning and rendered inline. */
+  .cj-overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .dm-select:focus{outline:none;border-color:#002583;box-shadow:0 0 0 3px rgba(0,37,131,.12);}
+  .dm-btn:focus-visible,.dm-close:focus-visible{outline:2px solid #002583;outline-offset:2px;}
+  .dm-primary{display:inline-flex;align-items:center;justify-content:center;gap:7px;background:#002583;color:#fff;border:none;padding:9px 18px;border-radius:10px;font-size:12.5px;font-weight:600;font-family:inherit;line-height:1;cursor:pointer;box-shadow:0 1px 2px rgba(0,37,131,.25);transition:background .15s,box-shadow .15s,transform .05s;}
+  .dm-primary:hover:not(:disabled){background:#001c66;box-shadow:0 4px 12px rgba(0,37,131,.28);}
+  .dm-primary:active:not(:disabled){transform:translateY(1px);}
+  .dm-primary:disabled{background:#EEF1F7;color:#9AA3B6;box-shadow:none;cursor:not-allowed;}
+  .dm-primary:focus-visible{outline:2px solid #002583;outline-offset:2px;}
+ </style>
+
 
 {% endblock %}
