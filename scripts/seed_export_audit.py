@@ -11,13 +11,26 @@ django.setup()
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
+from apps.history.audit import Actions
 from apps.history.models import AuditLog
 
 User = get_user_model()
 
-# Clear any previously-seeded export.create rows so we don't double up
-deleted, _ = AuditLog.objects.filter(event_type='export.create').delete()
-print(f'Cleared {deleted} previously seeded export.create rows.')
+# Seed under the same key the real export views emit. This script used to
+# write 'export.create', which no production code path produces — so seeded
+# demo rows and genuine export rows never showed up under the same filter,
+# and /history/ looked like exports were being recorded when the only rows
+# present were fake ones.
+EVENT = Actions.EXPORT_DOWNLOADED
+
+# Clear previously-seeded rows under either key so we don't double up. The
+# has_key guard keeps this from touching real export rows, which never
+# carry 'hash_prefix'.
+deleted, _ = AuditLog.objects.filter(
+    event_type__in=[EVENT, 'export.create'],
+    change_detail__has_key='hash_prefix',
+).delete()
+print(f'Cleared {deleted} previously seeded export rows.')
 
 # Exports happen after reviewer sign-off. Use a user with the literal
 # username 'reviewer' so the audit log shows that label cleanly.
@@ -61,7 +74,7 @@ created = 0
 for delta, kind, oid, fmt, title in exports:
     hash_prefix = _hash(f'{kind}|{oid}|approved|export')
     AuditLog.objects.create(
-        event_type='export.create',
+        event_type=EVENT,
         user=actor,
         user_role_at_time='reviewer',
         ip_address='127.0.0.1',
@@ -82,6 +95,6 @@ for delta, kind, oid, fmt, title in exports:
     )
     created += 1
 
-print(f'Seeded {created} export.create AuditLog rows attached to '
+print(f'Seeded {created} {EVENT} AuditLog rows attached to '
       f'reviewer "{actor.username}".')
-print('Refresh /history/ and filter by export.create')
+print('Refresh /history/ and use the Exports filter.')

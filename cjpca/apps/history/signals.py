@@ -10,8 +10,19 @@ Connects:
 
 For events not driven by signals (comparison.run, document.upload,
 user.role_changed, etc.) the relevant view calls ``audit.log_event``
-directly. ``auth.idle_timeout`` is logged from
-``apps.accounts.middleware.IdleSessionTimeoutMiddleware``.
+directly.
+
+Two caveats worth knowing before you trust this file:
+
+* The TOTPDevice receiver below is wrapped in ``try/except ImportError``
+  and django_otp is **not** in INSTALLED_APPS any more, so it never
+  registers and ``auth.mfa_enrolled`` is never written.
+* ``auth.idle_timeout`` used to be logged from an
+  ``IdleSessionTimeoutMiddleware``. That middleware no longer exists and
+  nothing replaced it, so that key is dormant too.
+
+Both are recorded in ``apps.history.audit.NOT_EMITTED``, which the test
+suite pins.
 """
 
 from django.contrib.auth.signals import (

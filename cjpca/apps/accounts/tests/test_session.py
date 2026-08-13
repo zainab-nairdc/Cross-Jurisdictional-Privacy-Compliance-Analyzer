@@ -11,6 +11,10 @@ Covers:
 * /accounts/two_factor/disable/ is locked down to admin (Part B carry-
   forward).
 * The heartbeat endpoint resets _last_activity.
+
+Feature-gated sections are skipped rather than imported unconditionally —
+see the note in test_audit.py; the unconditional ``django_otp`` import here
+was silently taking this whole module out of the suite too.
 """
 
 import time
@@ -18,16 +22,36 @@ import time
 from django.conf import settings
 from django.contrib.sessions.models import Session
 from django.test import TestCase, override_settings
-from django.urls import reverse
-
-from django_otp.plugins.otp_totp.models import TOTPDevice
+from django.urls import NoReverseMatch, reverse
+from unittest import skipUnless
 
 from apps.accounts.models import UserProfile
 from apps.accounts.session_utils import force_logout_user
 
 from .factories import make_user, disconnect_stuck_run_hook
 
+try:
+    from django_otp.plugins.otp_totp.models import TOTPDevice
+    HAS_OTP = True
+except ImportError:  # MFA is not part of the current build
+    TOTPDevice = None
+    HAS_OTP = False
 
+
+def _has_route(name, args=None) -> bool:
+    try:
+        reverse(name, args=args if args is not None else [])
+        return True
+    except NoReverseMatch:
+        return False
+
+
+HAS_USER_MGMT = _has_route('user-create')
+HAS_IDLE_MIDDLEWARE = any('IdleSessionTimeout' in mw for mw in settings.MIDDLEWARE)
+
+
+@skipUnless(HAS_IDLE_MIDDLEWARE,
+            'No IdleSessionTimeoutMiddleware in settings.MIDDLEWARE')
 class IdleTimeoutTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -179,6 +203,8 @@ class ForceLogoutUserTests(TestCase):
         self.assertEqual(r.status_code, 200)
 
 
+@skipUnless(HAS_USER_MGMT,
+            'User-management views are not routed in apps/accounts/urls.py')
 class PrivilegeChangeForcesLogoutTests(TestCase):
     """Role change / MFA reset / disable user must terminate target's sessions."""
 
@@ -251,6 +277,8 @@ class PrivilegeChangeForcesLogoutTests(TestCase):
         c = Client(); c.force_login(self.admin); return c
 
 
+@skipUnless(HAS_OTP and _has_route('two_factor:disable'),
+            'two_factor is not installed — MFA was removed from the PoC')
 class TwoFactorDisableLockdownTests(TestCase):
     """/accounts/two_factor/disable/ must require admin role."""
 

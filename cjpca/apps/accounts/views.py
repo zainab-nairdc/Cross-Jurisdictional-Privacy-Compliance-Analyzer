@@ -279,7 +279,7 @@ def change_role(request, pk):
     # Cycling sessions on privilege change is wired up in Part C.
     try:
         from .session_utils import force_logout_user
-        force_logout_user(user)
+        force_logout_user(user, actor=request.user)
     except ImportError:
         pass
 
@@ -311,7 +311,7 @@ def toggle_active(request, pk):
     if not user.is_active:
         try:
             from .session_utils import force_logout_user
-            force_logout_user(user)
+            force_logout_user(user, actor=request.user)
         except ImportError:
             pass
 
@@ -345,7 +345,7 @@ def reset_password(request, pk):
 
     try:
         from .session_utils import force_logout_user
-        force_logout_user(user)
+        force_logout_user(user, actor=request.user)
     except ImportError:
         pass
 
@@ -406,7 +406,7 @@ def reset_mfa(request, pk):
 
     try:
         from .session_utils import force_logout_user
-        force_logout_user(user)
+        force_logout_user(user, actor=request.user)
     except ImportError:
         pass
 

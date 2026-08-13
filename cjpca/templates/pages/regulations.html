@@ -115,9 +115,9 @@
    :class="filtersOpen ? 'border-[#002583] text-[#002583] bg-[#EEF2FB]' : 'border-gray-200 text-gray-600 bg-white hover:bg-gray-50'">
   <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z"/></svg>
   <span>Filters</span>
-  <span x-show="jurFilter!=='all' || typeFilter!=='all' || categoryFilter!=='all'" x-cloak
+  <span x-show="jurFilter!=='all' || typeFilter!=='all' || categoryFilter!=='all' || versionFilter!=='all'" x-cloak
     class="inline-flex items-center justify-center min-w-[15px] h-[15px] px-1 rounded-full text-[9px] font-bold text-white"
-    style="background:#002583;" x-text="(jurFilter!=='all'?1:0)+(typeFilter!=='all'?1:0)+(categoryFilter!=='all'?1:0)"></span>
+    style="background:#002583;" x-text="(jurFilter!=='all'?1:0)+(typeFilter!=='all'?1:0)+(categoryFilter!=='all'?1:0)+(versionFilter!=='all'?1:0)"></span>
  </button>
  </div>
 
@@ -164,12 +164,21 @@
       </template>
      </div>
     </div>
+    {# Version status — in force / upcoming / superseded, from Document.version_status #}
+    <div>
+     <p style="font-size:10px;font-weight:800;color:#94A0B8;text-transform:uppercase;letter-spacing:.06em;margin:0 0 9px;">Version status</p>
+     <div style="display:flex;flex-wrap:wrap;gap:8px;">
+      <template x-for="v in versionFilters" :key="v.val">
+       <button @click="versionFilter = v.val; selectedDoc = null" class="f-chip" :class="versionFilter === v.val ? 'on' : ''" x-text="v.label"></button>
+      </template>
+     </div>
+    </div>
    </div>
 
    {# Footer #}
    <div style="padding:13px 22px;border-top:1px solid #EEF1F7;display:flex;align-items:center;gap:10px;flex-shrink:0;">
-    <button x-show="jurFilter!=='all' || typeFilter!=='all' || categoryFilter!=='all'" x-cloak
-      @click="jurFilter='all'; typeFilter='all'; categoryFilter='all'; selectedDoc=null"
+    <button x-show="jurFilter!=='all' || typeFilter!=='all' || categoryFilter!=='all' || versionFilter!=='all'" x-cloak
+      @click="jurFilter='all'; typeFilter='all'; categoryFilter='all'; versionFilter='all'; selectedDoc=null"
       style="font-size:12px;font-weight:600;color:#64748B;background:none;border:none;cursor:pointer;"
       onmouseover="this.style.color='#121676'" onmouseout="this.style.color='#64748B'">Clear all</button>
     <button @click="filtersOpen=false"
@@ -242,7 +251,7 @@
  </svg>
  <p style="font-size:14px;font-weight:600;color:#002583;margin-bottom:4px;">No regulations match your search</p>
  <p style="font-size:12px;color:#002583;">Try a different keyword or clear the filter</p>
- <button @click="search='';statFilter='all';jurFilter='all';selectedDoc=null"
+ <button @click="search='';statFilter='all';jurFilter='all';typeFilter='all';categoryFilter='all';versionFilter='all';selectedDoc=null"
  style="margin-top:12px;padding:6px 16px;border-radius:7px;border:1px solid #E5E8EF;font-size:12px;color:#002583;background:#fff;cursor:pointer;">
  Clear filters
  </button>
@@ -761,6 +770,7 @@ function regsPage() {
  typeFilter: 'all',
  jurFilter: 'all',
  categoryFilter: 'all',
+ versionFilter: 'all',
  topicFilter: '',
  selectedDoc: null,
  currentTags: [],
@@ -829,6 +839,17 @@ function regsPage() {
   return Array.from(m, ([val, label]) => ({ val, label }));
  },
 
+ // Mirrors Document.version_status ('in_force' | 'upcoming' | 'superseded'),
+ // which docs_json already carries per document. Static list, not derived: a
+ // library with nothing superseded yet should still show the option so the
+ // reviewer knows the distinction exists.
+ versionFilters: [
+ { val:'all', label:'All' },
+ { val:'in_force', label:'In force' },
+ { val:'upcoming', label:'Upcoming' },
+ { val:'superseded', label:'Superseded' },
+ ],
+
  typeFilters: [
  { val:'Regulation', label:'Regulation' },
  { val:'Primary Law', label:'Primary Law' },
@@ -850,6 +871,10 @@ function regsPage() {
  if (this.categoryFilter !== 'all') {
  const d = allDocs.find(x => x.id === docId);
  if (!d || (d.regulation_category || '') !== this.categoryFilter) return false;
+ }
+ if (this.versionFilter !== 'all') {
+ const d = allDocs.find(x => x.id === docId);
+ if (!d || d.version_status !== this.versionFilter) return false;
  }
  if (this.search && !name.toLowerCase().includes(this.search.toLowerCase())) return false;
  if (this.topicFilter) {
@@ -958,6 +983,23 @@ function uploadModal() {
  version: '',
  source_url: '',
  notes: '',
+ },
+
+ // Preview of what Document.version_status will derive from the date the
+ // uploader just picked — a future date means the document lands in the
+ // library as "Upcoming" and flips to "In force" on its own that morning.
+ // Compared as YYYY-MM-DD strings so the browser's timezone can't shift the
+ // <input type="date"> value by a day.
+ get effectiveDateHint() {
+ const picked = this.shared.effective_date;
+ if (!picked) return '';
+ const today = new Date();
+ const todayIso = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+ if (picked <= todayIso) return '';
+ const [y, m, d] = picked.split('-').map(Number);
+ const pretty = new Date(y, m - 1, d).toLocaleDateString('en-GB',
+ { day: 'numeric', month: 'short', year: 'numeric' });
+ return `Marked Upcoming until ${pretty}, then In force.`;
  },
 
  onDrop(event) {
@@ -1176,6 +1218,8 @@ function regsPage_filterTopic(topicId) {
  <label style="display:block;font-size:10px;font-weight:600;color:#002583;margin-bottom:4px;">Effective date <span style="color:#002583;">*</span></label>
  <input type="date" x-model="shared.effective_date"
  style="width:100%;border:1px solid #E5E8EF;border-radius:7px;padding:6px 8px;font-size:11px;color:#002583;outline:none;">
+ <p x-show="effectiveDateHint" x-cloak x-text="effectiveDateHint"
+ style="display:flex;align-items:center;gap:4px;margin:4px 0 0;font-size:10px;font-weight:600;color:#B07A00;"></p>
  </div>
  </div>
  <div style="margin-bottom:10px;">

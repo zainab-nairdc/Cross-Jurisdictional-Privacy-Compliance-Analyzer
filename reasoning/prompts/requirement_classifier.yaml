@@ -1,0 +1,127 @@
+# requirement_classifier.yaml
+# Assign a REQUIREMENT to every official taxonomy topic that genuinely applies
+# to it — zero, one, or several — and flag a concept the taxonomy does not
+# cover rather than forcing it into the nearest existing topic.
+#
+# Deliberately NOT chunk_classifier.yaml. That prompt asks for "the single best
+# matching tag" and tells the model to pick the leading imperative when a clause
+# spans several topics. That is the right question for a chunk feeding a
+# single-label filter, and the wrong one here: a requirement that says "retain
+# no longer than necessary AND protect with appropriate measures" concerns
+# retention and security both, and dropping either is a loss of meaning rather
+# than a tidy simplification.
+#
+# inputs: requirement_text, source_quote, article_ref, regulation_name,
+#         taxonomy_listing, max_topics.
+
+template: |
+  You are a compliance analyst assigning topics to ONE regulatory requirement.
+
+  Answer this question:
+
+      "Which official taxonomy topics genuinely apply to this requirement?"
+
+  NOT "which single topic best describes it". A requirement may genuinely
+  concern several topics at once, and naming only one would misfile it.
+
+  ── The official taxonomy (the ONLY vocabulary you may assign from) ──
+  {{ taxonomy_listing }}
+
+  ── The requirement ──
+  Regulation : {{ regulation_name }}
+  Provision  : {{ article_ref }}
+
+  Requirement (a normalised restatement of the obligation):
+  ---
+  {{ requirement_text }}
+  ---
+  {% if source_quote %}
+  The source provision it was drawn from, verbatim:
+  ---
+  {{ source_quote }}
+  ---
+  {% endif %}
+
+  ── How to decide ──
+
+  1. Assign EVERY official topic the requirement genuinely concerns. Most
+     requirements have one or two. Some have three or more. Assign as many as
+     genuinely apply, up to {{ max_topics }}.
+
+     Worked example — "A controller shall retain personal data only for as long
+     as necessary and shall implement appropriate technical and organisational
+     measures to protect it" genuinely concerns BOTH:
+        retention  (how long data may be kept)
+        security   (the measures protecting it)
+     Returning only one of those would be wrong.
+
+  2. Assign a topic only where the requirement genuinely concerns it. A topic
+     merely MENTIONED in passing is not a topic the requirement is about. Do
+     not pad the list.
+
+  3. Prefer an existing official topic whenever one genuinely fits, even if the
+     requirement words the idea differently. Different wording for an existing
+     concept is NOT a new topic — "storage limitation" is the taxonomy's
+     "retention", and should be returned as a topic, not as a new candidate.
+
+  4. Returning NOTHING is a valid and correct answer. If the requirement is a
+     definition, a scope statement, a commencement clause, or otherwise carries
+     no compliance topic, return empty lists. Do not invent a topic to avoid an
+     empty answer.
+
+  5. If the requirement DOES concern something important that none of the
+     official topics adequately represents, put it in
+     "new_topic_candidates" — never in "topics". You are proposing it for a
+     human to consider; you are not creating it. The official taxonomy is
+     human-controlled and your answer cannot change it.
+
+     Use this sparingly. It is for a genuinely missing concept, not for
+     unfamiliar phrasing of a concept the taxonomy already has.
+
+  ── Evidence is required ──
+
+  Every topic you assign must carry "evidence": a SHORT phrase copied from the
+  requirement or the source provision that shows why the topic applies. An
+  assignment you cannot point at evidence for is one you should not make.
+
+  ── Output ──
+
+  Output ONLY a JSON object, no markdown fences, with this shape:
+
+  {
+    "topics": [
+      {
+        "concept": "<a topic tag from the taxonomy above>",
+        "subcategory": "<bare subcategory tag under that topic, or empty string>",
+        "confidence": <float 0.0-1.0>,
+        "evidence": "<short phrase copied from the requirement or provision>"
+      }
+    ],
+    "new_topic_candidates": [
+      {
+        "concept": "<short name for the missing concept>",
+        "reason": "<what this concept is, in one sentence>",
+        "why_existing_topics_are_insufficient": "<which official topics you considered and why each is inadequate>",
+        "confidence": <float 0.0-1.0>,
+        "evidence": "<short phrase copied from the requirement or provision>"
+      }
+    ]
+  }
+
+  RULES:
+  - "topics" may hold zero, one, or several entries. Several is normal.
+  - "new_topic_candidates" is OPTIONAL. An empty list is the usual answer.
+  - "concept" in "topics" is JUST the topic tag, e.g. "retention". Never
+    "retention/retention_periods".
+  - "subcategory" is JUST the bare subcategory tag, e.g. "retention_periods".
+    No slash, no topic prefix. Empty string if it fits only at topic level.
+  - "confidence" is your genuine certainty. Below 0.3 means you are guessing —
+    leave the topic out rather than reporting a guess.
+  - Never put a concept in BOTH lists.
+  - Do not invent taxonomy tags in "topics". Only the tags listed above.
+
+  Example — a requirement about retaining data securely:
+  {"topics": [{"concept": "retention", "subcategory": "retention_periods", "confidence": 0.91, "evidence": "only for as long as necessary"}, {"concept": "security", "subcategory": "technical_measures", "confidence": 0.84, "evidence": "appropriate technical and organisational measures"}], "new_topic_candidates": []}
+
+  Example — a definitions clause with no compliance topic:
+  {"topics": [], "new_topic_candidates": []}

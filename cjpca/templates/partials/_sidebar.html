@@ -5,10 +5,13 @@
 {% url 'comparison-analyst' as url_comparison_analyst %}
 {% url 'mapping' as url_mapping %}
 {% url 'review' as url_review %}
+{% url 'comparison-approved' as url_approved_runs %}
 {% url 'analytics' as url_analytics %}
 {% url 'history' as url_history %}
 {% url 'library-regulations' as url_regulations %}
 {% url 'library-policies' as url_policies %}
+{% url 'library-requirements' as url_requirements %}
+{% url 'library-topic-suggestions' as url_topic_suggestions %}
 {% url 'site-settings' as url_settings %}
 
 {% with cur=request.resolver_match.url_name %}
@@ -344,6 +347,77 @@
  </a>
  </li>
 
+ {# Approved Runs — human-certified comparison assessments. #}
+ <li>
+ <a href="{{ url_approved_runs }}" title="Approved Runs"
+ class="flex items-center py-1.5 rounded-md text-sm transition-colors"
+ :class="sidebarOpen ? 'gap-2.5 px-2 justify-between' : 'justify-center px-1'"
+ {% if cur == 'comparison-approved' %}
+ style="background:rgba(255,255,255,0.16);color:#ffffff;font-weight:600;"
+ {% else %}
+ style="color:rgba(255,255,255,0.82);"
+ onmouseover="this.style.background='rgba(255,255,255,0.10)';this.style.color='#ffffff'"
+ onmouseout="this.style.background='';this.style.color='rgba(255,255,255,0.82)'"
+ {% endif %}>
+ <span class="flex items-center" :class="sidebarOpen ? 'gap-2.5' : ''">
+ <svg class="h-3.5 w-3.5 flex-shrink-0"
+ style="color:{% if cur == 'comparison-approved' %}#ffffff{% else %}rgba(255,255,255,0.72){% endif %};"
+ fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.746 3.746 0 0121 12z"/>
+ </svg>
+ <span x-show="sidebarOpen" class="whitespace-nowrap">Approved Runs</span>
+ </span>
+ </a>
+ </li>
+
+ {# Requirements — canonical obligations, their topics and cross-references. #}
+ <li>
+ <a href="{{ url_requirements }}" title="Requirements"
+ class="flex items-center py-1.5 rounded-md text-sm transition-colors"
+ :class="sidebarOpen ? 'gap-2.5 px-2 justify-between' : 'justify-center px-1'"
+ {% if cur == 'library-requirements' or cur == 'library-requirement-detail' %}
+ style="background:rgba(255,255,255,0.16);color:#ffffff;font-weight:600;"
+ {% else %}
+ style="color:rgba(255,255,255,0.82);"
+ onmouseover="this.style.background='rgba(255,255,255,0.10)';this.style.color='#ffffff'"
+ onmouseout="this.style.background='';this.style.color='rgba(255,255,255,0.82)'"
+ {% endif %}>
+ <span class="flex items-center" :class="sidebarOpen ? 'gap-2.5' : ''">
+ <svg class="h-3.5 w-3.5 flex-shrink-0"
+ style="color:{% if cur == 'library-requirements' or cur == 'library-requirement-detail' %}#ffffff{% else %}rgba(255,255,255,0.72){% endif %};"
+ fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25z"/>
+ </svg>
+ <span x-show="sidebarOpen" class="whitespace-nowrap">Requirements</span>
+ </span>
+ </a>
+ </li>
+
+ {# Topic suggestions — the human-governed route to taxonomy growth. #}
+ <li>
+ <a href="{{ url_topic_suggestions }}" title="Topic suggestions"
+ class="flex items-center py-1.5 rounded-md text-sm transition-colors"
+ :class="sidebarOpen ? 'gap-2.5 px-2 justify-between' : 'justify-center px-1'"
+ {% if cur == 'library-topic-suggestions' or cur == 'library-topic-suggestion-detail' %}
+ style="background:rgba(255,255,255,0.16);color:#ffffff;font-weight:600;"
+ {% else %}
+ style="color:rgba(255,255,255,0.82);"
+ onmouseover="this.style.background='rgba(255,255,255,0.10)';this.style.color='#ffffff'"
+ onmouseout="this.style.background='';this.style.color='rgba(255,255,255,0.82)'"
+ {% endif %}>
+ <span class="flex items-center" :class="sidebarOpen ? 'gap-2.5' : ''">
+ <svg class="h-3.5 w-3.5 flex-shrink-0"
+ style="color:{% if cur == 'library-topic-suggestions' or cur == 'library-topic-suggestion-detail' %}#ffffff{% else %}rgba(255,255,255,0.72){% endif %};"
+ fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+ <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z"/>
+ </svg>
+ <span x-show="sidebarOpen" class="whitespace-nowrap">Topic suggestions</span>
+ </span>
+ {% if nav_suggestion_count %}
+ <span x-show="sidebarOpen" class="px-1.5 py-0.5 rounded-full text-[10px] font-bold leading-none" style="background:#E0B85C;color:#3A2A00;">{{ nav_suggestion_count }}</span>
+ {% endif %}
+ </a>
+ </li>
 
  </ul>
  </div>

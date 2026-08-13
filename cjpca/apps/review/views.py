@@ -8,6 +8,7 @@ from django.utils.decorators import method_decorator
 from django.views import View
 
 from apps.accounts.decorators import role_required
+from apps.history.audit import Actions, log_event
 from apps.comparison.models import (
     AuditEvent, ComparisonResult, ComparisonRun,
     PAIR_CONFIGS, REL_COLORS, REL_BG, REL_LABELS,
@@ -186,12 +187,28 @@ class ReviewExportView(View):
         ).exclude(lifecycle='draft').order_by('run__pair_key', 'id')
 
         if format == 'pdf':
-            return self._export_pdf(results)
-        if format in ('docx', 'word'):
-            return self._export_docx(results)
-        if format in ('xlsx', 'excel'):
-            return self._export_xlsx(results)
-        return HttpResponseBadRequest('Unknown export format')
+            response = self._export_pdf(results)
+        elif format in ('docx', 'word'):
+            response = self._export_docx(results)
+        elif format in ('xlsx', 'excel'):
+            response = self._export_xlsx(results)
+        else:
+            return HttpResponseBadRequest('Unknown export format')
+
+        # This bulk export ships every reviewed finding out of the system,
+        # so it is at least as audit-relevant as the per-package exports in
+        # apps.comparison / apps.mapping — it was the one export path that
+        # wrote no audit row at all.
+        log_event(
+            request.user, Actions.EXPORT_DOWNLOADED,
+            request=request,
+            target_type='comparison.ComparisonResult',
+            description=(f'{request.user.username} exported the full review '
+                         f'register as {format}'),
+            metadata={'format': format, 'scope': 'review_register',
+                      'result_count': results.count()},
+        )
+        return response
 
     def _rows(self, results):
         rows = []

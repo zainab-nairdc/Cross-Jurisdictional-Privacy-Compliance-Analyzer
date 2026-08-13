@@ -1002,9 +1002,9 @@ class SiteSettingsView(View):
 
         if previous != mode:
             try:
-                from apps.history.audit import log_event
+                from apps.history.audit import log_event, Actions
                 log_event(
-                    request.user, 'settings.updated', request=request,
+                    request.user, Actions.SETTINGS_UPDATED, request=request,
                     target_type='core.SiteSetting', target_id=setting.pk,
                     metadata={'field': 'jurisdiction_display',
                               'from': previous, 'to': mode},

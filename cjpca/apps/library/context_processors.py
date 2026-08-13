@@ -43,3 +43,22 @@ def upload_taxonomy(request):
     except Exception:
         return {"custom_jurisdictions": [], "custom_categories": [],
                 "existing_regulations_json": "[]"}
+
+
+def review_counts(request):
+    """Badge counts for the sidebar.
+
+    `nav_suggestion_count` is the number of OPEN topic suggestions — concepts
+    waiting on a human decision about whether the taxonomy should grow. Only
+    open ones count: approved, rejected and merged suggestions are settled and
+    would turn the badge into noise.
+
+    Fail-safe like `upload_taxonomy`: any error degrades to no badge rather
+    than breaking every page render.
+    """
+    try:
+        from apps.library.models import TopicSuggestion
+        return {"nav_suggestion_count": TopicSuggestion.objects.filter(
+            status__in=TopicSuggestion.OPEN_STATUSES).count()}
+    except Exception:
+        return {"nav_suggestion_count": 0}

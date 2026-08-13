@@ -41,13 +41,23 @@ log = logging.getLogger(__name__)
 # inside each section.
 class Actions:
     # Authentication / session
+    #
+    # NOTE on the dormant keys below. MFA, the idle-timeout middleware and
+    # the user-management screens were pulled out of the PoC (see the
+    # comment at the top of apps/accounts/urls.py). Their constants are
+    # kept because SECURITY_RBAC_README part D2 enumerates them and the
+    # history/monitoring surfaces are built against that list — but nothing
+    # currently emits them. ``NOT_EMITTED`` below is the authoritative
+    # record of which ones those are; the test suite asserts that set is
+    # exactly right, so re-adding a feature and forgetting to re-wire its
+    # audit call fails loudly instead of silently.
     LOGIN          = 'auth.login'
     LOGIN_FAILED   = 'auth.login_failed'
     LOGOUT         = 'auth.logout'
-    IDLE_TIMEOUT   = 'auth.idle_timeout'
-    MFA_ENROLLED   = 'auth.mfa_enrolled'
-    MFA_RESET      = 'auth.mfa_reset'
-    AUTH_BACKUP_CODES_REGENERATED = 'auth.backup_codes_regenerated'
+    IDLE_TIMEOUT   = 'auth.idle_timeout'      # dormant: no idle middleware
+    MFA_ENROLLED   = 'auth.mfa_enrolled'      # dormant: django_otp removed
+    MFA_RESET      = 'auth.mfa_reset'         # dormant: no route
+    AUTH_BACKUP_CODES_REGENERATED = 'auth.backup_codes_regenerated'  # dormant: no route
     SESSIONS_TERMINATED           = 'auth.sessions_terminated'
     # Analyst flows. Both the *initiation* (.run) and the eventual
     # *outcome* (.complete / .failed) are audited so BBK gets a full
@@ -57,6 +67,13 @@ class Actions:
     COMPARISON_RUN      = 'comparison.run'
     COMPARISON_COMPLETE = 'comparison.complete'
     COMPARISON_FAILED   = 'comparison.failed'
+    # Reuse of an approved assessment instead of a fresh comparison. All three
+    # are emitted from apps.comparison.views.RunComparisonView: the offer is
+    # recorded as well as the decision, so the trail shows what the analyst was
+    # shown, not only what they chose.
+    COMPARISON_REUSE_OFFERED  = 'comparison.reuse_offered'
+    COMPARISON_REUSE_ACCEPTED = 'comparison.reuse_accepted'
+    COMPARISON_RERUN_FORCED   = 'comparison.rerun_forced'
     MAPPING_RUN         = 'mapping.run'
     MAPPING_COMPLETE    = 'mapping.complete'
     MAPPING_FAILED      = 'mapping.failed'
@@ -65,11 +82,20 @@ class Actions:
     REVIEW_ACCEPT  = 'review.accept'
     REVIEW_REJECT  = 'review.reject'
     REVIEW_MODIFY  = 'review.modify'
+    # Approved-package exports. Emitted by the per-run/per-analysis export
+    # views AND by the bulk reviewer export at /review/export/<format>/.
+    EXPORT_DOWNLOADED = 'exports.downloaded'
     # Admin / corpus
     DOCUMENT_UPLOAD     = 'document.upload'
     DOCUMENT_DELETE     = 'document.delete'
+    DOCUMENT_TAG        = 'library.document_tag'
+    DOC_SUPERSEDED      = 'doc.superseded'
     INGESTION_COMPLETE  = 'ingestion.complete'
     INGESTION_FAILED    = 'ingestion.failed'
+    # Cross-jurisdiction gap analysis (analytics page)
+    GAP_ANALYSIS_RUN    = 'analytics.gap_analysis'
+    # Admin-configurable site settings (jurisdiction display mode, etc.)
+    SETTINGS_UPDATED    = 'settings.updated'
     # Reasoning layer — surfaced on the system monitoring page so admins
     # can see when the LLM is producing output that even OutputFixingParser
     # cannot rescue. One row per failed parse-after-retry.
@@ -81,6 +107,9 @@ class Actions:
     QUARANTINE_FLAGGED   = 'quarantine.flagged'
     QUARANTINE_APPROVED  = 'quarantine.approved'
     QUARANTINE_REJECTED  = 'quarantine.rejected'
+    # User management — all dormant: the views in apps/accounts/views.py
+    # carry working log_event calls but nothing routes them (see
+    # apps/accounts/urls.py).
     USER_CREATED    = 'user.created'
     USER_ROLE_CHANGED = 'user.role_changed'
     USER_DISABLED     = 'user.disabled'
@@ -91,6 +120,53 @@ class Actions:
     def all(cls) -> list:
         return [v for k, v in vars(cls).items()
                 if not k.startswith('_') and isinstance(v, str)]
+
+
+# ── Dormant actions ──────────────────────────────────────────────────────────
+# Declaring a constant is not the same as writing rows, and the two drifted
+# badly enough once that whole categories of activity were going unrecorded
+# while the dashboards implied otherwise. These two sets are the honest
+# record of the gap, and ``apps.accounts.tests.test_audit.ActionEmissionTests``
+# pins them: it walks the source with the AST looking for the action passed
+# to a ``log_event(...)`` call, so an action can neither lose its call site
+# nor quietly gain one without a test failing.
+
+#: No code anywhere calls ``log_event`` with these. They are referenced only
+#: by *readers* (dashboard queries), which is why the corresponding panels
+#: always render zero.
+NO_CALL_SITE = {
+    # SESSION_IDLE_TIMEOUT is configured and the login page still handles
+    # ?reason=idle, but the IdleSessionTimeoutMiddleware that used to emit
+    # this was removed and is not in settings.MIDDLEWARE.
+    Actions.IDLE_TIMEOUT,
+    # apps.accounts.views.SystemMonitoringView *queries* this event type in
+    # four places; nothing writes it. Wiring it up means calling log_event
+    # from the OutputFixingParser give-up path in reasoning/.
+    Actions.REASONING_VALIDATION_ERROR,
+}
+
+#: A ``log_event`` call site exists and is correct, but nothing can reach it.
+#: Restoring the feature restores the audit row — no audit work needed.
+UNREACHABLE = {
+    # The receiver in apps.history.signals sits inside a try/ImportError and
+    # django_otp is no longer in INSTALLED_APPS, so it never registers.
+    Actions.MFA_ENROLLED,
+    # These live in apps/accounts/views.py, but apps/accounts/urls.py routes
+    # only logout/ and monitoring/ — the views have no URL.
+    Actions.MFA_RESET,
+    Actions.AUTH_BACKUP_CODES_REGENERATED,
+    Actions.USER_CREATED,
+    Actions.USER_ROLE_CHANGED,
+    Actions.USER_DISABLED,
+    Actions.USER_PASSWORD_RESET,
+    Actions.USER_PASSWORD_CHANGED,
+    # Emitted by apps.accounts.session_utils.force_logout_user, whose only
+    # callers are the unrouted user-management views above.
+    Actions.SESSIONS_TERMINATED,
+}
+
+#: Everything that cannot appear in the audit log today, for either reason.
+NOT_EMITTED = NO_CALL_SITE | UNREACHABLE
 
 
 def _extract_ip(request: Optional[HttpRequest]) -> Optional[str]:

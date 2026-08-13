@@ -15,6 +15,19 @@
 {% block content %}
 <div class="flex flex-col h-full overflow-hidden bg-gray-50" x-data="{ showSendModal: false }">
 
+ {# Approval feedback. Without this the reviewer gets no confirmation that an
+    assessment was certified — and, worse, no warning when it was approved
+    with unverifiable currency. #}
+ {% if messages %}
+  <div style="flex-shrink:0;padding:8px 24px 0;">
+   {% for m in messages %}
+    <div style="padding:9px 13px;border-radius:8px;font-size:11px;font-weight:600;margin-bottom:6px;
+      background:{% if m.tags == 'error' %}#FDECEC{% elif m.tags == 'warning' %}#FFF6E0{% else %}#EAF7EE{% endif %};
+      color:{% if m.tags == 'error' %}#B3261E{% elif m.tags == 'warning' %}#B07A00{% else %}#1E7A3C{% endif %};">{{ m }}</div>
+   {% endfor %}
+  </div>
+ {% endif %}
+
  {# Header #}
  <div style="background:#fff;border-bottom:1px solid #E5E8EF;padding:12px 24px;flex-shrink:0;display:flex;align-items:center;gap:12px;">
   {% comment %}
@@ -51,6 +64,33 @@
       Send to reviewer
     </button>
     {% endif %}
+  {% endif %}
+
+  {# ── Run-level approval: certifying the ASSESSMENT, distinct from signing
+     off individual obligations. Only a certified run reaches Approved Runs. ── #}
+  {% if run.lifecycle == 'approved' %}
+   <a href="{% url 'comparison-approved' %}"
+      style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:50px;background:#EAF7EE;color:#1E7A3C;font-size:11px;font-weight:700;border:1px solid #1E7A3C;text-decoration:none;">
+    ✓ Approved v{{ run.version_no }}
+   </a>
+  {% elif run.lifecycle == 'superseded' %}
+   <span style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:50px;background:#EDE9FE;color:#5B21B6;font-size:11px;font-weight:700;border:1px solid #C4B5FD;">
+    Superseded v{{ run.version_no }}
+   </span>
+  {% elif approval.can_approve %}
+   <form method="post" action="{% url 'comparison-run-approval' run.pk %}" style="display:inline;">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="approve">
+    <button type="submit"
+      style="display:inline-flex;align-items:center;gap:7px;padding:8px 18px;border-radius:50px;border:none;font-family:inherit;font-size:12px;font-weight:700;color:#fff;background:#1E7A3C;cursor:pointer;box-shadow:0 2px 10px rgba(30,122,60,.22);"
+      title="Certify this assessment and publish it to Approved Runs">
+     <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+     Approve assessment
+    </button>
+   </form>
+  {% elif approval.reason %}
+   <span style="padding:6px 13px;border-radius:50px;background:#F1F2F6;color:#6B7280;font-size:10.5px;font-weight:600;"
+         title="{{ approval.reason }}">{{ approval.reason|truncatechars:64 }}</span>
   {% endif %}
 
   {% if run.status == 'complete' or run.status == 'partially_failed' %}

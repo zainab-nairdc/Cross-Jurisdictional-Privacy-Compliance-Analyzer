@@ -1,0 +1,138 @@
+{% extends 'base.html' %}
+
+{% block title %}Topic suggestions — CJPCA{% endblock %}
+
+{% block extra_head %}
+<style>
+ .ts-row { display:block;padding:12px 16px;border-bottom:1px solid #E5E8EF;text-decoration:none;color:inherit; }
+ .ts-row:hover { background:#F7F9FC; }
+ .ts-tab { padding:5px 12px;border-radius:20px;font-size:11px;font-weight:700;border:1.5px solid #E5E8EF;background:#fff;color:#002583;text-decoration:none;display:inline-block; }
+ .ts-tab.on { background:#002583;color:#fff;border-color:#002583; }
+ .ts-badge { padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em; }
+ .s-suggested { background:#E8F0FE;color:#002583; }
+ .s-under_review { background:#FFF6E0;color:#B07A00; }
+ .s-approved_pending_release { background:#FFF0E0;color:#C2410C; }
+ .s-active { background:#EAF7EE;color:#1E7A3C; }
+ .s-rejected, .s-superseded { background:#F1F2F6;color:#6B7280; }
+ .s-merged { background:#EDE9FE;color:#5B21B6; }
+ .ts-in { padding:6px 10px;border-radius:7px;border:1px solid #E5E8EF;font-size:11px;font-family:inherit;color:#002583;width:100%; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="height:100%;overflow-y:auto;background:#F7F9FC;">
+ <div style="max-width:1060px;margin:0 auto;padding:18px 24px 48px;">
+
+  <a href="{% url 'library-requirements' %}" style="font-size:11px;color:#6B7280;text-decoration:none;">← Requirements</a>
+
+  <h1 style="font-size:15px;font-weight:700;color:#002583;margin:10px 0 3px;">Topic suggestions</h1>
+  <p style="font-size:11px;color:#6B7280;margin:0 0 12px;line-height:1.55;max-width:820px;">
+   Concepts the model met that no official topic represents. The official taxonomy currently has
+   <strong>{{ official_topic_count }} topics</strong> — a starting vocabulary, not a ceiling.
+   Nothing here is official: approving a suggestion produces a proposed change to
+   <code>reasoning/taxonomy.py</code> for a person to review and commit.
+   <strong>The system never edits that file.</strong>
+  </p>
+
+  {% if messages %}
+   {% for m in messages %}
+    <div style="margin-bottom:10px;padding:9px 13px;border-radius:8px;font-size:11px;font-weight:600;
+                background:{% if m.tags == 'error' %}#FDECEC{% else %}#EAF7EE{% endif %};
+                color:{% if m.tags == 'error' %}#B3261E{% else %}#1E7A3C{% endif %};">{{ m }}</div>
+   {% endfor %}
+  {% endif %}
+
+  {% if pending_release %}
+   <div style="padding:10px 13px;border-radius:8px;background:#FFF0E0;border:1px solid #F0C9A0;margin-bottom:12px;">
+    <p style="font-size:11px;font-weight:700;color:#C2410C;margin:0 0 2px;">
+     {{ pending_release }} suggestion{{ pending_release|pluralize }} approved and awaiting taxonomy release</p>
+    <p style="font-size:10px;color:#9A5B2C;margin:0;line-height:1.5;">
+     Approved is not official. Apply each proposed change to <code>reasoning/taxonomy.py</code>,
+     commit it, then confirm with <code>manage.py taxonomy_apply &lt;id&gt; --mark-active</code>.
+    </p>
+   </div>
+  {% endif %}
+
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
+   <a class="ts-tab {% if not selected_status %}on{% endif %}" href="?">All ({{ total }})</a>
+   {% for val, label in status_choices %}
+    {% if counts|length %}
+     <a class="ts-tab {% if selected_status == val %}on{% endif %}" href="?status={{ val }}">{{ label }}</a>
+    {% endif %}
+   {% endfor %}
+  </div>
+
+  <div style="background:#fff;border:1px solid #E5E8EF;border-radius:10px;overflow:hidden;margin-bottom:16px;">
+   {% for s in suggestions %}
+    <a class="ts-row" href="{% url 'library-topic-suggestion-detail' s.pk %}">
+     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <span style="font-size:13px;font-weight:700;color:#002583;">{{ s.proposed_name }}</span>
+      <span class="ts-badge s-{{ s.status }}">{{ s.get_status_display }}</span>
+      {% if s.origin == 'human' %}<span class="ts-badge s-active">manual</span>{% endif %}
+      {% if s.is_high_signal %}<span class="ts-badge s-under_review">high signal</span>{% endif %}
+     </div>
+     <div style="display:flex;gap:14px;margin-top:4px;font-size:10px;color:#6B7280;flex-wrap:wrap;">
+      <span><strong>{{ s.occurrence_count }}</strong> occurrence{{ s.occurrence_count|pluralize }} (threshold {{ threshold }})</span>
+      <span>confidence {{ s.confidence|floatformat:2 }}</span>
+      <span>would add <code>{{ s.target_leaf }}</code></span>
+      {% if s.merged_into_topic %}<span style="color:#5B21B6;">merged into {{ s.merged_into_topic }}</span>{% endif %}
+     </div>
+     {% if s.reason %}<p style="font-size:11px;color:#374151;margin:5px 0 0;line-height:1.5;">{{ s.reason|truncatechars:180 }}</p>{% endif %}
+    </a>
+   {% empty %}
+    <div style="padding:40px;text-align:center;color:#6B7280;font-size:12px;">
+     No topic suggestions.
+     <div style="margin-top:6px;font-size:11px;color:#9AA3B2;">
+      This is the healthy state — it means every concept the model produced already mapped
+      onto the official taxonomy.
+     </div>
+    </div>
+   {% endfor %}
+  </div>
+
+  {# ── Manual creation: the taxonomy is not owned by the model ── #}
+  <div style="background:#fff;border:1px solid #E5E8EF;border-radius:10px;padding:14px 16px;">
+   <p style="font-size:11px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:.06em;margin:0 0 3px;">Propose a topic yourself</p>
+   <p style="font-size:11px;color:#6B7280;margin:0 0 10px;line-height:1.5;">
+    A new topic does not have to originate from the model. This follows the same route:
+    it becomes a suggestion, needs approval, and needs a taxonomy release to become official.
+   </p>
+   <form method="post" action="{% url 'library-topic-suggestion-create' %}"
+         style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:start;">
+    {% csrf_token %}
+    <div>
+     <label style="font-size:10px;font-weight:700;color:#6B7280;">Topic name</label>
+     <input name="name" class="ts-in" placeholder="e.g. Automated decision-making" required>
+    </div>
+    <div>
+     <label style="font-size:10px;font-weight:700;color:#6B7280;">Parent topic (leave blank for a new top-level topic)</label>
+     <select name="parent_topic" class="ts-in">
+      <option value="">— new top-level topic —</option>
+      {% for t in topic_options %}{% if t.depth == 0 %}
+       <option value="{{ t.topic }}">{{ t.label }}</option>
+      {% endif %}{% endfor %}
+     </select>
+    </div>
+    <div>
+     <label style="font-size:10px;font-weight:700;color:#6B7280;">Subcategory tag (optional)</label>
+     <input name="subcategory" class="ts-in" placeholder="e.g. adm_register">
+    </div>
+    <div>
+     <label style="font-size:10px;font-weight:700;color:#6B7280;">Why the current taxonomy is insufficient</label>
+     <input name="why_insufficient" class="ts-in" placeholder="which topics you considered and why they fall short">
+    </div>
+    <div style="grid-column:1 / -1;">
+     <label style="font-size:10px;font-weight:700;color:#6B7280;">What this concept is</label>
+     <input name="reason" class="ts-in" placeholder="one sentence">
+    </div>
+    <div style="grid-column:1 / -1;">
+     <button type="submit" style="padding:7px 16px;border-radius:8px;background:#002583;color:#fff;border:none;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;">
+      Create suggestion</button>
+    </div>
+   </form>
+  </div>
+
+  <p style="font-size:10px;color:#9AA3B2;margin:12px 0 0;">Official taxonomy version {{ taxonomy_version }}</p>
+ </div>
+</div>
+{% endblock %}

@@ -20,6 +20,13 @@ urlpatterns = [
     path('runs/<int:pk>/', views.ComparisonWorkspaceView.as_view(), name='comparison-workspace'),
     path('runs/<int:pk>/submit-review/', views.SubmitForReviewView.as_view(), name='comparison-submit-review'),
 
+    # ── Approved runs: comparison → human review → approved assessment ──
+    path('approved/', views.ApprovedRunsView.as_view(), name='comparison-approved'),
+    path('runs/<int:pk>/approval/', views.RunApprovalView.as_view(),
+         name='comparison-run-approval'),
+    path('runs/<int:pk>/recheck-currency/', views.RunCurrencyRecheckView.as_view(),
+         name='comparison-run-recheck-currency'),
+
     # ── Back-compat redirects: old routes funnel into the new combined page ──
     # query_string=True preserves ?reg_a_pk=… selections when the picker JS
     # accidentally hits an old URL (e.g. cached page reload after the routes

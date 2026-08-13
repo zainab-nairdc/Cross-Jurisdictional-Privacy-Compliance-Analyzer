@@ -137,6 +137,12 @@
          <input class="wz-in" x-model="meta.regulation_category" @input="meta.category_is_new = isNewCat()" placeholder="e.g. data protection"></div>
         <div><label class="wz-lbl">Issuing authority <span style="color:#9AA4BC;font-weight:400;">(optional)</span></label>
          <input class="wz-in" x-model="meta.issuing_authority" placeholder="e.g. PDPA"></div>
+        <div><label class="wz-lbl">Effective date
+          <span x-show="meta.ai_suggested && meta.effective_date" x-cloak style="font-size:9px;font-weight:700;color:#3B6FE0;background:#EEF2FB;padding:1px 6px;border-radius:8px;margin-left:4px;">AI</span>
+          <span style="color:#9AA4BC;font-weight:400;">(optional)</span></label>
+         <input type="date" class="wz-in" x-model="meta.effective_date">
+         <p x-show="effectiveDateHint" x-cloak x-text="effectiveDateHint"
+           style="margin:4px 0 0;font-size:10px;font-weight:600;color:#B07A00;line-height:1.4;"></p></div>
         <div class="wz-span2"><label class="wz-lbl">Scope summary
           <span style="font-size:9px;font-weight:700;color:#3B6FE0;background:#EEF2FB;padding:1px 6px;border-radius:8px;margin-left:4px;">AI</span></label>
          <textarea class="wz-in wz-grow" x-model="meta.scope_summary" rows="2"
@@ -486,6 +492,19 @@ function uploadWizard() {
   stepIndex() {
    return this.step<=1?0 : this.step===2?1 : this.step===3?2
         : this.step===4?3 : this.step===5?4 : 5;
+  },
+  // Live preview of the version_status the server will derive from the date in
+  // the field. Compared as YYYY-MM-DD strings, so the browser timezone can't
+  // shift an <input type="date"> value across midnight.
+  get effectiveDateHint() {
+   const picked = this.meta.effective_date;
+   if(!picked || !/^\d{4}-\d{2}-\d{2}$/.test(picked)) return '';
+   const t = new Date();
+   const todayIso = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+   if(picked <= todayIso) return '';
+   const [y,m,d] = picked.split('-').map(Number);
+   const pretty = new Date(y, m-1, d).toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'});
+   return `Filed as Upcoming until ${pretty}, then In force.`;
   },
   openWizard() { this.step=1; this.file=null; this.analysis=null; this.errorMsg=''; this.meta=DEF(); this.procDone=0; this.addingJur=false; this.newJurRaw=''; this.open=true; },
   pickFile(f) { if(!f) return; this.file=f; if(!this.meta.name) this.meta.name=f.name.replace(/\.[^.]+$/,''); },

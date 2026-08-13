@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+
+{% block title %}Requirements — CJPCA{% endblock %}
+
+{% block extra_head %}
+<style>
+ .rq-row { display:block;padding:12px 16px;border-bottom:1px solid #E5E8EF;text-decoration:none;color:inherit;transition:background .1s; }
+ .rq-row:hover { background:#F7F9FC; }
+ .rq-chip { display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;line-height:1.6; }
+ .rq-chip.official { background:#E8F0FE;color:#002583; }
+ .rq-chip.suggested { background:#FFF6E0;color:#B07A00; }
+ .rq-chip.unclass { background:#F1F2F6;color:#6B7280; }
+ .rq-chip.ref { background:#EAF7EE;color:#1E7A3C; }
+ .rq-chip.refamb { background:#FDECEC;color:#B3261E; }
+ .rq-tab { padding:5px 13px;border-radius:20px;font-size:11px;font-weight:700;border:1.5px solid #E5E8EF;background:#fff;color:#002583;text-decoration:none;display:inline-block; }
+ .rq-tab.on { background:#002583;color:#fff;border-color:#002583; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex;flex-direction:column;height:100%;overflow:hidden;background:#fff;">
+
+ <div style="border-bottom:1px solid #E5E8EF;padding:14px 24px;flex-shrink:0;">
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;">
+   <div>
+    <h1 style="font-size:15px;font-weight:700;color:#002583;margin:0 0 2px;">Requirements</h1>
+    <p style="font-size:11px;color:#6B7280;margin:0;line-height:1.5;max-width:760px;">
+     Canonical obligations extracted from each regulation. A requirement may carry
+     <strong>several topics at once</strong> — retention and security, for example — and each
+     assignment keeps its own confidence and provenance. Cross-references are preserved as
+     links, never copied into the requirement text.
+    </p>
+   </div>
+   <a href="{% url 'library-topic-suggestions' %}"
+      style="flex-shrink:0;display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;background:{% if open_suggestions %}#FFF6E0{% else %}#fff{% endif %};border:1px solid {% if open_suggestions %}#E0B85C{% else %}#E5E8EF{% endif %};color:{% if open_suggestions %}#B07A00{% else %}#002583{% endif %};font-size:11px;font-weight:700;text-decoration:none;">
+    Topic suggestions
+    {% if open_suggestions %}<span style="padding:1px 7px;border-radius:20px;background:#B07A00;color:#fff;font-size:10px;">{{ open_suggestions }}</span>{% endif %}
+   </a>
+  </div>
+
+  <form method="get" style="display:flex;align-items:center;gap:8px;margin-top:12px;flex-wrap:wrap;">
+   <select name="regulation" onchange="this.form.submit()"
+           style="padding:5px 10px;border-radius:7px;border:1px solid #E5E8EF;font-size:11px;font-family:inherit;color:#002583;">
+    <option value="">All regulations</option>
+    {% for r in regulations %}
+     <option value="{{ r.pk }}" {% if selected.regulation == r.pk|stringformat:'s' %}selected{% endif %}>{{ r.name }} ({{ r.n }})</option>
+    {% endfor %}
+   </select>
+   <select name="topic" onchange="this.form.submit()"
+           style="padding:5px 10px;border-radius:7px;border:1px solid #E5E8EF;font-size:11px;font-family:inherit;color:#002583;">
+    <option value="">All topics</option>
+    {% for t in topic_options %}{% if t.depth == 0 %}
+     <option value="{{ t.topic }}" {% if selected.topic == t.topic %}selected{% endif %}>{{ t.label }}</option>
+    {% endif %}{% endfor %}
+   </select>
+   <input type="hidden" name="state" value="{{ selected.state }}">
+  </form>
+
+  <div style="display:flex;align-items:center;gap:6px;margin-top:10px;flex-wrap:wrap;">
+   {% for s in 'x' %}{% endfor %}
+   <a class="rq-tab {% if not selected.state %}on{% endif %}" href="?regulation={{ selected.regulation }}&topic={{ selected.topic }}">All</a>
+   <a class="rq-tab {% if selected.state == 'multi' %}on{% endif %}" href="?regulation={{ selected.regulation }}&topic={{ selected.topic }}&state=multi">Multi-topic</a>
+   <a class="rq-tab {% if selected.state == 'untopiced' %}on{% endif %}" href="?regulation={{ selected.regulation }}&topic={{ selected.topic }}&state=untopiced">No topic</a>
+   <a class="rq-tab {% if selected.state == 'suggested' %}on{% endif %}" href="?regulation={{ selected.regulation }}&topic={{ selected.topic }}&state=suggested">Has unresolved concept</a>
+   <a class="rq-tab {% if selected.state == 'refs' %}on{% endif %}" href="?regulation={{ selected.regulation }}&topic={{ selected.topic }}&state=refs">Has cross-references</a>
+   <span style="margin-left:auto;font-size:10px;color:#9AA3B2;">taxonomy {{ taxonomy_version }}</span>
+  </div>
+ </div>
+
+ <div style="flex:1;overflow-y:auto;">
+  {% for req in requirements %}
+   <a class="rq-row" href="{% url 'library-requirement-detail' req.pk %}">
+    <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:3px;">
+     <span style="font-size:10px;font-weight:700;color:#6B7280;">{{ req.regulation.name }}</span>
+     {% if req.article_ref %}<span style="font-size:10px;color:#9AA3B2;">{{ req.article_ref|truncatechars:60 }}</span>{% endif %}
+    </div>
+    <p style="font-size:12px;color:#1F2937;margin:0 0 6px;line-height:1.5;">{{ req.text|truncatechars:210 }}</p>
+    <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">
+     {% for a in req.topic_assignments.all %}
+      {% if a.is_official %}
+       <span class="rq-chip official">{{ a.label }}{% if a.assignment == 'human' %} · human{% endif %}</span>
+      {% elif a.assignment == 'suggested' %}
+       <span class="rq-chip suggested">? {{ a.model_concept }}</span>
+      {% endif %}
+     {% empty %}
+      <span class="rq-chip unclass">no topic</span>
+     {% endfor %}
+     {% for ref in req.references.all %}
+      {% if ref.status == 'resolved' %}<span class="rq-chip ref">→ {{ ref.ref_text|truncatechars:26 }}</span>
+      {% elif ref.status == 'ambiguous' %}<span class="rq-chip refamb">? {{ ref.ref_text|truncatechars:26 }}</span>{% endif %}
+     {% endfor %}
+    </div>
+   </a>
+  {% empty %}
+   <div style="padding:48px;text-align:center;color:#6B7280;font-size:12px;">
+    No requirements match these filters.
+    <div style="margin-top:8px;font-size:11px;color:#9AA3B2;">
+     Extract them with <code>manage.py extract_requirements &lt;id&gt; --apply</code>,
+     then classify with <code>manage.py classify_requirements &lt;id&gt; --apply</code>.
+    </div>
+   </div>
+  {% endfor %}
+ </div>
+</div>
+{% endblock %}

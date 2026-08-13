@@ -9,6 +9,7 @@ from django.views import View
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import redirect, render, get_object_or_404
+from django.urls import reverse
 from django.utils.decorators import method_decorator
 
 from apps.accounts.decorators import role_required
@@ -29,18 +30,93 @@ _JUR_LABELS = {
 }
 
 
+class DocumentDeletionBlocked(Exception):
+    """Raised when a document cannot be deleted because work depends on it.
+
+    Carries the structured blockers so the caller can explain the refusal
+    instead of surfacing a raw ProtectedError that names an unrelated model.
+    """
+
+    def __init__(self, document, blockers):
+        self.document = document
+        self.blockers = blockers or []
+        super().__init__(
+            f'{getattr(document, "name", "document")} cannot be deleted: '
+            + '; '.join(b.get('label', '') for b in self.blockers))
+
+
+def document_deletion_blockers(doc):
+    """Everything that must be resolved before `doc` can be deleted.
+
+    Currently only comparison work blocks. Kept as one funnel so future
+    blockers have an obvious home and every caller asks the same question.
+    Fail-soft: if the check itself errors it returns [], and the database-level
+    PROTECT still refuses the delete.
+    """
+    try:
+        from apps.comparison.assessments import deletion_blockers
+        return deletion_blockers(doc)
+    except Exception:
+        logger.exception('deletion blocker check failed for %s', getattr(doc, 'pk', None))
+        return []
+
+
 def _purge_document(doc, actor=None, reason='', learning_mode='keep', request=None):
-    """Delete a document AND its indexed content. Chunks live in bm25 + chroma (and
-    the Arabic store for Arabic docs); doc.delete() alone leaves them searchable as
-    ghost citations. Fail-soft per store so one unavailable backend can't strand a
-    half-deleted document. Returns the purged document's name."""
+    """Delete a document AND its indexed content. Returns the purged name.
+
+    ORDER MATTERS, and it was wrong before. The chunk purge is irreversible —
+    it drops the document's content from bm25, chroma and the Arabic store —
+    while the row deletion is transactional. Purging first meant a refused
+    delete (a ProtectedError from a dependent record) left the Document row in
+    place with its searchable content already destroyed: a document that still
+    reads as `indexed` but returns nothing. Silent corruption.
+
+    So the reversible work now happens first:
+
+        1. refuse up front if anything depends on this document
+        2. delete the row, in a transaction
+        3. only then purge the stores
+
+    The residual failure mode is a crash between 2 and 3, leaving ghost chunks
+    — which the existing per-store fail-soft handling already covers, and which
+    is at least detectable, unlike losing a live document's content.
+
+    Raises DocumentDeletionBlocked before touching anything if the document is
+    still referenced.
+    """
+    blockers = document_deletion_blockers(doc)
+    if blockers:
+        raise DocumentDeletionBlocked(doc, blockers)
+
     name, doc_type, pk = doc.name, doc.doc_type, doc.pk
     title = getattr(doc, 'chunk_doc_title', '') or doc.full_name or doc.name
+    language = getattr(doc, 'language', '')
+
+    # Before the row goes: this reads the document's comparison results to find
+    # the feedback it produced, so it needs the relations intact. In 'keep'
+    # mode (the default) it only tombstones, so an aborted delete costs nothing.
     try:
         from apps.feedback.services import purge_document_learning
         learning = purge_document_learning(doc, mode=learning_mode)
     except Exception:
         learning = {'mode': learning_mode, 'signals': 0, 'gold': 0}
+
+    from django.db import transaction
+    from django.db.models import ProtectedError, RestrictedError
+    try:
+        with transaction.atomic():
+            doc.delete()
+    except (ProtectedError, RestrictedError) as exc:
+        # Belt-and-braces: a dependency the pre-flight did not know about. The
+        # stores are still intact because nothing has touched them yet.
+        raise DocumentDeletionBlocked(doc, [{
+            'kind': 'protected', 'severity': 'hard', 'count': 1,
+            'label': 'Other records still reference this document',
+            'detail': str(exc)[:300], 'runs': [],
+        }]) from exc
+
+    # Row is gone; now drop the indexed content. Fail-soft per store so one
+    # unavailable backend cannot strand the purge.
     try:
         from retrieval.bm25_store import delete_by_doc_title
         from ingestion.indexer import delete_doc_chunks
@@ -48,13 +124,12 @@ def _purge_document(doc, actor=None, reason='', learning_mode='keep', request=No
         delete_doc_chunks(title)
     except Exception:
         logger.exception('chunk purge failed for %s', title)
-    if getattr(doc, 'language', '') == Document.ARABIC:
+    if language == Document.ARABIC:
         try:
             from arabic import store as ar_store
             ar_store.delete_source(title)
         except Exception:
             pass
-    doc.delete()
     try:
         from apps.history.audit import log_event, Actions
         who = getattr(actor, 'username', None) or 'system'
@@ -447,21 +522,34 @@ class DocumentDeleteView(View):
             'chunk_count': chunk_count,
             'learning': learning,
             'jur_label': _jur_label(doc),
+            # Shown before the button, so a refusal is visible up front rather
+            # than after the user commits to the action.
+            'blockers': document_deletion_blockers(doc),
         })
 
     def post(self, request, pk):
+        from django.contrib import messages
         try:
             doc = Document.objects.get(pk=pk)
             # One purge path shared with the upload wizard's "delete the old
-            # version" choice, so the two can't drift: chunks out of bm25 + chroma
-            # (+ the Arabic store) before the row goes, or doc.delete() leaves
-            # searchable ghost chunks that still surface as citations.
+            # version" choice, so the two can't drift. It refuses up front if
+            # anything depends on the document, and only purges the stores
+            # after the row is actually gone.
             _purge_document(
                 doc, actor=request.user, request=request,
                 learning_mode=('purge' if request.POST.get('learning_mode') == 'purge' else 'keep'),
             )
         except Document.DoesNotExist:
             pass
+        except DocumentDeletionBlocked as blocked:
+            # Refused, and nothing was destroyed. Report it instead of letting
+            # a ProtectedError become a 500.
+            messages.error(request, str(blocked))
+            if request.htmx:
+                response = HttpResponse()
+                response['HX-Redirect'] = reverse('library-delete', args=[pk])
+                return response
+            return redirect('library-delete', pk=pk)
         if request.htmx:
             response = HttpResponse()
             response['HX-Redirect'] = request.META.get('HTTP_REFERER', '/library/regulations/')
@@ -1149,8 +1237,25 @@ class FinalizeView(View):
                         fields.append('document_id')
                     doc.parent_regulation = parent.document_id or parent.chunk_doc_title or parent.name
                     fields.append('parent_regulation')
-                    _purge_document(parent, actor=request.user,
-                                    reason=f'replaced by new version "{doc.name}"')
+                    try:
+                        _purge_document(parent, actor=request.user,
+                                        reason=f'replaced by new version "{doc.name}"')
+                    except DocumentDeletionBlocked as blocked:
+                        # Comparison work depends on the old version, so it is
+                        # kept and superseded instead of deleted. The upload
+                        # still succeeds — losing the new document because the
+                        # old one could not be removed would be the worse
+                        # outcome, and superseding is what the wizard's other
+                        # branch does anyway.
+                        logger.warning('cannot delete superseded version %s: %s',
+                                       parent.pk, blocked)
+                        doc.version_of = parent
+                        fields.append('version_of')
+                        try:
+                            parent.supersede_with(doc, actor=request.user)
+                        except Exception:
+                            logger.exception('supersede_with fallback failed for %s -> %s',
+                                             parent.pk, doc.pk)
                 else:
                     doc.version_of = parent
                     fields.append('version_of')
@@ -1346,7 +1451,7 @@ class DocumentTagView(View):
             from apps.history.audit import log_event, Actions
             log_event(
                 request.user,
-                getattr(Actions, 'DOCUMENT_TAG', 'library.document_tag'),
+                Actions.DOCUMENT_TAG,
                 target_type='library.Document', target_id=doc.pk, request=request,
                 description=f'{action} tag "{tag}" on {doc.name}',
                 metadata={'action': action, 'tag': tag, 'doc_id': doc.pk},

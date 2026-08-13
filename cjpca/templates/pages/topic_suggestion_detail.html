@@ -1,0 +1,257 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ suggestion.proposed_name }} — Topic suggestion{% endblock %}
+
+{% block extra_head %}
+<style>
+ .sd-card { background:#fff;border:1px solid #E5E8EF;border-radius:10px;padding:14px 16px;margin-bottom:12px; }
+ .sd-h { font-size:11px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:.06em;margin:0 0 9px; }
+ .sd-badge { padding:2px 9px;border-radius:20px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em; }
+ .s-suggested { background:#E8F0FE;color:#002583; }
+ .s-under_review { background:#FFF6E0;color:#B07A00; }
+ .s-approved_pending_release { background:#FFF0E0;color:#C2410C; }
+ .s-active { background:#EAF7EE;color:#1E7A3C; }
+ .s-rejected, .s-superseded { background:#F1F2F6;color:#6B7280; }
+ .s-merged { background:#EDE9FE;color:#5B21B6; }
+ .sd-in { padding:6px 10px;border-radius:7px;border:1px solid #E5E8EF;font-size:11px;font-family:inherit;color:#002583; }
+ .sd-btn { padding:6px 13px;border-radius:7px;border:1px solid #E5E8EF;background:#fff;color:#002583;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit; }
+ .sd-btn.primary { background:#002583;color:#fff;border-color:#002583; }
+ .sd-btn.warn { background:#B07A00;color:#fff;border-color:#B07A00; }
+ .sd-btn.danger { color:#B3261E;border-color:#F3C9C4; }
+ .sd-act { border:1px solid #E5E8EF;border-radius:9px;padding:11px 13px;margin-bottom:9px; }
+ pre.sd-patch { background:#0E1525;color:#D7E0F0;padding:13px 15px;border-radius:9px;font-size:10.5px;line-height:1.6;overflow-x:auto;margin:0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="height:100%;overflow-y:auto;background:#F7F9FC;">
+ <div style="max-width:1000px;margin:0 auto;padding:18px 24px 48px;">
+
+  <a href="{% url 'library-topic-suggestions' %}" style="font-size:11px;color:#6B7280;text-decoration:none;">← Topic suggestions</a>
+
+  {% if messages %}
+   {% for m in messages %}
+    <div style="margin-top:10px;padding:9px 13px;border-radius:8px;font-size:11px;font-weight:600;
+                background:{% if m.tags == 'error' %}#FDECEC{% else %}#EAF7EE{% endif %};
+                color:{% if m.tags == 'error' %}#B3261E{% else %}#1E7A3C{% endif %};">{{ m }}</div>
+   {% endfor %}
+  {% endif %}
+
+  {# ── Header ── #}
+  <div class="sd-card" style="margin-top:12px;">
+   <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;">
+    <h1 style="font-size:16px;font-weight:700;color:#002583;margin:0;">{{ suggestion.proposed_name }}</h1>
+    <span class="sd-badge s-{{ suggestion.status }}">{{ suggestion.get_status_display }}</span>
+    <span class="sd-badge s-suggested">{{ suggestion.get_origin_display }}</span>
+   </div>
+
+   <div style="display:flex;gap:16px;margin-top:8px;font-size:11px;color:#6B7280;flex-wrap:wrap;">
+    <span><strong>{{ suggestion.occurrence_count }}</strong> occurrence{{ suggestion.occurrence_count|pluralize }}
+     <span style="color:#9AA3B2;">(high-signal at {{ threshold }})</span></span>
+    <span>confidence <strong>{{ suggestion.confidence|floatformat:2 }}</strong></span>
+    <span>would add <code>{{ suggestion.target_leaf }}</code></span>
+   </div>
+
+   {% if suggestion.occurrence_count < threshold and suggestion.is_open %}
+    <p style="font-size:10.5px;color:#B07A00;margin:8px 0 0;line-height:1.5;background:#FFFBF0;padding:7px 10px;border-radius:6px;">
+     Seen fewer than {{ threshold }} times. The local model has been measured proposing
+     different concepts on identical input, so a small count is weak evidence — judge it on the
+     evidence below, not on the count.
+    </p>
+   {% endif %}
+
+   {% if suggestion.reason %}
+    <p style="font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin:12px 0 3px;">What this concept is</p>
+    <p style="font-size:12px;color:#111827;margin:0;line-height:1.6;">{{ suggestion.reason }}</p>
+   {% endif %}
+   {% if suggestion.why_existing_insufficient %}
+    <p style="font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin:11px 0 3px;">Why the existing topics are said to be insufficient</p>
+    <p style="font-size:12px;color:#111827;margin:0;line-height:1.6;">{{ suggestion.why_existing_insufficient }}</p>
+   {% endif %}
+
+   {% if suggestion.similar_topics %}
+    <p style="font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin:11px 0 4px;">Similar existing topics</p>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+     {% for t in suggestion.similar_topics %}
+      <span style="padding:3px 9px;border-radius:20px;background:#E8F0FE;color:#002583;font-size:10px;font-weight:600;">
+       {{ t.label }}{% if t.subcategory %} / {{ t.subcategory }}{% endif %}{% if t.score %} · {{ t.score|floatformat:2 }}{% endif %}</span>
+     {% endfor %}
+    </div>
+    <p style="font-size:10px;color:#9AA3B2;margin:6px 0 0;">
+     If one of these already covers the concept, merge into it rather than adding a topic.</p>
+   {% endif %}
+
+   {% if suggestion.reviewer_note %}
+    <p style="font-size:11px;color:#374151;margin:11px 0 0;padding:7px 10px;background:#F7F9FC;border-radius:6px;">
+     <strong>Reviewer note:</strong> {{ suggestion.reviewer_note }}
+     {% if suggestion.reviewer %}<span style="color:#9AA3B2;"> — {{ suggestion.reviewer }}</span>{% endif %}</p>
+   {% endif %}
+  </div>
+
+  {# ── Evidence ── #}
+  <div class="sd-card">
+   <p class="sd-h">Evidence ({{ evidence|length }})</p>
+   <p style="font-size:11px;color:#6B7280;margin:-4px 0 10px;line-height:1.5;">
+    Each row is a real requirement that raised this concept, with the source text it came from.
+   </p>
+   {% for e in evidence %}
+    <div style="padding:9px 0;border-bottom:1px solid #F1F2F6;">
+     <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;">
+      {% if e.requirement %}
+       <a href="{% url 'library-requirement-detail' e.requirement.pk %}"
+          style="font-size:11px;font-weight:700;color:#002583;text-decoration:none;">
+        {{ e.requirement.regulation.name }} — {{ e.requirement.article_ref|default:"?"|truncatechars:44 }} →</a>
+      {% else %}
+       <span style="font-size:11px;color:#6B7280;">(source requirement deleted)</span>
+      {% endif %}
+      <span style="font-size:10px;color:#9AA3B2;">model said “{{ e.model_concept }}” · {{ e.confidence|floatformat:2 }}</span>
+     </div>
+     {% if e.quote %}
+      <p style="font-size:11px;color:#374151;line-height:1.6;background:#F7F9FC;border-left:3px solid #E5E8EF;padding:7px 11px;border-radius:0 6px 6px 0;margin:5px 0 0;">
+       {{ e.quote|truncatechars:400 }}</p>
+     {% endif %}
+    </div>
+   {% empty %}
+    <p style="font-size:11px;color:#6B7280;margin:0;">No evidence recorded.</p>
+   {% endfor %}
+  </div>
+
+  {# ── Decision ── #}
+  {% if suggestion.status != 'active' %}
+  <div class="sd-card">
+   <p class="sd-h">Decision</p>
+
+   {# 1. It's really an existing topic — the outcome we expect most often #}
+   <div class="sd-act" style="border-color:#BFD3F2;background:#FAFCFF;">
+    <p style="font-size:11px;font-weight:700;color:#002583;margin:0 0 3px;">This is really an existing topic</p>
+    <p style="font-size:10.5px;color:#6B7280;margin:0 0 8px;line-height:1.5;">
+     Merges the suggestion and re-points every requirement that raised it at the official topic,
+     recorded as your decision. Usually the right answer — most unfamiliar wording is a new name
+     for a concept the taxonomy already has.</p>
+    <form method="post" action="{% url 'library-topic-suggestion-action' suggestion.pk %}"
+          style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;">
+     {% csrf_token %}
+     <input type="hidden" name="action" value="merge_topic">
+     <select name="leaf" class="sd-in" required style="max-width:320px;">
+      <option value="">Choose the official topic…</option>
+      {% for t in topic_options %}
+       <option value="{% if t.subcategory %}{{ t.topic }}/{{ t.subcategory }}{% else %}{{ t.topic }}{% endif %}">
+        {% if t.depth %}&nbsp;&nbsp;└ {% endif %}{{ t.label }}</option>
+      {% endfor %}
+     </select>
+     <input name="note" class="sd-in" placeholder="note (optional)" style="max-width:200px;">
+     <button class="sd-btn primary" type="submit">Merge into topic</button>
+    </form>
+   </div>
+
+   {# 2. Duplicate of another suggestion #}
+   {% if other_open %}
+   <div class="sd-act">
+    <p style="font-size:11px;font-weight:700;color:#002583;margin:0 0 8px;">This duplicates another suggestion</p>
+    <form method="post" action="{% url 'library-topic-suggestion-action' suggestion.pk %}"
+          style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;">
+     {% csrf_token %}
+     <input type="hidden" name="action" value="merge_suggestion">
+     <select name="target_id" class="sd-in" required style="max-width:320px;">
+      <option value="">Choose the suggestion to keep…</option>
+      {% for o in other_open %}<option value="{{ o.pk }}">#{{ o.pk }} {{ o.proposed_name }} ({{ o.occurrence_count }})</option>{% endfor %}
+     </select>
+     <button class="sd-btn" type="submit">Merge suggestions</button>
+    </form>
+   </div>
+   {% endif %}
+
+   {# 3. Genuinely new — approve, edit-before-approve #}
+   <div class="sd-act" style="border-color:#F0C9A0;background:#FFFDFA;">
+    <p style="font-size:11px;font-weight:700;color:#C2410C;margin:0 0 3px;">This is genuinely new</p>
+    <p style="font-size:10.5px;color:#9A5B2C;margin:0 0 8px;line-height:1.5;">
+     Moves it to <strong>approved — pending taxonomy release</strong> and generates the exact
+     source change. <strong>This does not make the topic official.</strong> You may rename it or
+     reparent it under an existing topic first.</p>
+    <form method="post" action="{% url 'library-topic-suggestion-action' suggestion.pk %}"
+          style="display:grid;grid-template-columns:1fr 1fr;gap:7px;align-items:end;">
+     {% csrf_token %}
+     <input type="hidden" name="action" value="approve">
+     <div>
+      <label style="font-size:10px;font-weight:700;color:#6B7280;">Name</label>
+      <input name="name" class="sd-in" style="width:100%;" value="{{ suggestion.proposed_name }}">
+     </div>
+     <div>
+      <label style="font-size:10px;font-weight:700;color:#6B7280;">Parent topic (blank = new top-level)</label>
+      <select name="parent_topic" class="sd-in" style="width:100%;">
+       <option value="">— new top-level topic —</option>
+       {% for t in topic_options %}{% if t.depth == 0 %}
+        <option value="{{ t.topic }}" {% if suggestion.parent_topic == t.topic %}selected{% endif %}>{{ t.label }}</option>
+       {% endif %}{% endfor %}
+      </select>
+     </div>
+     <div>
+      <label style="font-size:10px;font-weight:700;color:#6B7280;">Subcategory tag (optional)</label>
+      <input name="subcategory" class="sd-in" style="width:100%;" value="{{ suggestion.proposed_subcategory }}">
+     </div>
+     <div>
+      <label style="font-size:10px;font-weight:700;color:#6B7280;">Note</label>
+      <input name="note" class="sd-in" style="width:100%;" placeholder="why this is genuinely new">
+     </div>
+     <div style="grid-column:1 / -1;">
+      <button class="sd-btn warn" type="submit">Approve — pending taxonomy release</button>
+     </div>
+    </form>
+   </div>
+
+   {# 4. Reject #}
+   <div class="sd-act">
+    <form method="post" action="{% url 'library-topic-suggestion-action' suggestion.pk %}"
+          style="display:flex;gap:7px;align-items:center;flex-wrap:wrap;">
+     {% csrf_token %}
+     <input type="hidden" name="action" value="reject">
+     <input name="note" class="sd-in" placeholder="why this is not a topic" style="max-width:340px;">
+     <button class="sd-btn danger" type="submit">Reject</button>
+     <span style="font-size:10px;color:#9AA3B2;">Rejection is not permanent — it can be raised again with fresh evidence.</span>
+    </form>
+   </div>
+  </div>
+  {% endif %}
+
+  {# ── The proposed source change ── #}
+  {% if patch %}
+  <div class="sd-card">
+   <p class="sd-h">Proposed change to reasoning/taxonomy.py</p>
+   <p style="font-size:11px;color:#6B7280;margin:-4px 0 10px;line-height:1.5;">
+    Generated, <strong>never applied</strong>. The official taxonomy is human-edited source code:
+    a change to it alters <code>TAXONOMY_VERSION</code>, which decides whether every stored
+    classification in the corpus is still valid. Apply this by hand and commit it.
+   </p>
+   <pre class="sd-patch">{{ patch }}</pre>
+
+   {% if suggestion.status == 'approved_pending_release' %}
+    <div style="margin-top:11px;padding:11px 13px;border-radius:8px;background:{% if is_in_taxonomy %}#EAF7EE{% else %}#FFF6E0{% endif %};">
+     {% if is_in_taxonomy %}
+      <p style="font-size:11px;font-weight:700;color:#1E7A3C;margin:0 0 6px;">
+       <code>{{ suggestion.target_leaf }}</code> is now present in the official taxonomy.</p>
+      <form method="post" action="{% url 'library-topic-suggestion-action' suggestion.pk %}">
+       {% csrf_token %}
+       <input type="hidden" name="action" value="mark_active">
+       <button class="sd-btn primary" type="submit">Confirm release — mark active</button>
+      </form>
+     {% else %}
+      <p style="font-size:11px;font-weight:700;color:#B07A00;margin:0 0 3px;">Not yet released.</p>
+      <p style="font-size:10.5px;color:#8A6410;margin:0;line-height:1.55;">
+       <code>{{ suggestion.target_leaf }}</code> is not in <code>reasoning/taxonomy.py</code> yet, so this
+       suggestion cannot be marked active. Apply the change above, commit it, and reload —
+       the confirm button appears only once the topic genuinely exists.
+      </p>
+     {% endif %}
+    </div>
+   {% endif %}
+  </div>
+  {% endif %}
+
+  <p style="font-size:10px;color:#9AA3B2;margin:0;">
+   Suggested under taxonomy {{ suggestion.taxonomy_version_at_suggestion|default:"—" }} ·
+   current {{ taxonomy_version }}
+   {% if suggestion.expected_taxonomy_version %} · expected after release {{ suggestion.expected_taxonomy_version }}{% endif %}
+  </p>
+ </div>
+</div>
+{% endblock %}

@@ -89,6 +89,21 @@ REL_BG = {
 # ── V2 Models ──────────────────────────────────────────────────────────────────
 
 class ComparisonRun(models.Model):
+    """One execution of a regulation-to-regulation comparison.
+
+    `status` is about EXECUTION (did the workflow finish?). `lifecycle` is about
+    REVIEW (has a human signed this off as a compliance assessment?). They are
+    orthogonal: a run can be `complete` and still `draft`, and that combination
+    is the normal state of freshly generated output.
+
+    An APPROVED run is a versioned compliance assessment, not a cached
+    response. It records exactly which document versions were compared
+    (`source_snapshot`), so the assessment can be judged against the sources it
+    was actually based on rather than against whatever those documents happen
+    to say today.
+    """
+
+    # ── status: execution ──
     PENDING          = 'pending'
     RUNNING          = 'running'
     COMPLETE         = 'complete'
@@ -102,10 +117,54 @@ class ComparisonRun(models.Model):
         (PARTIALLY_FAILED, 'Partially failed'),
     ]
 
-    pair_key        = models.CharField(max_length=10, db_index=True)
-    reg_a           = models.ForeignKey('library.Document', on_delete=models.CASCADE,
+    # ── lifecycle: human review of the assessment as a whole ──
+    # Distinct from ComparisonResult.lifecycle, which signs off ONE obligation
+    # pair. Approving forty rows is not the same act as certifying the
+    # assessment, and only the latter puts a run on the Approved Runs page.
+    DRAFT      = 'draft'
+    IN_REVIEW  = 'in_review'
+    APPROVED   = 'approved'
+    REJECTED   = 'rejected'
+    SUPERSEDED = 'superseded'
+    LIFECYCLE_CHOICES = [
+        (DRAFT,      'Draft'),
+        (IN_REVIEW,  'In review'),
+        (APPROVED,   'Approved'),
+        (REJECTED,   'Rejected'),
+        (SUPERSEDED, 'Superseded by a newer approved version'),
+    ]
+
+    # ── currency: are the sources this was based on still what they were? ──
+    # CURRENT  — the recorded snapshot still matches the live documents.
+    # OUTDATED — a source has changed since approval. Detection lands in a
+    #            later phase; the state exists now so nothing has to be
+    #            inferred at render time.
+    # UNKNOWN  — no verified snapshot was captured (every run that predates
+    #            source-version tracking). NOT a synonym for current: it means
+    #            currency cannot be established, and such a run must never be
+    #            presented as current or offered for reuse.
+    CURRENT  = 'current'
+    OUTDATED = 'outdated'
+    UNKNOWN  = 'unknown'
+    CURRENCY_CHOICES = [
+        (CURRENT,  'Current'),
+        (OUTDATED, 'Outdated — a source has changed'),
+        (UNKNOWN,  'Cannot verify currency'),
+    ]
+
+    # Was 10, which silently truncated on any backend that enforces length —
+    # the live table already held 'bahrain_bahrain' (15 chars). Widened to fit
+    # the jurisdiction-pair form this is actually written with.
+    pair_key        = models.CharField(max_length=64, db_index=True)
+    # PROTECT, not CASCADE. A comparison is only meaningful in terms of the two
+    # documents it compared, so cascading would let a library tidy-up silently
+    # destroy a signed-off compliance assessment — the exact audit failure this
+    # model exists to prevent. Enforced at the ORM layer so a shell, a script or
+    # the admin cannot bypass it either; the UI explains the refusal up front
+    # via apps.comparison.assessments.deletion_blockers().
+    reg_a           = models.ForeignKey('library.Document', on_delete=models.PROTECT,
                                         related_name='runs_as_a')
-    reg_b           = models.ForeignKey('library.Document', on_delete=models.CASCADE,
+    reg_b           = models.ForeignKey('library.Document', on_delete=models.PROTECT,
                                         related_name='runs_as_b')
     topics          = models.JSONField(default=list)
     status          = models.CharField(max_length=20, choices=STATUS_CHOICES, default=PENDING,
@@ -133,11 +192,139 @@ class ComparisonRun(models.Model):
     created_by      = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True,
                                         on_delete=models.SET_NULL)
 
+    # ── Approved-assessment fields ──────────────────────────────────────────
+
+    lifecycle       = models.CharField(max_length=12, choices=LIFECYCLE_CHOICES,
+                                       default=DRAFT, db_index=True)
+    approved_at     = models.DateTimeField(null=True, blank=True)
+    approved_by     = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True,
+                                        on_delete=models.SET_NULL,
+                                        related_name='approved_comparison_runs')
+
+    # Stable identity of the QUESTION being asked, across every version of the
+    # answer: (regulation A family, regulation B family, orientation, scope).
+    #
+    # Built from the version FAMILY root rather than the document pk, so
+    # "Bahrain PDPL v1 vs India DPDP" and "Bahrain PDPL v2 vs India DPDP" are
+    # two versions of ONE assessment — which is what makes v1/v2 lineage
+    # meaningful.
+    #
+    # Orientation is part of it deliberately: A→B and B→A produce different
+    # narratives, so they are different assessments, never two views of one.
+    # Scope is part of it too, so a topic-scoped run cannot silently present
+    # itself as a newer version of a full-scope one.
+    assessment_key  = models.CharField(max_length=64, blank=True, db_index=True)
+
+    # Position within the assessment. Assigned at APPROVAL, because only
+    # approved runs are versions of an assessment — drafts and abandoned
+    # experiments are not.
+    version_no      = models.PositiveIntegerField(default=0)
+    supersedes      = models.ForeignKey('self', null=True, blank=True,
+                                        on_delete=models.SET_NULL,
+                                        related_name='superseded_by_run')
+
+    # Immutable record of exactly what was compared. Written once, at run
+    # creation, and never updated — the moment it is rewritten it stops being
+    # evidence of what the assessment was based on.
+    source_snapshot = models.JSONField(default=dict, blank=True)
+    # sha256 over the MATERIAL subset of the snapshot (documents + orientation
+    # + scope). Empty means no verified capture: legacy runs carry '' and can
+    # therefore never match a reuse lookup by accident.
+    source_fingerprint = models.CharField(max_length=64, blank=True, db_index=True)
+
+    currency_state     = models.CharField(max_length=10, choices=CURRENCY_CHOICES,
+                                          default=UNKNOWN, db_index=True)
+    outdated_reason    = models.CharField(max_length=300, blank=True)
+    currency_checked_at = models.DateTimeField(null=True, blank=True)
+
+    # What produced the analysis. Recorded for audit and displayed with the
+    # assessment. Deliberately NOT part of source_fingerprint: a human approved
+    # this OUTPUT, and swapping the model later does not retroactively
+    # invalidate their judgement — only a change to the SOURCES does.
+    model_version    = models.CharField(max_length=64, blank=True)
+    prompt_version   = models.CharField(max_length=64, blank=True)
+    taxonomy_version = models.CharField(max_length=32, blank=True)
+
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['lifecycle', '-approved_at']),
+            models.Index(fields=['assessment_key', '-version_no']),
+        ]
 
     def __str__(self):
         return f'{self.reg_a.name} vs {self.reg_b.name}'
+
+    # ── approved-assessment helpers ─────────────────────────────────────────
+
+    @property
+    def is_approved(self) -> bool:
+        return self.lifecycle == self.APPROVED
+
+    @property
+    def currency_is_verifiable(self) -> bool:
+        """Was a real snapshot captured when this ran?
+
+        False for every run that predates source-version tracking. Such a run
+        may still be opened and audited, but nothing may claim it is current.
+        """
+        return bool(self.source_fingerprint) and not self.source_snapshot.get('backfilled')
+
+    @property
+    def is_reusable(self) -> bool:
+        """May this assessment stand in for a fresh comparison?
+
+        Approval alone is not enough — an approved assessment whose currency
+        cannot be established is exactly the "silently use an outdated result
+        as if it were current" failure this design exists to prevent.
+
+        Reuse itself is not implemented yet; this is the gate the UI already
+        uses to decide whether to OFFER it.
+        """
+        return (self.lifecycle == self.APPROVED
+                and self.currency_state == self.CURRENT
+                and self.currency_is_verifiable)
+
+    @property
+    def currency_label(self) -> str:
+        if self.currency_state == self.CURRENT:
+            return 'Current'
+        if self.currency_state == self.OUTDATED:
+            return self.outdated_reason or 'Outdated — a source has changed'
+        return 'Cannot verify currency'
+
+    @property
+    def snapshot_a(self) -> dict:
+        return (self.source_snapshot or {}).get('reg_a') or {}
+
+    @property
+    def snapshot_b(self) -> dict:
+        return (self.source_snapshot or {}).get('reg_b') or {}
+
+    @property
+    def scope_label(self) -> str:
+        scope = (self.source_snapshot or {}).get('scope') or {}
+        if scope.get('mode') == 'topics' and scope.get('topics'):
+            return f'{len(scope["topics"])} topic(s)'
+        if self.topics:
+            return f'{len(self.topics)} topic(s)'
+        return 'Full scope'
+
+    def review_state(self) -> dict:
+        """How far the per-result review has got.
+
+        Run-level approval is gated on this: every result must carry a human
+        decision first. The two layers stay separate — this reads the
+        per-result workflow, it does not replace it.
+        """
+        counts = {'total': 0, 'draft': 0, 'reviewed': 0,
+                  'approved': 0, 'rejected': 0}
+        for lifecycle in self.results.values_list('lifecycle', flat=True):
+            counts['total'] += 1
+            counts[lifecycle] = counts.get(lifecycle, 0) + 1
+        counts['undecided'] = counts['draft']
+        counts['all_decided'] = counts['total'] > 0 and counts['draft'] == 0
+        return counts
 
     @property
     def progress_pct(self):

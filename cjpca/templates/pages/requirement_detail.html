@@ -1,0 +1,203 @@
+{% extends 'base.html' %}
+
+{% block title %}Requirement — CJPCA{% endblock %}
+
+{% block extra_head %}
+<style>
+ .rd-card { background:#fff;border:1px solid #E5E8EF;border-radius:10px;padding:14px 16px;margin-bottom:12px; }
+ .rd-h { font-size:11px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:.06em;margin:0 0 10px; }
+ .rd-topic { display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid #F1F2F6; }
+ .rd-topic:last-child { border-bottom:none; }
+ .rd-badge { padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em; }
+ .b-matched { background:#E8F0FE;color:#002583; }
+ .b-human { background:#EAF7EE;color:#1E7A3C; }
+ .b-suggested { background:#FFF6E0;color:#B07A00; }
+ .b-unclass { background:#F1F2F6;color:#6B7280; }
+ .b-resolved { background:#EAF7EE;color:#1E7A3C; }
+ .b-ambiguous { background:#FFF6E0;color:#B07A00; }
+ .b-unresolved { background:#F1F2F6;color:#6B7280; }
+ .b-detected { background:#E8F0FE;color:#002583; }
+ .rd-btn { padding:5px 11px;border-radius:7px;border:1px solid #E5E8EF;background:#fff;color:#002583;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit; }
+ .rd-btn:hover { border-color:#002583; }
+ .rd-btn.danger { color:#B3261E; }
+ .rd-btn.primary { background:#002583;color:#fff;border-color:#002583; }
+ .rd-sel { padding:5px 9px;border-radius:7px;border:1px solid #E5E8EF;font-size:11px;font-family:inherit;color:#002583;max-width:280px; }
+ .rd-quote { font-size:12px;color:#374151;line-height:1.6;background:#F7F9FC;border-left:3px solid #E5E8EF;padding:9px 12px;border-radius:0 6px 6px 0;margin:0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="height:100%;overflow-y:auto;background:#F7F9FC;">
+ <div style="max-width:1000px;margin:0 auto;padding:18px 24px 48px;">
+
+  <a href="{% url 'library-requirements' %}" style="font-size:11px;color:#6B7280;text-decoration:none;">← All requirements</a>
+
+  {% if messages %}
+   {% for m in messages %}
+    <div style="margin-top:10px;padding:9px 13px;border-radius:8px;font-size:11px;font-weight:600;
+                background:{% if m.tags == 'error' %}#FDECEC{% else %}#EAF7EE{% endif %};
+                color:{% if m.tags == 'error' %}#B3261E{% else %}#1E7A3C{% endif %};">{{ m }}</div>
+   {% endfor %}
+  {% endif %}
+
+  {# ── A. The requirement ── #}
+  <div class="rd-card" style="margin-top:12px;">
+   <p class="rd-h">Requirement</p>
+   <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+    <span style="font-size:11px;font-weight:700;color:#002583;">{{ requirement.regulation.name }}</span>
+    {% if requirement.article_ref %}<span style="font-size:11px;color:#6B7280;">{{ requirement.article_ref }}</span>{% endif %}
+    <span class="rd-badge b-unclass">{{ requirement.get_extraction_source_display }}</span>
+    {% if requirement.extraction_model %}<span style="font-size:10px;color:#9AA3B2;">{{ requirement.extraction_model }}</span>{% endif %}
+   </div>
+   <p style="font-size:13px;color:#111827;line-height:1.65;margin:0 0 12px;">{{ requirement.text }}</p>
+
+   {% if requirement.source_quote %}
+    <p style="font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin:0 0 5px;">Source provision, verbatim</p>
+    <p class="rd-quote">{{ requirement.source_quote }}</p>
+   {% endif %}
+
+   <div style="display:flex;gap:18px;margin-top:12px;font-size:10px;color:#9AA3B2;flex-wrap:wrap;">
+    {% if requirement.source_chunk_id %}<span>chunk {{ requirement.source_chunk_id|truncatechars:22 }}</span>{% endif %}
+    {% if requirement.applicability %}<span>binds: {{ requirement.applicability }}</span>{% endif %}
+    <span>mirror: {{ requirement.topics|join:", "|default:"—" }}</span>
+   </div>
+  </div>
+
+  {# ── B. Topics ── #}
+  <div class="rd-card">
+   <div style="display:flex;align-items:baseline;justify-content:space-between;">
+    <p class="rd-h">Topics</p>
+    <span style="font-size:10px;color:#9AA3B2;">taxonomy {{ taxonomy_version }}</span>
+   </div>
+   <p style="font-size:11px;color:#6B7280;margin:-4px 0 10px;line-height:1.5;">
+    A requirement may hold <strong>as many topics as genuinely apply</strong>. Rank orders them; it does
+    not grade them — a lower-ranked topic is not a lesser finding.
+   </p>
+
+   {% for a in assignments %}
+    <div class="rd-topic">
+     <span style="font-size:10px;color:#9AA3B2;width:16px;flex-shrink:0;padding-top:2px;">{{ a.rank }}</span>
+     <div style="flex:1;min-width:0;">
+      <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
+       <span style="font-size:12px;font-weight:700;color:{% if a.is_official %}#002583{% else %}#6B7280{% endif %};">{{ a.label }}</span>
+       {% if a.assignment == 'human' %}<span class="rd-badge b-human">human</span>
+       {% elif a.assignment == 'matched' %}<span class="rd-badge b-matched">matched</span>
+       {% elif a.assignment == 'suggested' %}<span class="rd-badge b-suggested">unresolved concept</span>
+       {% else %}<span class="rd-badge b-unclass">unclassified</span>{% endif %}
+       {% if a.assignment != 'human' and a.confidence %}<span style="font-size:10px;color:#6B7280;">{{ a.confidence|floatformat:2 }}</span>{% endif %}
+       {% if a.resolution_method != 'none' %}<span style="font-size:10px;color:#9AA3B2;">via {{ a.get_resolution_method_display|lower }}</span>{% endif %}
+       {% if a.is_stale %}<span class="rd-badge b-suggested">stale taxonomy</span>{% endif %}
+      </div>
+      {% if a.model_concept and a.model_concept != a.topic %}
+       <p style="font-size:10px;color:#9AA3B2;margin:3px 0 0;">model said: “{{ a.model_concept }}”</p>
+      {% endif %}
+      {% if a.evidence %}<p style="font-size:11px;color:#374151;margin:4px 0 0;font-style:italic;">“{{ a.evidence }}”</p>{% endif %}
+      {% if a.assignment == 'suggested' and a.suggestion_id %}
+       <a href="{% url 'library-topic-suggestion-detail' a.suggestion_id %}"
+          style="font-size:10px;color:#B07A00;font-weight:600;text-decoration:none;">
+        review suggestion #{{ a.suggestion_id }} ({{ a.suggestion.occurrence_count }} occurrence{{ a.suggestion.occurrence_count|pluralize }}) →</a>
+      {% endif %}
+     </div>
+     <form method="post" action="{% url 'library-requirement-topics' requirement.pk %}" style="flex-shrink:0;">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="remove">
+      <input type="hidden" name="assignment_id" value="{{ a.pk }}">
+      <button class="rd-btn danger" type="submit">Remove</button>
+     </form>
+    </div>
+   {% empty %}
+    <p style="font-size:11px;color:#6B7280;margin:0;">No topic assignments yet.</p>
+   {% endfor %}
+
+   {# ── D. Review actions ── #}
+   <div style="border-top:1px solid #E5E8EF;margin-top:12px;padding-top:12px;display:flex;flex-direction:column;gap:8px;">
+    <form method="post" action="{% url 'library-requirement-topics' requirement.pk %}"
+          style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
+     {% csrf_token %}
+     <input type="hidden" name="action" value="add">
+     <select name="leaf" class="rd-sel" required>
+      <option value="">Add an official topic…</option>
+      {% for t in topic_options %}
+       <option value="{% if t.subcategory %}{{ t.topic }}/{{ t.subcategory }}{% else %}{{ t.topic }}{% endif %}">
+        {% if t.depth %}&nbsp;&nbsp;└ {% endif %}{{ t.label }}</option>
+      {% endfor %}
+     </select>
+     <input name="note" placeholder="why (optional)" class="rd-sel" style="max-width:220px;">
+     <button class="rd-btn primary" type="submit">Add topic</button>
+    </form>
+
+    <form method="post" action="{% url 'library-requirement-topics' requirement.pk %}"
+          style="display:flex;align-items:center;gap:7px;">
+     {% csrf_token %}
+     <input type="hidden" name="action" value="unclassified">
+     <input name="note" placeholder="why no topic applies (optional)" class="rd-sel" style="max-width:300px;">
+     <button class="rd-btn" type="submit">Mark as having no applicable topic</button>
+    </form>
+
+    <p style="font-size:10px;color:#9AA3B2;margin:2px 0 0;line-height:1.5;">
+     Your changes are recorded as <strong>human</strong> assignments. A later
+     <code>classify_requirements</code> run replaces the model's assignments but never
+     touches yours.
+    </p>
+   </div>
+  </div>
+
+  {# ── C. Cross-references ── #}
+  <div class="rd-card">
+   <p class="rd-h">Cross-references</p>
+   <p style="font-size:11px;color:#6B7280;margin:-4px 0 10px;line-height:1.5;">
+    References are preserved as links, never copied into the requirement text. An
+    <strong>ambiguous</strong> reference lists every valid target and names none as
+    <em>the</em> target — one article is not always one chunk.
+   </p>
+
+   {% for ref in references %}
+    <div style="padding:9px 0;border-bottom:1px solid #F1F2F6;">
+     <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
+      <span style="font-size:12px;font-weight:700;color:#002583;">“{{ ref.ref_text }}”</span>
+      {% if ref.status == 'resolved' %}<span class="rd-badge b-resolved">resolved</span>
+      {% elif ref.status == 'ambiguous' %}<span class="rd-badge b-ambiguous">ambiguous</span>
+      {% elif ref.status == 'unresolved' %}<span class="rd-badge b-unresolved">unresolved</span>
+      {% else %}<span class="rd-badge b-detected">detected</span>{% endif %}
+      <span style="font-size:10px;color:#6B7280;">{{ ref.get_ref_kind_display }}{% if ref.ref_number %} {{ ref.ref_number }}{% endif %}</span>
+      <span class="rd-badge b-unclass">{{ ref.get_scope_display }}</span>
+      {% if ref.confidence %}<span style="font-size:10px;color:#9AA3B2;">{{ ref.confidence|floatformat:2 }}</span>{% endif %}
+     </div>
+
+     {% if ref.target_document %}
+      <p style="font-size:11px;color:#374151;margin:4px 0 0;">
+       Document: <strong>{{ ref.target_document.name }}</strong>
+       {% if ref.target_doc_code %}<span style="color:#9AA3B2;">({{ ref.target_doc_code }})</span>{% endif %}
+      </p>
+     {% endif %}
+
+     {% if ref.status == 'resolved' and ref.target_chunk_id %}
+      <p style="font-size:11px;color:#1E7A3C;margin:3px 0 0;">Target provision: {{ ref.target_chunk_id|truncatechars:34 }}</p>
+     {% endif %}
+
+     {% if ref.candidate_details %}
+      <p style="font-size:10px;font-weight:700;color:#B07A00;margin:5px 0 3px;">
+       {{ ref.candidate_details|length }} candidate target{{ ref.candidate_details|length|pluralize }} — not narrowed to one:</p>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;">
+       {% for c in ref.candidate_details %}
+        <span style="padding:2px 8px;border-radius:6px;background:#FFF6E0;color:#B07A00;font-size:10px;font-weight:600;">
+         {{ c.article_ref|default:c.node_id|truncatechars:34 }}</span>
+       {% endfor %}
+      </div>
+     {% endif %}
+
+     {% if ref.resolution_note %}
+      <p style="font-size:10px;color:#9AA3B2;margin:4px 0 0;">{{ ref.resolution_note }}</p>
+     {% endif %}
+    </div>
+   {% empty %}
+    <p style="font-size:11px;color:#6B7280;margin:0;">
+     No cross-references detected. Run
+     <code>manage.py detect_references {{ requirement.regulation_id }} --apply</code>.
+    </p>
+   {% endfor %}
+  </div>
+
+ </div>
+</div>
+{% endblock %}

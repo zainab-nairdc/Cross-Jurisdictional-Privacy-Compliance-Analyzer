@@ -1666,9 +1666,9 @@ class MappingExecSummaryView(View):
         from apps.review.exports import build_executive_summary_pdf, audit_hash
         data = build_executive_summary_pdf(analysis)
         try:
-            from apps.history.audit import log_event
+            from apps.history.audit import log_event, Actions
             log_event(
-                request.user, 'exports.downloaded',
+                request.user, Actions.EXPORT_DOWNLOADED,
                 request=request,
                 target_type='mapping.MappingAnalysis', target_id=analysis.pk,
                 description=f'{request.user.username} downloaded exec summary for mapping #{analysis.pk}',
@@ -1696,9 +1696,9 @@ class MappingGapRegisterView(View):
         from apps.review.exports import build_gap_register_xlsx, audit_hash
         data = build_gap_register_xlsx(analysis)
         try:
-            from apps.history.audit import log_event
+            from apps.history.audit import log_event, Actions
             log_event(
-                request.user, 'exports.downloaded',
+                request.user, Actions.EXPORT_DOWNLOADED,
                 request=request,
                 target_type='mapping.MappingAnalysis', target_id=analysis.pk,
                 description=f'{request.user.username} downloaded gap register for mapping #{analysis.pk}',

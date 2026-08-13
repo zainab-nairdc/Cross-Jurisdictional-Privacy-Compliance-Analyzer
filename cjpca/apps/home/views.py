@@ -26,6 +26,7 @@ from apps.library.models import Document
 from apps.ingestion.models import IngestionJob, QuarantinedChunk
 from apps.comparison.models import ComparisonResult, ComparisonRun
 from apps.mapping.models import MappingAnalysis, ObligationMapping, Gap
+from apps.history.audit import Actions as AuditActions
 from apps.history.models import AuditLog
 
 _RING_CIRCUMFERENCE = round(2 * math.pi * 36, 2)
@@ -188,15 +189,25 @@ def _admin_ctx(user) -> dict:
     )
 
     # System-event audit feed: auth / document / user / quarantine / reasoning.
+    #
+    # Derived from the canonical Actions list rather than hand-maintained —
+    # the hardcoded copy had drifted and was omitting settings.updated,
+    # doc.superseded, library.document_tag and exports.downloaded, so real
+    # admin activity never appeared in this panel.
     system_actions = [
-        'auth.login', 'auth.login_failed', 'auth.logout', 'auth.idle_timeout',
-        'auth.mfa_enrolled', 'auth.mfa_reset',
-        'document.upload', 'document.delete',
-        'ingestion.complete', 'ingestion.failed',
-        'quarantine.flagged', 'quarantine.approved', 'quarantine.rejected',
-        'reasoning.validation_error',
-        'user.created', 'user.role_changed', 'user.disabled',
-        'user.password_reset', 'user.password_changed',
+        AuditActions.LOGIN, AuditActions.LOGIN_FAILED, AuditActions.LOGOUT,
+        AuditActions.IDLE_TIMEOUT, AuditActions.MFA_ENROLLED, AuditActions.MFA_RESET,
+        AuditActions.SESSIONS_TERMINATED,
+        AuditActions.DOCUMENT_UPLOAD, AuditActions.DOCUMENT_DELETE,
+        AuditActions.DOCUMENT_TAG, AuditActions.DOC_SUPERSEDED,
+        AuditActions.INGESTION_COMPLETE, AuditActions.INGESTION_FAILED,
+        AuditActions.QUARANTINE_FLAGGED, AuditActions.QUARANTINE_APPROVED,
+        AuditActions.QUARANTINE_REJECTED,
+        AuditActions.REASONING_VALIDATION_ERROR,
+        AuditActions.EXPORT_DOWNLOADED, AuditActions.SETTINGS_UPDATED,
+        AuditActions.USER_CREATED, AuditActions.USER_ROLE_CHANGED,
+        AuditActions.USER_DISABLED, AuditActions.USER_PASSWORD_RESET,
+        AuditActions.USER_PASSWORD_CHANGED,
     ]
     recent_events = list(
         AuditLog.objects

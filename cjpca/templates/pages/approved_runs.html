@@ -1,0 +1,185 @@
+{% extends 'base.html' %}
+
+{% block title %}Approved Runs — CJPCA{% endblock %}
+
+{% block extra_head %}
+<style>
+ .ar-card { background:#fff;border:1px solid #E5E8EF;border-radius:10px;margin-bottom:12px;overflow:hidden; }
+ .ar-head { padding:13px 16px; }
+ .ar-badge { padding:2px 9px;border-radius:20px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap; }
+ .c-current  { background:#EAF7EE;color:#1E7A3C; }
+ .c-outdated { background:#FDECEC;color:#B3261E; }
+ .c-unknown  { background:#F1F2F6;color:#6B7280; }
+ .v-badge    { background:#002583;color:#fff; }
+ .s-superseded { background:#EDE9FE;color:#5B21B6; }
+ .ar-side { flex:1;min-width:0;background:#F7F9FC;border:1px solid #E9EDF5;border-radius:8px;padding:9px 11px; }
+ .ar-ab { display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:5px;background:#002583;color:#fff;font-size:10px;font-weight:800;flex-shrink:0; }
+ .ar-btn { display:inline-block;padding:6px 13px;border-radius:7px;border:1px solid #E5E8EF;background:#fff;color:#002583;font-size:11px;font-weight:700;text-decoration:none;cursor:pointer;font-family:inherit; }
+ .ar-btn:hover { border-color:#002583; }
+ .ar-btn.primary { background:#002583;color:#fff;border-color:#002583; }
+ .ar-hist { border-top:1px solid #E5E8EF;background:#FAFBFD;padding:9px 16px; }
+ .ar-meta { font-size:10px;color:#9AA3B2; }
+ .ar-stat { text-align:center;padding:9px 14px;background:#fff;border:1px solid #E5E8EF;border-radius:9px;min-width:88px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="height:100%;overflow-y:auto;background:#F7F9FC;">
+ <div style="max-width:1060px;margin:0 auto;padding:18px 24px 48px;">
+
+  <h1 style="font-size:15px;font-weight:700;color:#002583;margin:0 0 3px;">Approved Runs</h1>
+  <p style="font-size:11px;color:#6B7280;margin:0 0 14px;line-height:1.55;max-width:840px;">
+   Comparison assessments a reviewer has signed off. Each records the exact document
+   versions it was based on — an approved result is only valid relative to its sources.
+   Superseded versions stay available for audit and are never deleted.
+  </p>
+
+  {% if messages %}
+   {% for m in messages %}
+    <div style="margin-bottom:10px;padding:9px 13px;border-radius:8px;font-size:11px;font-weight:600;
+      background:{% if m.tags == 'error' %}#FDECEC{% elif m.tags == 'warning' %}#FFF6E0{% else %}#EAF7EE{% endif %};
+      color:{% if m.tags == 'error' %}#B3261E{% elif m.tags == 'warning' %}#B07A00{% else %}#1E7A3C{% endif %};">{{ m }}</div>
+   {% endfor %}
+  {% endif %}
+
+  <div style="display:flex;gap:9px;margin-bottom:16px;flex-wrap:wrap;">
+   <div class="ar-stat"><div style="font-size:17px;font-weight:700;color:#002583;">{{ counts.assessments }}</div><div class="ar-meta">Assessments</div></div>
+   <div class="ar-stat"><div style="font-size:17px;font-weight:700;color:#002583;">{{ counts.versions }}</div><div class="ar-meta">Approved versions</div></div>
+   <div class="ar-stat"><div style="font-size:17px;font-weight:700;color:#1E7A3C;">{{ counts.current }}</div><div class="ar-meta">Current</div></div>
+   <div class="ar-stat"><div style="font-size:17px;font-weight:700;color:#B3261E;">{{ counts.outdated }}</div><div class="ar-meta">Outdated</div></div>
+   <div class="ar-stat"><div style="font-size:17px;font-weight:700;color:#6B7280;">{{ counts.unknown }}</div><div class="ar-meta">Unverifiable</div></div>
+  </div>
+
+  {% for a in assessments %}
+   {% with run=a.latest %}
+   <div class="ar-card">
+    <div class="ar-head">
+     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:9px;">
+      <span class="ar-badge v-badge">v{{ run.version_no }}</span>
+      <span style="font-size:13px;font-weight:700;color:#002583;">{{ run.reg_a.name }} → {{ run.reg_b.name }}</span>
+      {% if run.currency_state == 'current' %}<span class="ar-badge c-current">✓ Current</span>
+      {% elif run.currency_state == 'outdated' %}<span class="ar-badge c-outdated">⚠ Outdated</span>
+      {% else %}<span class="ar-badge c-unknown">Cannot verify currency</span>{% endif %}
+      {% if a.version_count > 1 %}<span class="ar-meta">{{ a.version_count }} versions</span>{% endif %}
+     </div>
+
+     {# ── A/B made explicit: orientation is part of the assessment identity ── #}
+     <div style="display:flex;gap:9px;flex-wrap:wrap;margin-bottom:9px;">
+      <div class="ar-side">
+       <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
+        <span class="ar-ab">A</span>
+        <span style="font-size:11px;font-weight:700;color:#111827;">{{ run.reg_a.name }}</span>
+       </div>
+       <div class="ar-meta">
+        {% if run.snapshot_a.version %}version {{ run.snapshot_a.version }} · {% endif %}
+        {{ run.snapshot_a.document_id|default:"no document id" }}
+        {% if run.snapshot_a.content_hash %}<br>hash {{ run.snapshot_a.content_hash|slice:":12" }}{% endif %}
+       </div>
+      </div>
+      <div class="ar-side">
+       <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
+        <span class="ar-ab" style="background:#B07A00;">B</span>
+        <span style="font-size:11px;font-weight:700;color:#111827;">{{ run.reg_b.name }}</span>
+       </div>
+       <div class="ar-meta">
+        {% if run.snapshot_b.version %}version {{ run.snapshot_b.version }} · {% endif %}
+        {{ run.snapshot_b.document_id|default:"no document id" }}
+        {% if run.snapshot_b.content_hash %}<br>hash {{ run.snapshot_b.content_hash|slice:":12" }}{% endif %}
+       </div>
+      </div>
+     </div>
+
+     {% if run.currency_state == 'unknown' %}
+      <p style="font-size:10.5px;color:#6B7280;margin:0 0 9px;line-height:1.5;background:#F1F2F6;padding:7px 10px;border-radius:6px;">
+       This assessment predates source-version tracking, so the document versions it was
+       actually based on were not recorded. It can be opened and audited, but it is not
+       offered for reuse and must not be treated as current.
+      </p>
+     {% elif run.currency_state == 'outdated' %}
+      <p style="font-size:10.5px;color:#B3261E;margin:0 0 9px;line-height:1.5;background:#FDECEC;padding:7px 10px;border-radius:6px;">
+       <strong>Outdated</strong> — {{ run.outdated_reason }}
+      </p>
+     {% endif %}
+
+     <div class="ar-meta" style="margin-bottom:10px;">
+      Approved {{ run.approved_at|date:"d M Y H:i" }}
+      {% if run.approved_by %}by {{ run.approved_by.username }}{% endif %}
+      · {{ run.results.count }} obligation{{ run.results.count|pluralize }}
+      · {{ run.scope_label }}
+      {% if run.model_version %} · {{ run.model_version }}{% endif %}
+      {% if run.taxonomy_version %} · taxonomy {{ run.taxonomy_version }}{% endif %}
+     </div>
+
+     <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;">
+      <a class="ar-btn primary" href="{% url 'comparison-workspace' run.pk %}">Open</a>
+      {% if run.is_reusable %}
+       {# Reuse actions appear only for a verified, current assessment. #}
+       <span class="ar-meta" style="color:#1E7A3C;font-weight:700;">Verified current — reusable</span>
+      {% else %}
+       {# Contextual: carries this assessment's own sources and scope into the
+          picker so the analyst re-runs the SAME comparison. Prefill only —
+          they still submit it, and nothing executes from this link. #}
+       <a class="ar-btn" href="{% url 'comparison' %}?reg_a_pk={{ run.reg_a_id }}&reg_b_pk={{ run.reg_b_id }}&scope_mode={{ run.source_snapshot.scope.mode|default:'full' }}{% for t in run.source_snapshot.scope.topics %}&topics={{ t|urlencode }}{% endfor %}">Re-run comparison</a>
+       <span class="ar-meta">Reuse unavailable —
+        {% if run.currency_state == 'outdated' %}a source has changed{% else %}currency cannot be verified{% endif %}</span>
+      {% endif %}
+      <form method="post" action="{% url 'comparison-run-recheck-currency' run.pk %}" style="display:inline;">
+       {% csrf_token %}
+       <button class="ar-btn" type="submit" title="Re-verify this assessment against the current documents">Re-check</button>
+      </form>
+      {% if run.currency_checked_at %}
+       <span class="ar-meta">checked {{ run.currency_checked_at|timesince }} ago</span>
+      {% else %}
+       <span class="ar-meta">never checked</span>
+      {% endif %}
+     </div>
+    </div>
+
+    {% if a.history %}
+     <div class="ar-hist">
+      <p style="font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin:0 0 6px;">Earlier versions — retained for audit</p>
+      {% for old in a.history %}
+       <div style="display:flex;align-items:center;gap:8px;padding:4px 0;flex-wrap:wrap;">
+        <span class="ar-badge s-superseded">v{{ old.version_no }} {{ old.get_lifecycle_display }}</span>
+        <span style="font-size:11px;color:#374151;">{{ old.reg_a.name }} → {{ old.reg_b.name }}</span>
+        <span class="ar-meta">approved {{ old.approved_at|date:"d M Y" }}{% if old.approved_by %} by {{ old.approved_by.username }}{% endif %}</span>
+        <a class="ar-btn" style="padding:3px 9px;" href="{% url 'comparison-workspace' old.pk %}">Open (audit)</a>
+       </div>
+      {% endfor %}
+     </div>
+    {% endif %}
+   </div>
+   {% endwith %}
+  {% empty %}
+   <div style="background:#fff;border:1px solid #E5E8EF;border-radius:10px;padding:40px;text-align:center;">
+    <p style="font-size:12px;color:#6B7280;margin:0 0 6px;">No approved assessments yet.</p>
+    <p style="font-size:11px;color:#9AA3B2;margin:0;line-height:1.6;">
+     Run a comparison, review every obligation, then approve the assessment from its
+     workspace. Approved assessments appear here with the exact source versions they used.
+    </p>
+   </div>
+  {% endfor %}
+
+  {% if awaiting %}
+   <div style="background:#fff;border:1px solid #E5E8EF;border-radius:10px;padding:14px 16px;margin-top:16px;">
+    <p style="font-size:11px;font-weight:700;color:#002583;text-transform:uppercase;letter-spacing:.06em;margin:0 0 3px;">
+     Fully reviewed, awaiting certification ({{ awaiting|length }})</p>
+    <p style="font-size:11px;color:#6B7280;margin:0 0 10px;line-height:1.5;">
+     Every obligation in these runs has been decided, but nobody has certified the
+     assessment as a whole yet. Approving forty rows and certifying the assessment are
+     deliberately separate acts.
+    </p>
+    {% for run in awaiting %}
+     <div style="display:flex;align-items:center;gap:9px;padding:6px 0;border-top:1px solid #F1F2F6;flex-wrap:wrap;">
+      <span style="font-size:11px;font-weight:600;color:#111827;">{{ run.reg_a.name }} → {{ run.reg_b.name }}</span>
+      <span class="ar-meta">run #{{ run.pk }} · {{ run.results.count }} obligation{{ run.results.count|pluralize }} · {{ run.created_at|date:"d M Y" }}</span>
+      {% if not run.source_fingerprint %}<span class="ar-badge c-unknown">no source snapshot</span>{% endif %}
+      <a class="ar-btn" style="margin-left:auto;" href="{% url 'comparison-workspace' run.pk %}">Review &amp; approve</a>
+     </div>
+    {% endfor %}
+   </div>
+  {% endif %}
+
+ </div>
+</div>
+{% endblock %}

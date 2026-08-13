@@ -11,26 +11,59 @@ Sections:
 * ``IntegrationActionTests``    — one integration test per action key
                                    from Task D2: triggers the action and
                                    asserts an AuditLog row was written.
+* ``ActionEmissionTests``       — static check that every declared action
+                                   actually has a ``log_event`` call site.
+
+A note on the guarded imports and skips below. This module used to import
+``django_otp`` unconditionally. That package was dropped from the project
+along with MFA, so the *entire module* failed to import and every test in
+it was reported as a single collection error rather than run — which is
+how the audit log grew holes without anyone noticing. Feature-dependent
+tests are now skipped individually, with the reason attached, so the rest
+of the file keeps guarding the trail.
 """
 
+import ast
 import io
 import time
+from pathlib import Path
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import RequestFactory, TestCase, override_settings
-from django.urls import reverse
-
-from django_otp.plugins.otp_totp.models import TOTPDevice
+from django.urls import NoReverseMatch, reverse
+from unittest import skipUnless
 
 from apps.accounts.models import UserProfile
-from apps.history.audit import Actions, log_event
+from apps.history.audit import Actions, NO_CALL_SITE, log_event
 from apps.history.models import AuditLog
 
 from .factories import make_user, disconnect_stuck_run_hook
 
 
 User = get_user_model()
+
+try:
+    from django_otp.plugins.otp_totp.models import TOTPDevice
+    HAS_OTP = True
+except ImportError:  # MFA is not part of the current build
+    TOTPDevice = None
+    HAS_OTP = False
+
+
+def _has_route(name, args=None) -> bool:
+    """True if ``name`` resolves to a URL. Used to skip tests for admin
+    screens that exist as views but are not routed."""
+    try:
+        reverse(name, args=args if args is not None else [])
+        return True
+    except NoReverseMatch:
+        return False
+
+
+HAS_USER_MGMT = _has_route('user-create')
+HAS_IDLE_MIDDLEWARE = any('IdleSessionTimeout' in mw for mw in settings.MIDDLEWARE)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -207,6 +240,9 @@ class AuthSignalIntegrationTests(_AuditRowAsserter):
         self.assertIsNone(rows.first().user)
 
 
+@skipUnless(HAS_IDLE_MIDDLEWARE,
+            'No IdleSessionTimeoutMiddleware in settings.MIDDLEWARE — '
+            'auth.idle_timeout is listed in audit.NO_CALL_SITE')
 class IdleTimeoutIntegrationTests(_AuditRowAsserter):
     @classmethod
     def setUpTestData(cls):
@@ -226,6 +262,8 @@ class IdleTimeoutIntegrationTests(_AuditRowAsserter):
         self.assertAuditRow(Actions.IDLE_TIMEOUT, user=self.user)
 
 
+@skipUnless(HAS_OTP, 'django_otp is not installed — MFA was removed from '
+                     'the PoC; auth.mfa_* are listed in audit.UNREACHABLE')
 class MFAIntegrationTests(_AuditRowAsserter):
     @classmethod
     def setUpTestData(cls):
@@ -250,6 +288,9 @@ class MFAIntegrationTests(_AuditRowAsserter):
                             target_id=self.target.pk)
 
 
+@skipUnless(HAS_USER_MGMT,
+            'User-management views are not routed in apps/accounts/urls.py — '
+            'user.* are listed in audit.UNREACHABLE')
 class UserManagementIntegrationTests(_AuditRowAsserter):
     @classmethod
     def setUpTestData(cls):
@@ -478,3 +519,135 @@ class AllSixteenActionsCoveredTests(TestCase):
         defined = set(Actions.all())
         missing = self.EXPECTED - defined
         self.assertFalse(missing, f'Action constants missing: {missing}')
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Section 4 — static emission check
+# ─────────────────────────────────────────────────────────────────────────────
+
+# The test above only proves the *constants exist*. That is why it kept
+# passing while several action keys had no writer at all: a dashboard can
+# query 'reasoning.validation_error' forever and always render zero, and
+# nothing in the suite objected. This section closes that hole by parsing
+# the source and asking a different question — which actions are actually
+# passed to a log_event() call?
+
+_DJANGO_ROOT = Path(__file__).resolve().parents[3]      # …/cjpca
+_REPO_ROOT   = _DJANGO_ROOT.parent
+_SCAN_ROOTS  = [_DJANGO_ROOT / 'apps', _REPO_ROOT / 'reasoning']
+
+# Value → constant name, for readable failure messages.
+_VALUE_TO_NAME = {v: k for k, v in vars(Actions).items()
+                  if not k.startswith('_') and isinstance(v, str)}
+
+
+def _is_scannable(path: Path) -> bool:
+    parts = path.parts
+    if 'tests' in parts or 'migrations' in parts:
+        return False
+    return not path.name.startswith('test_')
+
+
+def _action_values(node) -> set:
+    """Collect every ``Actions.X`` value referenced anywhere under ``node``."""
+    found = set()
+    for sub in ast.walk(node):
+        if isinstance(sub, ast.Attribute) and isinstance(sub.value, ast.Name) \
+                and sub.value.id == 'Actions':
+            value = getattr(Actions, sub.attr, None)
+            if isinstance(value, str):
+                found.add(value)
+    return found
+
+
+def _emitted_actions() -> set:
+    """Return every action value passed as the ``action`` argument of a
+    ``log_event(...)`` call in non-test source.
+
+    Deliberately AST-based rather than a text search: 'reasoning.validation_error'
+    appears four times in apps/accounts/views.py, but every one of them is a
+    ``.filter(event_type=...)`` read. A grep would call that covered.
+
+    Where the action is computed rather than named inline — the reviewer
+    endpoints pick it out of an ``action_map`` dict keyed by lifecycle — we
+    fall back to every ``Actions.X`` mentioned in the enclosing function.
+    That is narrow enough not to count a dashboard query as an emission,
+    since those live in functions that call no log_event at all.
+    """
+    emitted = set()
+    for root in _SCAN_ROOTS:
+        if not root.exists():
+            continue
+        for path in root.rglob('*.py'):
+            if not _is_scannable(path):
+                continue
+            try:
+                tree = ast.parse(path.read_text(encoding='utf-8'))
+            except (SyntaxError, UnicodeDecodeError):
+                continue
+
+            # Map each function to its body so we can resolve indirection.
+            scopes = [n for n in ast.walk(tree)
+                      if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef,
+                                        ast.Module))]
+            for scope in scopes:
+                for node in ast.walk(scope):
+                    if not isinstance(node, ast.Call):
+                        continue
+                    func = node.func
+                    name = (func.attr if isinstance(func, ast.Attribute)
+                            else getattr(func, 'id', None))
+                    if name != 'log_event' or len(node.args) < 2:
+                        continue
+                    arg = node.args[1]
+                    if isinstance(arg, ast.Attribute) and \
+                            isinstance(arg.value, ast.Name) and arg.value.id == 'Actions':
+                        value = getattr(Actions, arg.attr, None)
+                        if isinstance(value, str):
+                            emitted.add(value)
+                    elif isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                        emitted.add(arg.value)
+                    elif not isinstance(scope, ast.Module):
+                        # Computed action (dict lookup, ternary, variable) —
+                        # credit every Actions.X named in this function.
+                        emitted |= _action_values(scope)
+    return emitted
+
+
+class ActionEmissionTests(TestCase):
+    """Every declared action must have a writer, or be documented as not
+    having one in ``apps.history.audit.NO_CALL_SITE``."""
+
+    def test_every_action_has_a_log_event_call_site(self):
+        emitted = _emitted_actions()
+        expected = set(Actions.all()) - NO_CALL_SITE
+        missing = expected - emitted
+        self.assertFalse(
+            missing,
+            'These actions are declared but nothing calls log_event() with '
+            'them. Either wire up the emission or add them to '
+            'apps.history.audit.NO_CALL_SITE with a reason: '
+            + ', '.join(sorted(f'{_VALUE_TO_NAME.get(m, "?")} ({m})' for m in missing)),
+        )
+
+    def test_no_call_site_allowlist_is_not_stale(self):
+        emitted = _emitted_actions()
+        resurrected = NO_CALL_SITE & emitted
+        self.assertFalse(
+            resurrected,
+            'These actions now have a log_event() call site but are still '
+            'listed in apps.history.audit.NO_CALL_SITE — remove them from '
+            'that set: ' + ', '.join(sorted(resurrected)),
+        )
+
+    def test_emitted_raw_strings_are_declared_constants(self):
+        """Catch the 'exports.downloaded' class of bug: an event key emitted
+        as a bare string, absent from Actions, and therefore missing from the
+        dashboard feeds and the history category map."""
+        undeclared = _emitted_actions() - set(Actions.all())
+        self.assertFalse(
+            undeclared,
+            'These event keys are written but not declared on Actions, so '
+            'the history/monitoring surfaces built from that list will miss '
+            'them: ' + ', '.join(sorted(undeclared)),
+        )

@@ -34,9 +34,43 @@
     <div><strong>Uploaded:</strong> {{ doc.upload_date|date:"d M Y" }}</div>
    </div>
 
-   <p style="font-size:12px;color:#B91C1C;font-weight:700;margin:0 0 22px;">
-    This action cannot be undone.
-   </p>
+   {% if messages %}
+    {% for m in messages %}
+     <div style="padding:10px 14px;border-radius:8px;background:#FDECEC;color:#B3261E;font-size:12px;font-weight:600;margin:0 0 16px;line-height:1.5;">{{ m }}</div>
+    {% endfor %}
+   {% endif %}
+
+   {# ── Deletion blockers. Shown BEFORE the button so a refusal is visible up
+      front, rather than after the user has committed to the action. ── #}
+   {% if blockers %}
+    <div style="background:#FFF6E0;border:1px solid #E0B85C;border-radius:8px;padding:14px 16px;margin-bottom:20px;">
+     <p style="font-size:13px;font-weight:800;color:#8A6410;margin:0 0 4px;">This document cannot be deleted</p>
+     <p style="font-size:11.5px;color:#8A6410;margin:0 0 12px;line-height:1.5;">
+      Comparison work depends on it. Deleting it would destroy that work, so the
+      document is kept until the dependencies are resolved.
+     </p>
+     {% for b in blockers %}
+      <div style="border-top:1px solid #EBD9AE;padding-top:10px;margin-top:10px;">
+       <p style="font-size:12px;font-weight:700;color:#6B4E00;margin:0 0 2px;">{{ b.label }}</p>
+       <p style="font-size:11px;color:#8A6410;margin:0 0 7px;line-height:1.5;">{{ b.detail }}</p>
+       {% for r in b.runs|slice:":8" %}
+        <div style="display:flex;align-items:center;gap:7px;font-size:11px;color:#6B4E00;padding:2px 0;">
+         <span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:4px;background:#8A6410;color:#fff;font-size:9px;font-weight:800;flex-shrink:0;">{{ r.side }}</span>
+         <a href="{% url 'comparison-workspace' r.id %}" style="color:#6B4E00;font-weight:600;text-decoration:underline;">{{ r.label }}</a>
+         <span style="color:#A8843A;">{{ r.lifecycle }}{% if r.version %} v{{ r.version }}{% endif %}</span>
+        </div>
+       {% endfor %}
+       {% if b.runs|length > 8 %}
+        <p style="font-size:10.5px;color:#A8843A;margin:5px 0 0;">…and {{ b.runs|length|add:"-8" }} more</p>
+       {% endif %}
+      </div>
+     {% endfor %}
+    </div>
+   {% else %}
+    <p style="font-size:12px;color:#B91C1C;font-weight:700;margin:0 0 22px;">
+     This action cannot be undone.
+    </p>
+   {% endif %}
 
    <form method="post" action="{% url 'library-delete' doc.pk %}"
          x-data="{ typed: '', get matches() { return this.typed.trim().toLowerCase() === '{{ doc.name|escapejs }}'.trim().toLowerCase(); } }"
@@ -63,9 +97,16 @@
 
     <div style="display:flex;gap:10px;justify-content:flex-end;">
      <a href="{% url 'library-view' doc.pk %}" style="padding:9px 18px;background:#fff;color:#1F2937;border:1px solid #D1D5DB;border-radius:6px;font-size:13px;font-weight:600;text-decoration:none;">Cancel</a>
-     <button type="submit" :disabled="!matches"
-             :style="matches ? { background: '#B91C1C', cursor: 'pointer' } : { background: '#E7C5C5', cursor: 'not-allowed' }"
-             style="padding:9px 18px;color:#fff;border:0;border-radius:6px;font-size:13px;font-weight:700;">Delete document</button>
+     {% if blockers %}
+      {# Disabled outright: the server refuses this anyway, so offering the
+         action would only produce a dead end. #}
+      <button type="button" disabled title="Resolve the dependencies listed above first"
+              style="padding:9px 18px;color:#fff;border:0;border-radius:6px;font-size:13px;font-weight:700;background:#E7C5C5;cursor:not-allowed;">Delete document</button>
+     {% else %}
+      <button type="submit" :disabled="!matches"
+              :style="matches ? { background: '#B91C1C', cursor: 'pointer' } : { background: '#E7C5C5', cursor: 'not-allowed' }"
+              style="padding:9px 18px;color:#fff;border:0;border-radius:6px;font-size:13px;font-weight:700;">Delete document</button>
+     {% endif %}
     </div>
    </form>
 

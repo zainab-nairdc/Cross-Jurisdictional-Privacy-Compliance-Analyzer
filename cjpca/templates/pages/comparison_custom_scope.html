@@ -480,7 +480,10 @@ function toggleTile(tile, id) {
 
 function customScope() {
  return {
- scopeMode:'full', includeOrphans:false,
+ // Prefilled when the analyst arrived from "Re-run comparison" on the
+ // Approved Runs page. Defaults are unchanged for every other entry point,
+ // and the form is still submitted by hand either way.
+ scopeMode:'{{ prefill_scope_mode|default:"full" }}', includeOrphans:false,
  // Reactive counter — selected topics. canRun depends on this so Alpine
  // re-evaluates the disabled state the instant a topic is ticked. Previous
  // version queried the DOM inside canRun, which Alpine doesn't track —
@@ -496,6 +499,19 @@ function customScope() {
  return this.selectedTopicCount > 0;
  },
  init() {
+ // Tick the topics carried over from a contextual "Re-run comparison".
+ // Selection only — the analyst still has to press Run.
+ {% for t in prefill_topics %}
+ (function(id){
+   const tile = document.getElementById('tile-'+id), cb = document.getElementById('cb-'+id),
+         box = document.getElementById('chkbox-'+id);
+   if (cb && !cb.checked) {
+     cb.checked = true;
+     if (tile) tile.classList.add('sel');
+     if (box) box.classList.add('sel');
+   }
+ })('{{ t|escapejs }}');
+ {% endfor %}
  this.onTopicToggle();
  // When the user actually submits, start the elapsed timer.
  const form = document.getElementById('scope-form');

@@ -3,9 +3,9 @@
 Per-role scoping:
 
 * admin    — sees every event (system + work)
-* reviewer — work-only slice (comparison/mapping/review); auth, document,
-             user-management and quarantine events are hidden because they
-             belong to the admin oversight surface
+* reviewer — work-only slice (comparison/mapping/review/export/analytics);
+             auth, document, user-management and quarantine events are
+             hidden because they belong to the admin oversight surface
 * analyst  — only their own actions (work events they generated)
 
 The view filters AuditLog rows by category before rendering, so the
@@ -31,8 +31,14 @@ ALL_ROLES = ('admin', 'reviewer', 'analyst')
 # Categories visible to each role. Admin gets the full set, reviewer is
 # limited to work events, analyst sees only their own actions (which the
 # query then narrows by user= and category isn't restricted further).
-WORK_CATEGORIES = {'comparison', 'mapping', 'review'}
-ADMIN_CATEGORIES = {'auth', 'comparison', 'mapping', 'review', 'upload', 'admin'}
+#
+# 'export' and 'analytics' belong in the work set: an analyst who downloads
+# an approved package or runs a gap analysis must be able to see that in
+# their own timeline. Before, both fell through _action_category()'s
+# fallback into 'auth' and were filtered out of every non-admin view.
+WORK_CATEGORIES = {'comparison', 'mapping', 'review', 'export', 'analytics'}
+ADMIN_CATEGORIES = {'auth', 'comparison', 'mapping', 'review', 'upload',
+                    'admin', 'export', 'analytics', 'system'}
 
 
 def _role_category_filter(role: str) -> set | None:
@@ -54,31 +60,51 @@ EVENT_META = {
     'auth':        {'label': 'Auth',       **_BLUE},
     'comparison':  {'label': 'Comparison', **_BLUE},
     'admin':       {'label': 'Admin',      **_BLUE},
+    'system':      {'label': 'System',     **_BLUE},
     'mapping':     {'label': 'Mapping',    **_ORANGE},
     'upload':      {'label': 'Upload',     **_ORANGE},
     'review':      {'label': 'Review',     **_ORANGE},
     'export':      {'label': 'Export',     **_ORANGE},
+    'analytics':   {'label': 'Analytics',  **_ORANGE},
 }
 
 
 # Maps an action key (event_type) to the category bucket used by the
 # template's filter chips.
+#
+# Keep this exhaustive. The old version matched a prefix of 'export.' while
+# the export views actually emit 'exports.downloaded' — so the Export chip
+# never matched anything — and everything unmatched fell into an 'auth'
+# fallback. That silently mislabelled ingestion, quarantine, settings and
+# document-tag rows as "Auth", and, because non-admins are filtered to
+# WORK_CATEGORIES, dropped them from reviewer and analyst timelines
+# altogether. Unknown keys now land in 'system' (admin-visible) so a new
+# event type is merely uncategorised rather than invisible.
+_CATEGORY_PREFIXES = (
+    ('auth.',       'auth'),
+    ('comparison.', 'comparison'),
+    ('mapping.',    'mapping'),
+    ('review.',     'review'),
+    ('document.',   'upload'),
+    ('library.',    'upload'),
+    ('doc.',        'upload'),
+    ('user.',       'admin'),
+    ('settings.',   'admin'),
+    ('exports.',    'export'),
+    ('export.',     'export'),
+    ('analytics.',  'analytics'),
+    ('ingestion.',  'system'),
+    ('quarantine.', 'system'),
+    ('reasoning.',  'system'),
+    ('geofence.',   'system'),
+)
+
+
 def _action_category(action: str) -> str:
-    if action.startswith('auth.'):
-        return 'auth'
-    if action.startswith('comparison.'):
-        return 'comparison'
-    if action.startswith('mapping.'):
-        return 'mapping'
-    if action.startswith('review.'):
-        return 'review'
-    if action.startswith('document.'):
-        return 'upload'
-    if action.startswith('user.'):
-        return 'admin'
-    if action.startswith('export.'):
-        return 'export'
-    return 'auth'  # fallback bucket
+    for prefix, category in _CATEGORY_PREFIXES:
+        if action.startswith(prefix):
+            return category
+    return 'system'  # unknown keys stay visible to admins
 
 
 class _Event:
@@ -160,6 +186,8 @@ def _apply_filters(events, request):
             'auth':        'auth',
             'admin':       'admin',
             'exports':     'export',
+            'analytics':   'analytics',
+            'system':      'system',
         }
         cat = cat_map.get(type_filter.lower())
         if cat:

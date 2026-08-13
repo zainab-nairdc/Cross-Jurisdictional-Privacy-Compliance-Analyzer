@@ -2,6 +2,7 @@
 views.py — Page views for the V2 Comparison Workspace (4 screens).
 """
 import json
+import logging
 import os
 import subprocess
 import sys
@@ -19,6 +20,8 @@ from apps.comparison.models import (
     ComparisonRun, ComparisonResult, AuditEvent,
     PAIR_CONFIGS,
 )
+
+logger = logging.getLogger(__name__)
 
 ALL_ROLES = ('analyst', 'reviewer', 'admin')
 
@@ -379,6 +382,15 @@ class PairPickerView(View):
         reg_a = Document.objects.filter(pk=reg_a_pk, doc_type=Document.REGULATION, status=Document.INDEXED).first() if reg_a_pk else None
         reg_b = Document.objects.filter(pk=reg_b_pk, doc_type=Document.REGULATION, status=Document.INDEXED).first() if reg_b_pk else None
 
+        # Scope carried over from a "Re-run comparison" link on Approved Runs,
+        # so the analyst does not have to re-pick what the previous assessment
+        # covered. Prefill ONLY — the form is still submitted by hand, and
+        # nothing runs until they do.
+        prefill_scope_mode = request.GET.get('scope_mode', '')
+        prefill_topics = [t for t in request.GET.getlist('topics') if t]
+        if prefill_scope_mode not in ('full', 'topics'):
+            prefill_scope_mode = 'topics' if prefill_topics else ''
+
         scan = None
         if reg_a and reg_b and reg_a.pk != reg_b.pk:
             from apps.comparison.topic_scan import scan_topic_coverage
@@ -398,6 +410,8 @@ class PairPickerView(View):
             'reg_b':      reg_b,
             'reg_a_pk':   reg_a_pk or '',
             'reg_b_pk':   reg_b_pk or '',
+            'prefill_scope_mode': prefill_scope_mode,
+            'prefill_topics':     prefill_topics,
             'flag_a':     _FLAG_MAP.get(reg_a.jurisdiction, '') if reg_a else '',
             'flag_b':     _FLAG_MAP.get(reg_b.jurisdiction, '') if reg_b else '',
             'has_regs':   bool(reg_a and reg_b and reg_a.pk != reg_b.pk),
@@ -440,6 +454,88 @@ class RunComparisonView(View):
         topics          = request.POST.getlist('topics') if scope_mode != 'full' else []
         include_orphans = request.POST.get('include_orphans') == '1'
 
+        # ── Reuse gate ──────────────────────────────────────────────────────
+        # Three ways through here, and only one of them runs the model:
+        #
+        #   use_existing   the analyst accepted the offer -> open that
+        #                  assessment. No run, no results, no LLM.
+        #   force_rerun    the analyst declined -> fall through to the normal
+        #                  path below and generate a fresh comparison.
+        #   neither        look for an approved assessment that already answers
+        #                  this exact request. If one exists, OFFER it and stop
+        #                  — nothing is created and the model is not called
+        #                  until a person has chosen.
+        #
+        # Reuse is never applied automatically, and the escape hatch is always
+        # available.
+        from apps.comparison.assessments import find_reusable_run
+        from apps.history.audit import log_event, Actions
+
+        force_rerun  = request.POST.get('force_rerun') == '1'
+        use_existing = (request.POST.get('use_existing') or '').strip()
+
+        if use_existing:
+            # Re-resolved from the request rather than trusted from the POST:
+            # the run must still be reusable AND still be the answer to THIS
+            # comparison, or a stale/crafted id could be recorded as an
+            # accepted reuse of something else.
+            candidate = find_reusable_run(reg_a, reg_b, topics, scope_mode)
+            if candidate and str(candidate.pk) == use_existing:
+                log_event(
+                    request.user, Actions.COMPARISON_REUSE_ACCEPTED,
+                    request=request,
+                    target_type='comparison.ComparisonRun', target_id=candidate.pk,
+                    description=(f'{request.user.username} reused approved '
+                                 f'assessment #{candidate.pk} v{candidate.version_no} '
+                                 f'instead of re-running {reg_a.name} vs {reg_b.name}'),
+                    metadata={'run_id': candidate.pk,
+                              'assessment_key': candidate.assessment_key,
+                              'version_no': candidate.version_no,
+                              'reg_a': reg_a.name, 'reg_b': reg_b.name,
+                              'topics': topics, 'scope_mode': scope_mode},
+                )
+                return redirect('comparison-workspace', pk=candidate.pk)
+            # No longer valid — fall through and compare properly rather than
+            # silently opening something that may no longer answer the request.
+
+        if not force_rerun:
+            candidate = find_reusable_run(reg_a, reg_b, topics, scope_mode)
+            if candidate is not None:
+                log_event(
+                    request.user, Actions.COMPARISON_REUSE_OFFERED,
+                    request=request,
+                    target_type='comparison.ComparisonRun', target_id=candidate.pk,
+                    description=(f'offered approved assessment #{candidate.pk} '
+                                 f'v{candidate.version_no} instead of re-running '
+                                 f'{reg_a.name} vs {reg_b.name}'),
+                    metadata={'run_id': candidate.pk,
+                              'assessment_key': candidate.assessment_key,
+                              'version_no': candidate.version_no,
+                              'reg_a': reg_a.name, 'reg_b': reg_b.name,
+                              'topics': topics, 'scope_mode': scope_mode},
+                )
+                return render(request, 'pages/comparison_reuse_offer.html', {
+                    'candidate':       candidate,
+                    'reg_a':           reg_a,
+                    'reg_b':           reg_b,
+                    'topics':          topics,
+                    'scope_mode':      scope_mode,
+                    'include_orphans': include_orphans,
+                    'scope_label':     ('Full scope' if scope_mode == 'full'
+                                        else f'{len(topics)} selected topic(s)'),
+                })
+        else:
+            log_event(
+                request.user, Actions.COMPARISON_RERUN_FORCED,
+                request=request,
+                target_type='library.Document', target_id=reg_a.pk,
+                description=(f'{request.user.username} chose to re-run '
+                             f'{reg_a.name} vs {reg_b.name} rather than reuse an '
+                             f'approved assessment'),
+                metadata={'reg_a': reg_a.name, 'reg_b': reg_b.name,
+                          'topics': topics, 'scope_mode': scope_mode},
+            )
+
         # Build the run row up front so the workspace URL exists immediately and
         # we can audit even a crash in compare_regulations.
         pair_key = f'{reg_a.jurisdiction}_{reg_b.jurisdiction}'
@@ -452,6 +548,27 @@ class RunComparisonView(View):
             created_by=request.user if request.user.is_authenticated else None,
         )
 
+        # Record WHAT is being compared, before comparing it. Metadata only —
+        # nothing about how the comparison executes changes here. Without this
+        # the run's currency can never be established later, because nothing
+        # would say which document versions it was based on.
+        try:
+            from apps.comparison.assessments import stamp_run
+            from reasoning.config import cfg as _reasoning_cfg
+            stamp_run(
+                run, reg_a, reg_b,
+                topics          = topics,
+                scope_mode      = scope_mode,
+                include_orphans = include_orphans,
+                model_version   = getattr(getattr(_reasoning_cfg, 'llm', None),
+                                          'model', '') or '',
+                prompt_version  = 'comparison_workflow.yaml',
+            )
+        except Exception:
+            # A stamping failure must not cost the comparison. The run simply
+            # stays unverifiable, which is the honest outcome.
+            logger.exception('failed to stamp run %s with its source snapshot', run.pk)
+
         from apps.history.audit import log_event, Actions
         log_event(
             request.user, Actions.COMPARISON_RUN,
@@ -462,6 +579,8 @@ class RunComparisonView(View):
                 'pair_key': pair_key,
                 'reg_a': reg_a.name, 'reg_b': reg_b.name,
                 'topics': topics, 'include_orphans': include_orphans,
+                'assessment_key': run.assessment_key,
+                'source_fingerprint': run.source_fingerprint[:16],
             },
         )
 
@@ -607,7 +726,13 @@ class SubmitForReviewView(View):
         run.analyst_note            = note
         run.submitted_for_review_at = timezone.now()
         run.submitted_by            = request.user
-        run.save(update_fields=['analyst_note', 'submitted_for_review_at', 'submitted_by'])
+        # Keep the run-level lifecycle in step with the hand-off. An already
+        # approved or superseded run is not dragged backwards by a re-submit.
+        fields = ['analyst_note', 'submitted_for_review_at', 'submitted_by']
+        if run.lifecycle in (ComparisonRun.DRAFT, ComparisonRun.REJECTED):
+            run.lifecycle = ComparisonRun.IN_REVIEW
+            fields.append('lifecycle')
+        run.save(update_fields=fields)
 
         ComparisonResult.objects.filter(
             run=run, lifecycle=ComparisonResult.DRAFT,
@@ -646,6 +771,13 @@ class ComparisonWorkspaceView(View):
     def get(self, request, pk):
         run = get_object_or_404(ComparisonRun, pk=pk)
         ctx = self._build_context(run)
+        # Whether the assessment can be certified, and if not, why. Computed
+        # here so the template states a reason rather than silently hiding the
+        # action. Read-only — opening a workspace never regenerates anything.
+        from apps.comparison.assessments import can_approve
+        ok, reason = can_approve(run)
+        ctx['approval'] = {'can_approve': ok, 'reason': reason,
+                           'review': run.review_state()}
         return render(request, 'pages/comparison_workspace.html', ctx)
 
     def _build_context(self, run):
@@ -1448,9 +1580,9 @@ class ComparisonExecSummaryView(View):
         from apps.review.exports import build_executive_summary_pdf, audit_hash
         data = build_executive_summary_pdf(run)
         try:
-            from apps.history.audit import log_event
+            from apps.history.audit import log_event, Actions
             log_event(
-                request.user, 'exports.downloaded',
+                request.user, Actions.EXPORT_DOWNLOADED,
                 request=request,
                 target_type='comparison.ComparisonRun', target_id=run.pk,
                 description=f'{request.user.username} downloaded exec summary for run #{run.pk}',
@@ -1477,9 +1609,9 @@ class ComparisonRegisterView(View):
         from apps.review.exports import build_gap_register_xlsx, audit_hash
         data = build_gap_register_xlsx(run)
         try:
-            from apps.history.audit import log_event
+            from apps.history.audit import log_event, Actions
             log_event(
-                request.user, 'exports.downloaded',
+                request.user, Actions.EXPORT_DOWNLOADED,
                 request=request,
                 target_type='comparison.ComparisonRun', target_id=run.pk,
                 description=f'{request.user.username} downloaded comparison register for run #{run.pk}',
@@ -1570,3 +1702,144 @@ class GuidanceComparisonView(View):
             'selected': sel,
             'columns': columns,
         })
+
+
+# ── Phase B: run-level approval ───────────────────────────────────────────────
+
+@method_decorator(role_required('reviewer', 'admin'), name='dispatch')
+class RunApprovalView(View):
+    """POST /comparison/runs/<pk>/approval/ — certify the assessment as a whole.
+
+    Separate from the per-result review workflow, which is untouched: that
+    signs off ONE obligation pair, this certifies the assessment. Only the
+    latter puts a run on the Approved Runs page, and it is gated on every
+    result having been decided first.
+
+    Approving assigns the run its version within the assessment and supersedes
+    the previous approved version, which is RETAINED for audit.
+    """
+
+    def post(self, request, pk):
+        from django.contrib import messages
+        from apps.comparison.assessments import ApprovalError, approve_run, reject_run
+
+        run    = get_object_or_404(ComparisonRun, pk=pk)
+        action = request.POST.get('action', 'approve')
+        note   = (request.POST.get('note') or '').strip()[:2000]
+        actor  = request.user if request.user.is_authenticated else None
+
+        try:
+            if action == 'approve':
+                approve_run(run, actor=actor, note=note)
+                if run.currency_state == ComparisonRun.UNKNOWN:
+                    messages.warning(
+                        request,
+                        f'Approved as v{run.version_no}. This run predates '
+                        f'source-version tracking, so the versions compared '
+                        f'were not recorded — it is shown as "cannot verify '
+                        f'currency" and is not offered for reuse.')
+                else:
+                    messages.success(request,
+                                     f'Approved as v{run.version_no}.')
+            elif action == 'reject':
+                reject_run(run, actor=actor, note=note)
+                messages.success(request, 'Assessment rejected.')
+            else:
+                return HttpResponseBadRequest('Unknown action')
+        except ApprovalError as exc:
+            messages.error(request, str(exc))
+
+        nxt = request.POST.get('next')
+        if nxt == 'approved':
+            return redirect('comparison-approved')
+        return redirect('comparison-workspace', pk=pk)
+
+
+# ── Phase C: Approved Runs ────────────────────────────────────────────────────
+
+@method_decorator(role_required(*ALL_ROLES), name='dispatch')
+class ApprovedRunsView(View):
+    """GET /comparison/approved/ — human-approved comparison assessments.
+
+    Shows ONLY runs a reviewer has certified, grouped into assessments with
+    the newest version first and older versions kept openable for audit.
+
+    The page states currency explicitly for every entry. A run whose currency
+    cannot be established is labelled as such and offered no reuse action —
+    presenting an unverifiable assessment as current is the failure this whole
+    design exists to avoid.
+    """
+
+    def get(self, request):
+        from apps.comparison.assessments import (
+            approved_assessments, refresh_approved_currency,
+        )
+
+        # Re-check currency before listing, so the page never renders a stale
+        # verdict. Scoped to approved + superseded runs (a small set), reads
+        # only documents, and writes only the three currency fields.
+        try:
+            refresh_approved_currency()
+        except Exception:
+            # A failed refresh must not take the page down. Whatever was last
+            # recorded is shown, and it is never optimistic — an unchecked run
+            # is `unknown`, not `current`.
+            logger.exception('currency refresh failed while rendering Approved Runs')
+
+        assessments = approved_assessments()
+        counts = {
+            'assessments': len(assessments),
+            'versions':    sum(a['version_count'] for a in assessments),
+            'current':     sum(1 for a in assessments
+                               if a['latest'].currency_state == ComparisonRun.CURRENT),
+            'outdated':    sum(1 for a in assessments
+                               if a['latest'].currency_state == ComparisonRun.OUTDATED),
+            'unknown':     sum(1 for a in assessments
+                               if a['latest'].currency_state == ComparisonRun.UNKNOWN),
+        }
+        # Runs that finished and were fully reviewed but never certified — the
+        # queue this page is fed from.
+        awaiting = [
+            r for r in ComparisonRun.objects
+            .filter(lifecycle__in=[ComparisonRun.DRAFT, ComparisonRun.IN_REVIEW],
+                    status__in=[ComparisonRun.COMPLETE, ComparisonRun.PARTIALLY_FAILED])
+            .select_related('reg_a', 'reg_b').order_by('-created_at')[:50]
+            if r.review_state()['all_decided']
+        ]
+
+        return render(request, 'pages/approved_runs.html', {
+            'assessments': assessments,
+            'counts':      counts,
+            'awaiting':    awaiting,
+        })
+
+
+@method_decorator(role_required(*ALL_ROLES), name='dispatch')
+class RunCurrencyRecheckView(View):
+    """POST /comparison/runs/<pk>/recheck-currency/ — re-verify one assessment.
+
+    Manual counterpart to the automatic refresh on the Approved Runs page, for
+    when a reviewer has just corrected a document and wants an immediate
+    answer. Writes only the currency fields.
+    """
+
+    def post(self, request, pk):
+        from django.contrib import messages
+        from apps.comparison.assessments import apply_currency
+
+        run = get_object_or_404(ComparisonRun, pk=pk)
+        before = run.currency_state
+        verdict = apply_currency(run)
+
+        if verdict.state == ComparisonRun.CURRENT:
+            messages.success(request, f'Re-checked: still current (was {before}).')
+        elif verdict.state == ComparisonRun.OUTDATED:
+            messages.warning(request, f'Re-checked: outdated — {verdict.reason}')
+        else:
+            messages.warning(request,
+                             f'Re-checked: currency cannot be verified — {verdict.reason}')
+
+        nxt = request.POST.get('next')
+        if nxt == 'workspace':
+            return redirect('comparison-workspace', pk=pk)
+        return redirect('comparison-approved')

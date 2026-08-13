@@ -922,7 +922,7 @@ class CrossJurisdictionGapView(LoginRequiredMixin, View):
                     from apps.history.audit import log_event, Actions
                     log_event(
                         request.user,
-                        getattr(Actions, 'GAP_ANALYSIS_RUN', 'analytics.gap_analysis'),
+                        Actions.GAP_ANALYSIS_RUN,
                         request=request,
                         description=f'Cross-jurisdiction gap analysis: {topic} ({", ".join(jurs)})',
                         metadata={

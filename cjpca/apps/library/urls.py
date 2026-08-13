@@ -1,7 +1,25 @@
 from django.urls import path
-from . import views
+from . import review_views, views
 
 urlpatterns = [
+    # ── Phase 3: requirement review + human-governed taxonomy expansion ──
+    path('requirements/',                review_views.RequirementListView.as_view(),
+         name='library-requirements'),
+    path('requirements/<int:pk>/',       review_views.RequirementDetailView.as_view(),
+         name='library-requirement-detail'),
+    path('requirements/<int:pk>/topics/',
+         review_views.RequirementTopicActionView.as_view(),
+         name='library-requirement-topics'),
+    path('topic-suggestions/',           review_views.TopicSuggestionQueueView.as_view(),
+         name='library-topic-suggestions'),
+    path('topic-suggestions/new/',       review_views.TopicSuggestionCreateView.as_view(),
+         name='library-topic-suggestion-create'),
+    path('topic-suggestions/<int:pk>/',  review_views.TopicSuggestionDetailView.as_view(),
+         name='library-topic-suggestion-detail'),
+    path('topic-suggestions/<int:pk>/action/',
+         review_views.TopicSuggestionActionView.as_view(),
+         name='library-topic-suggestion-action'),
+
     path('regulations/',           views.RegulationsView.as_view(),    name='library-regulations'),
     path('policies/',              views.PoliciesView.as_view(),       name='library-policies'),
     # PoC scope: Term Dictionary, Cross-reference search and Obligation

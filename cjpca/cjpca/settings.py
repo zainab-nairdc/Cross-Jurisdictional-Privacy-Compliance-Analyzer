@@ -91,6 +91,8 @@ TEMPLATES = [
                 'apps.accounts.context_processors.user_role',
                 # custom jurisdictions/categories for the global upload wizard
                 'apps.library.context_processors.upload_taxonomy',
+                # open-topic-suggestion badge for the sidebar
+                'apps.library.context_processors.review_counts',
             ],
         },
     },

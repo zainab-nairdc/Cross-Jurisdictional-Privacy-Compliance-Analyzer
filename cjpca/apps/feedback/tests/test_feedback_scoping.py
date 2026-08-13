@@ -317,9 +317,15 @@ class DeletionAndReingestionTests(TestCase):
     def test_reingestion_does_not_revive_feedback(self):
         """Same doc title re-ingested -> byte-identical chunk ids (md5 of
         doc_title::chunk_id::index). Retired feedback must stay inert."""
+        from apps.comparison.models import ComparisonRun
         from apps.feedback.services import purge_document_learning
         from apps.library.models import Document
         purge_document_learning(self.doc, mode='keep')
+        # ComparisonRun.reg_a/reg_b are PROTECT, so a document a comparison was
+        # built on cannot be deleted while that run exists — the run has to go
+        # first. This test is about feedback surviving a re-ingest, not about
+        # deletion protection, so it just follows the required order.
+        ComparisonRun.objects.filter(reg_a=self.doc).delete()
         self.doc.delete()
         # re-ingest: same title, so ingestion regenerates the SAME chunk ids
         Document.objects.create(name='TestReg', doc_type='regulation')
