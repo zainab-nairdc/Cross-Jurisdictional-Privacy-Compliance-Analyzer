@@ -12,12 +12,30 @@
 </style>
 {% endblock %}
 
+{% comment %}
+Sibling of `content`, NOT nested inside it. A block defined inside another
+block is rendered in BOTH positions — once where base.html places
+`breadcrumb`, once inline as part of `content` — which showed the breadcrumb
+twice on this page.
+{% endcomment %}
+{% block breadcrumb %}
+<div style="flex-shrink:0;padding:8px 24px;display:flex;align-items:center;gap:6px;font-size:10px;color:#6B7280;border-bottom:1px solid #E5E8EF;background:#fff;">
+ <a href="{% url 'home' %}" style="color:#002583;text-decoration:none;font-weight:600;">Home</a>
+ <span style="color:#E5E8EF;">›</span>
+ <a href="{% url 'comparison' %}" style="color:#002583;text-decoration:none;font-weight:600;">Comparison</a>
+ <span style="color:#E5E8EF;">›</span>
+ <span style="color:#6B7280;">Run #{{ run.pk }}: {{ run.reg_a.name }} vs {{ run.reg_b.name }}</span>
+</div>
+{% endblock %}
+
 {% block content %}
 <div class="flex flex-col h-full overflow-hidden bg-gray-50" x-data="{ showSendModal: false }">
 
- {# Approval feedback. Without this the reviewer gets no confirmation that an
-    assessment was certified — and, worse, no warning when it was approved
-    with unverifiable currency. #}
+ {% comment %}
+ Approval feedback. Without this the reviewer gets no confirmation that an
+ assessment was certified — and, worse, no warning when it was approved
+ with unverifiable currency.
+ {% endcomment %}
  {% if messages %}
   <div style="flex-shrink:0;padding:8px 24px 0;">
    {% for m in messages %}
@@ -66,8 +84,10 @@
     {% endif %}
   {% endif %}
 
-  {# ── Run-level approval: certifying the ASSESSMENT, distinct from signing
-     off individual obligations. Only a certified run reaches Approved Runs. ── #}
+  {% comment %}
+  ── Run-level approval: certifying the ASSESSMENT, distinct from signing
+  off individual obligations. Only a certified run reaches Approved Runs. ──
+  {% endcomment %}
   {% if run.lifecycle == 'approved' %}
    <a href="{% url 'comparison-approved' %}"
       style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:50px;background:#EAF7EE;color:#1E7A3C;font-size:11px;font-weight:700;border:1px solid #1E7A3C;text-decoration:none;">
@@ -93,41 +113,44 @@
          title="{{ approval.reason }}">{{ approval.reason|truncatechars:64 }}</span>
   {% endif %}
 
-  {% if run.status == 'complete' or run.status == 'partially_failed' %}
-  <div x-data="{ exportOpen: false }" style="position:relative;">
-   <button @click="exportOpen = !exportOpen" type="button"
-    style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:50px;background:#fff;color:#002583;font-size:11px;font-weight:700;border:1px solid #E5E8EF;cursor:pointer;font-family:inherit;">
-    <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M12 3v13.5m0 0l-3.75-3.75M12 16.5l3.75-3.75"/></svg>
-    Download package
-    <svg width="9" height="9" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg>
-   </button>
-   <div x-show="exportOpen" x-cloak @click.outside="exportOpen = false"
-        style="position:absolute;right:0;top:calc(100% + 6px);min-width:300px;background:#fff;border:1px solid #E5E8EF;border-radius:10px;box-shadow:0 8px 24px rgba(0,37,131,.12);z-index:50;padding:6px;">
-    <a href="{% url 'comparison-export-pdf' run.pk %}"
-       style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:8px;text-decoration:none;color:inherit;"
-       onmouseover="this.style.background='#F7F9FC'" onmouseout="this.style.background=''">
-     <div style="width:30px;height:30px;border-radius:7px;background:#FCE8E8;color:#D93939;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
+   {% if run.status == 'complete' or run.status == 'partially_failed' %}
+   <div x-data="{ exportOpen: false }" style="position:relative;">
+    <button @click="exportOpen = !exportOpen" type="button"
+     style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:50px;background:#fff;color:#002583;font-size:11px;font-weight:700;border:1px solid #E5E8EF;cursor:pointer;font-family:inherit;">
+     <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M12 3v13.5m0 0l-3.75-3.75M12 16.5l3.75-3.75"/></svg>
+     Download package
+     <svg width="9" height="9" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg>
+    </button>
+    <template x-teleport="body">
+     <div x-show="exportOpen" x-cloak @click.outside="exportOpen = false"
+          style="position:fixed;z-index:9999;padding:6px;min-width:300px;background:#fff;border:1px solid #E5E8EF;border-radius:10px;box-shadow:0 8px 24px rgba(0,37,131,.12);"
+          @keydown.escape.window="exportOpen = false">
+      <a href="{% url 'comparison-export-pdf' run.pk %}"
+         style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:8px;text-decoration:none;color:inherit;"
+         onmouseover="this.style.background='#F7F9FC'" onmouseout="this.style.background=''">
+       <div style="width:30px;height:30px;border-radius:7px;background:#FCE8E8;color:#D93939;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
+       </div>
+       <div style="min-width:0;flex:1;">
+        <p style="font-size:12px;font-weight:700;color:#002583;margin:0;line-height:1.3;">Executive Summary (PDF)</p>
+        <p style="font-size:10px;color:#6B7280;margin:2px 0 0;line-height:1.4;">One-page board-pack summary with alignment score, flagged rows, and audit hash.</p>
+       </div>
+      </a>
+      <a href="{% url 'comparison-export-xlsx' run.pk %}"
+         style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:8px;text-decoration:none;color:inherit;"
+         onmouseover="this.style.background='#F7F9FC'" onmouseout="this.style.background=''">
+       <div style="width:30px;height:30px;border-radius:7px;background:#E1F4E5;color:#1B7F3A;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3.375 19.5h17.25M3.375 5.25h17.25m-17.25 0v13.125c0 .621.504 1.125 1.125 1.125h15c.621 0 1.125-.504 1.125-1.125V5.25"/></svg>
+       </div>
+       <div style="min-width:0;flex:1;">
+        <p style="font-size:12px;font-weight:700;color:#002583;margin:0;line-height:1.3;">Comparison Register (Excel)</p>
+        <p style="font-size:10px;color:#6B7280;margin:2px 0 0;line-height:1.4;">Flagged-rows register: conflicting, stricter-side, and additional clauses with citations.</p>
+       </div>
+      </a>
      </div>
-     <div style="min-width:0;flex:1;">
-      <p style="font-size:12px;font-weight:700;color:#002583;margin:0;line-height:1.3;">Executive Summary (PDF)</p>
-      <p style="font-size:10px;color:#6B7280;margin:2px 0 0;line-height:1.4;">One-page board-pack summary with alignment score, flagged rows, and audit hash.</p>
-     </div>
-    </a>
-    <a href="{% url 'comparison-export-xlsx' run.pk %}"
-       style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:8px;text-decoration:none;color:inherit;"
-       onmouseover="this.style.background='#F7F9FC'" onmouseout="this.style.background=''">
-     <div style="width:30px;height:30px;border-radius:7px;background:#E1F4E5;color:#1B7F3A;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3.375 19.5h17.25M3.375 5.25h17.25m-17.25 0v13.125c0 .621.504 1.125 1.125 1.125h15c.621 0 1.125-.504 1.125-1.125V5.25"/></svg>
-     </div>
-     <div style="min-width:0;flex:1;">
-      <p style="font-size:12px;font-weight:700;color:#002583;margin:0;line-height:1.3;">Comparison Register (Excel)</p>
-      <p style="font-size:10px;color:#6B7280;margin:2px 0 0;line-height:1.4;">Flagged-rows register: conflicting, stricter-side, and additional clauses with citations.</p>
-     </div>
-    </a>
+    </template>
    </div>
-  </div>
-  {% endif %}
+   {% endif %}
  </div>
 
  {# Analyst note panel — shown to reviewer (and to analyst after submission) #}
@@ -139,10 +162,12 @@
  </div>
  {% endif %}
 
- {# Send-to-reviewer modal #}
- <div x-show="showSendModal" x-cloak
-      style="position:fixed;inset:0;background:rgba(0,37,131,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;"
-      @click.self="showSendModal = false">
+  {# Send-to-reviewer modal #}
+  <div x-show="showSendModal" x-cloak
+       style="position:fixed;inset:0;background:rgba(0,37,131,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;"
+       @click.self="showSendModal = false"
+       @keydown.escape.window="showSendModal = false"
+       x-init="$nextTick(() => window.trapFocus($el))">
    <form method="post" action="{% url 'comparison-submit-review' run.pk %}"
          style="background:#fff;border-radius:14px;padding:24px;width:520px;max-width:100%;box-shadow:0 12px 40px rgba(0,0,0,.25);">
      {% csrf_token %}

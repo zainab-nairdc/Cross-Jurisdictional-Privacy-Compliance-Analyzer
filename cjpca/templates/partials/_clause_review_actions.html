@@ -1,0 +1,71 @@
+{% comment %}
+Review action bar for a ComparisonResult. Used inside _clause_detail.html
+when hx_target is set (review mode).
+Context: result (ComparisonResult), run (ComparisonRun), hx_target (CSS selector)
+{% endcomment %}
+
+<div style="padding:14px 18px;border-top:2px solid #E5E8EF;flex-shrink:0;background:#ffffff;">
+ <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+  {% if result.lifecycle != 'approved' %}
+  <form hx-post="{% url 'comparison-result-transition' result.pk %}" hx-target="{{ hx_target }}" hx-swap="innerHTML">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="approved">
+  <button type="submit" style="display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;font-size:11px;font-weight:700;background:#1B7F3A;color:#fff;border:none;cursor:pointer;font-family:inherit;transition:background .12s;"
+          onmouseover="this.style.background='#166830'" onmouseout="this.style.background='#1B7F3A'">
+  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+  Approve
+  </button>
+  </form>
+  {% endif %}
+  {% if result.lifecycle != 'rejected' %}
+  <form hx-post="{% url 'comparison-result-transition' result.pk %}" hx-target="{{ hx_target }}" hx-swap="innerHTML">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="rejected">
+  <button type="submit" style="display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;font-size:11px;font-weight:700;background:#D93939;color:#fff;border:none;cursor:pointer;font-family:inherit;transition:background .12s;"
+          onmouseover="this.style.background='#B3261E'" onmouseout="this.style.background='#D93939'">
+  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+  Reject
+  </button>
+  </form>
+  {% endif %}
+  {% if result.lifecycle != 'draft' %}
+  <form hx-post="{% url 'comparison-result-transition' result.pk %}" hx-target="{{ hx_target }}" hx-swap="innerHTML">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="reset">
+  <button type="submit" style="padding:7px 12px;border-radius:8px;font-size:11px;font-weight:600;background:#ffffff;color:#6B7280;border:1px solid #E5E8EF;cursor:pointer;font-family:inherit;transition:background .12s,color .12s;"
+          onmouseover="this.style.background='#F4F6FB';this.style.color='#002583'" onmouseout="this.style.background='#ffffff';this.style.color='#6B7280'">Reset</button>
+  </form>
+  {% endif %}
+  <span style="margin-left:auto;padding:4px 10px;border-radius:20px;font-size:10px;font-weight:700;
+  {% if result.lifecycle == 'approved' %}background:#E1F4E5;color:#1B7F3A;
+  {% elif result.lifecycle == 'rejected' %}background:#FCE8E8;color:#D93939;
+  {% elif result.lifecycle == 'reviewed' %}background:#E5E8EF;color:#002583;
+  {% else %}background:#FFF6E0;color:#B07A00;{% endif %}">
+  {{ result.lifecycle|title }}
+  </span>
+  </div>
+  <form hx-post="{% url 'comparison-result-note' result.pk %}" hx-swap="none"
+  hx-on::after-request="this.querySelector('.note-saved').style.display='inline-flex'; setTimeout(() => this.querySelector('.note-saved').style.display='none', 2000)">
+  {% csrf_token %}
+  <textarea name="note" rows="2" placeholder="Add a reviewer note…"
+  style="width:100%;padding:8px 10px;border:1px solid #E5E8EF;border-radius:8px;font-size:11px;color:#002583;resize:vertical;font-family:inherit;outline:none;box-sizing:border-box;">{{ result.reviewer_note }}</textarea>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
+  <span class="note-saved" style="display:none;align-items:center;gap:4px;font-size:10px;font-weight:700;color:#1B7F3A;">
+   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+   Saved
+  </span>
+  <button type="submit" style="padding:5px 14px;border-radius:6px;font-size:10px;font-weight:700;background:#002583;color:#fff;border:none;cursor:pointer;">Save note</button>
+  </div>
+  </form>
+ {% if result.lifecycle == 'draft' %}
+ <div style="padding:8px 12px;margin-top:8px;background:#F8FAFC;border:1px solid #EEF1F7;border-radius:8px;display:flex;align-items:center;gap:8px;">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#002583" stroke-width="1.8" style="flex-shrink:0;">
+   <path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189M12 12.75V18m0-5.25a6.01 6.01 0 01-1.5-.189M12 12.75V18m0-5.25a6.01 6.01 0 00-1.5-.189M12 12.75V18m0-5.25a6.01 6.01 0 011.5-.189M12 12.75V18m0-5.25a6.01 6.01 0 00-1.5-.189M12 12.75V18"/>
+   <circle cx="12" cy="12" r="9" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <span style="font-size:10.5px;color:#6B7280;line-height:1.4;">
+   Your approval or rejection becomes a <strong style="color:#002583;">learning signal</strong> that improves future retrievals for this topic.
+  </span>
+ </div>
+ {% endif %}
+</div>

@@ -107,7 +107,7 @@
  <div style="background:#fff;border-bottom:1px solid #E5E8EF;padding:12px 24px;flex-shrink:0;display:flex;align-items:center;gap:12px;">
  <div style="flex:1;">
  <p style="font-size:14px;font-weight:800;color:#002583;margin:0;letter-spacing:-.02em;">Comparison</p>
- <p style="font-size:11px;color:#002583;margin:0;">Pick any two regulations, then run the AI workflow to see every obligation with verbatim evidence and risk score.</p>
+ <p class="text-sm-primary-no-margin">Pick any two regulations, then run the AI workflow to see every obligation with verbatim evidence and risk score.</p>
  </div>
  <a href="{% url 'comparison-guidance' %}"
     style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:50px;border:1px solid #E5E8EF;font-size:11.5px;font-weight:700;color:#002583;background:#fff;text-decoration:none;white-space:nowrap;"
@@ -304,12 +304,12 @@
  {% endif %}
  </div>
  <div style="display:flex;flex-direction:column;gap:3px;">
- <div style="display:flex;align-items:center;gap:5px;">
+ <div class="flex-center-gap-sm">
  <span style="font-size:8px;font-weight:800;color:#002583;width:7px;flex-shrink:0;">A</span>
  <div style="flex:1;height:3px;background:#ffffff;border-radius:2px;overflow:hidden;"><div style="height:100%;width:{{ topic.bar_width_a }}%;background:#002583;border-radius:2px;"></div></div>
  <span style="font-size:8px;color:#002583;width:14px;text-align:right;flex-shrink:0;">{{ topic.articles_a }}</span>
  </div>
- <div style="display:flex;align-items:center;gap:5px;">
+ <div class="flex-center-gap-sm">
  <span style="font-size:8px;font-weight:800;color:#002583;width:7px;flex-shrink:0;">B</span>
  <div style="flex:1;height:3px;background:#ffffff;border-radius:2px;overflow:hidden;"><div style="height:100%;width:{{ topic.bar_width_b }}%;background:#002583;border-radius:2px;"></div></div>
  <span style="font-size:8px;color:#002583;width:14px;text-align:right;flex-shrink:0;">{{ topic.articles_b }}</span>

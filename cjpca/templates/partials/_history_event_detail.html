@@ -40,17 +40,17 @@
  <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#002583;margin-bottom:8px;">Event details</p>
  <div style="border:1px solid #E5E8EF;border-radius:9px;overflow:hidden;">
  <table style="width:100%;border-collapse:collapse;">
- <tr style="border-bottom:1px solid #E5E8EF;">
+ <tr class="border-b">
  <td style="padding:8px 12px;font-size:11px;color:#002583;width:38%;white-space:nowrap;">Date / time</td>
  <td style="padding:8px 12px;font-size:11px;font-family:'Satoshi',sans-serif;color:#002583;">
  {{ event.timestamp|localtime|date:"d M Y, H:i:s" }}
  </td>
  </tr>
- <tr style="border-bottom:1px solid #E5E8EF;">
+ <tr class="border-b">
  <td style="padding:8px 12px;font-size:11px;color:#002583;">User</td>
  <td style="padding:8px 12px;font-size:11px;color:#002583;">{{ event.user_label }}</td>
  </tr>
- <tr style="border-bottom:1px solid #E5E8EF;">
+ <tr class="border-b">
  <td style="padding:8px 12px;font-size:11px;color:#002583;">Action type</td>
  <td style="padding:8px 12px;font-size:11px;font-family:'Satoshi',sans-serif;color:#002583;">{{ event.etype }}</td>
  </tr>

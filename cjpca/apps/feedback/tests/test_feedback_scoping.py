@@ -176,13 +176,15 @@ class RejectionTests(TestCase):
         ten = feedback_rerank(make_nodes(), topic='t')
         self.assertEqual(rank_of(one, 'chunk1'), rank_of(ten, 'chunk1'))
 
-    def test_modify_has_no_retrieval_effect(self):
-        """Documented known limitation — pinned so a change is deliberate."""
+    def test_modify_boosts_with_bounded_weight(self):
+        """A reviewer correction now contributes +0.5 so the corrected clause
+        surfaces more reliably without dominating ranking."""
         record_feedback(kind='modify', source_id=1, topic='t',
                         before={'chunk_id_a': 'chunk4'})
-        self.assertEqual(chunk_feedback_scores(topic='t'), {})
-        self.assertEqual(order(feedback_rerank(make_nodes(), topic='t')),
-                         order(make_nodes()))
+        self.assertEqual(chunk_feedback_scores(topic='t'), {'chunk4': 0.5})
+        out = feedback_rerank(make_nodes(), topic='t')
+        self.assertLess(rank_of(out, 'chunk4'), 4,
+                        'modify signal must promote the corrected chunk')
 
 
 class VersionScopingTests(TestCase):
@@ -221,6 +223,49 @@ class VersionScopingTests(TestCase):
         self.assertEqual(chunk_feedback_scores(topic='t', version_scope=False), {'chunk4': 1})
 
 
+class DecayTests(TestCase):
+    """Feedback signals lose weight with age when FEEDBACK_DECAY_HALF_LIFE_DAYS
+    is configured, preventing stale approvals from dominating retrieval forever."""
+
+    def setUp(self):
+        self.sig = record_feedback(kind='approve', source_id=1, topic='t',
+                                   before={'chunk_id_a': 'chunk4'})
+
+    def test_no_decay_when_half_life_unset(self):
+        from django.conf import settings
+        original = getattr(settings, 'FEEDBACK_DECAY_HALF_LIFE_DAYS', None)
+        settings.FEEDBACK_DECAY_HALF_LIFE_DAYS = None
+        try:
+            self.assertEqual(chunk_feedback_scores(topic='t'), {'chunk4': 1.0})
+        finally:
+            settings.FEEDBACK_DECAY_HALF_LIFE_DAYS = original
+
+    def test_fresh_signal_full_weight(self):
+        from django.conf import settings
+        original = getattr(settings, 'FEEDBACK_DECAY_HALF_LIFE_DAYS', None)
+        settings.FEEDBACK_DECAY_HALF_LIFE_DAYS = 90
+        try:
+            score = chunk_feedback_scores(topic='t').get('chunk4', 0)
+            self.assertAlmostEqual(score, 1.0, places=2,
+                                   msg='fresh signal should carry full weight')
+        finally:
+            settings.FEEDBACK_DECAY_HALF_LIFE_DAYS = original
+
+    def test_aged_signal_decays(self):
+        from django.conf import settings
+        from django.utils import timezone
+        original = getattr(settings, 'FEEDBACK_DECAY_HALF_LIFE_DAYS', None)
+        settings.FEEDBACK_DECAY_HALF_LIFE_DAYS = 90
+        try:
+            # Artificially age the signal by 90 days (one half-life).
+            FeedbackSignal.objects.filter(pk=self.sig.pk).update(
+                created_at=timezone.now() - timezone.timedelta(days=90))
+            scores = chunk_feedback_scores(topic='t')
+            self.assertAlmostEqual(scores.get('chunk4', 0), 0.5, places=2)
+        finally:
+            settings.FEEDBACK_DECAY_HALF_LIFE_DAYS = original
+
+
 class TopicKeyAlignmentTests(TestCase):
     """The topic a signal is filed under MUST equal the topic retrieval scoped by,
     or topic-scoping would silently discard every signal."""
@@ -247,11 +292,17 @@ class TopicKeyAlignmentTests(TestCase):
         self.assertEqual(chunk_feedback_scores(topic='cross_border'), {'chunk4': 1})
         self.assertEqual(chunk_feedback_scores(topic='lawful_basis'), {})
 
-    def test_falls_back_to_principle_ids_for_full_scope_runs(self):
+    def test_full_scope_runs_record_blank_topic(self):
+        """Full-scope runs carry no selected topic; feedback is recorded without
+        topic scoping rather than falling back to the fuzzy principle_ids probe."""
         from apps.feedback.services import capture_comparison_transition
         res = self._result(run_topics=[], principle_ids=['lawful_basis'])
         sig = capture_comparison_transition(res, 'approved', actor=None)
-        self.assertEqual(sig.topic, 'lawful_basis')
+        self.assertEqual(sig.topic, '')
+        self.assertEqual(chunk_feedback_scores(topic='lawful_basis'), {},
+                         'blank-topic signal must not pollute unrelated topic scoping')
+        self.assertEqual(chunk_feedback_scores(), {'chunk4': 1},
+                         'blank-topic signal must still apply globally')
 
     def test_end_to_end_topic_round_trip(self):
         """Approve under a topic, then confirm a retrieval scoped to that SAME

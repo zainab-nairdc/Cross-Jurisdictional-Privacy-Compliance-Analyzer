@@ -67,7 +67,7 @@
 
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:8px;">
        <div style="flex:1;min-width:0;">
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div class="flex-center-wrap">
          <span style="background:{% if row.severity == 'high' %}#002583{% else %}#FFB800{% endif %};color:#fff;padding:2px 8px;border-radius:20px;font-size:9px;font-weight:800;letter-spacing:.05em;">{{ row.severity|upper }}</span>
          <span style="background:#fff;color:#002583;padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700;border:1px solid #002583;">RULE {{ row.rule_id }}</span>
          <span style="background:#fff;color:#002583;padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700;border:1px solid #002583;">TIER {{ row.tier }}</span>
@@ -96,7 +96,7 @@
         </div>
        {% else %}
         <div style="text-align:right;flex-shrink:0;">
-         <p style="font-size:10px;color:#002583;margin:0;">Decided by</p>
+         <p class="text-xs-primary">Decided by</p>
          <p style="font-size:11px;color:#002583;font-weight:700;margin:2px 0 0;">{{ row.decided_by.username|default:"—" }}</p>
          <p style="font-size:10px;color:#002583;margin:2px 0 0;">{{ row.decided_at|date:"d M H:i" }}</p>
         </div>

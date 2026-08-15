@@ -19,14 +19,11 @@ stamps are ENFORCED at scoring time by services.chunk_feedback_scores(): stale
 rows are ignored for retrieval but never deleted, so they stay queryable for
 audit and history.
 
-Signal kinds and what each one currently DOES (known limitation):
+Signal kinds and what each one currently DOES:
     approve -> +1 retrieval signal on the row's chunks, and promotes to GoldExemplar
     reject  -> -1 retrieval signal on the row's chunks
-    modify  -> STORED with full before/after detail, but has NO retrieval effect.
-               A reviewer correcting an answer teaches the retrieval layer nothing
-               today. Deliberately left unchanged: choosing a weight for a partial
-               correction needs a product/evaluation decision, not an invented
-               constant. See services.chunk_feedback_scores().
+    modify  -> +0.5 retrieval signal on the row's chunks (bounded positive boost
+              so the corrected clause surfaces more reliably).
 """
 
 from django.conf import settings

@@ -80,12 +80,22 @@ def _chat_json(prompt: str, model: str = MODEL) -> dict:
             options={"temperature": 0, "num_ctx": _NUM_CTX},
         )
         return json.loads(resp["message"]["content"])
-    except Exception:
+    except Exception as exc:
         # Degrade to "no suggestion" rather than crash the upload — but never
         # silently: a swallowed error here is indistinguishable from a document
         # the model had nothing to say about, which makes a broken Ollama look
         # like a boring document.
-        logger.exception("doc-intel: local model call failed")
+        #
+        # warning, not exception: this path is a HANDLED fallback (the chunker
+        # drops to its markdown/regex split), but logger.exception printed a
+        # full httpx traceback that read as a crash mid-ingest and sent us
+        # hunting for a failure that had already been absorbed. Keep the type
+        # and message so a broken Ollama is still obvious in the log.
+        logger.warning(
+            "doc-intel: local model call failed (%s: %s) — "
+            "degrading to no suggestion",
+            type(exc).__name__, exc,
+        )
         return {}
 
 

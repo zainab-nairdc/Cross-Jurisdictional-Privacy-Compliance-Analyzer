@@ -35,10 +35,21 @@
   // literals without HTML-attribute escaping pain — that was the cause of
   // the run-#99 "Failed to load document" garbled prose leak.
   window.analystResults = function () {
+    var validTabs = [
+      {% for tab_key, tab_label in tab_defs %}'{{ tab_key }}'{% if not forloop.last %}, {% endif %}{% endfor %}
+    ];
+    var urlTab = new URLSearchParams(window.location.search).get('tab');
+    var initialTab = validTabs.includes(urlTab) ? urlTab : 'overview';
     return {
-      tab: 'overview',
+      tab: initialTab,
       viewerOpen: false,
       viewerLoading: false,
+      switchTab(key) {
+        this.tab = key;
+        var url = new URL(window.location);
+        url.searchParams.set('tab', key);
+        history.replaceState(null, '', url);
+      },
       async openDocViewer(src) {
         this.viewerOpen = true;
         this.viewerLoading = true;
@@ -75,11 +86,12 @@
 <div x-data="analystResults()" class="cmp"
      @open-doc-viewer.window="openDocViewer($event.detail.src)">
 
- {# Document viewer modal (Alpine event-driven, 80vh, ESC/outside-click dismiss). #}
- <div x-show="viewerOpen" x-cloak
-      style="position:fixed;inset:0;background:rgba(0,37,131,.55);z-index:9998;display:flex;align-items:center;justify-content:center;padding:32px;"
-      @click.self="viewerOpen = false"
-      @keydown.escape.window="viewerOpen = false">
+  {# Document viewer modal (Alpine event-driven, 80vh, ESC/outside-click dismiss). #}
+  <div x-show="viewerOpen" x-cloak
+       style="position:fixed;inset:0;background:rgba(0,37,131,.55);z-index:9998;display:flex;align-items:center;justify-content:center;padding:32px;"
+       @click.self="viewerOpen = false"
+       @keydown.escape.window="viewerOpen = false"
+       x-init="$nextTick(() => window.trapFocus($el))">
   <div style="background:#fff;border-radius:14px;width:880px;max-width:100%;height:80vh;max-height:720px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.25);">
    <div style="padding:10px 14px;border-bottom:1px solid #E5E8EF;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
     <p style="font-size:12px;font-weight:700;color:#002583;margin:0;">Document viewer</p>
@@ -116,7 +128,7 @@
  {# Tab nav — chip style. #}
  <div class="flex items-center gap-1.5 flex-wrap pb-3" style="border-bottom:1px solid #E5E8EF;margin-bottom:22px;">
   {% for tab_key, tab_label in tab_defs %}
-  <button type="button" @click="tab = '{{ tab_key }}'"
+  <button type="button" @click="switchTab('{{ tab_key }}')"
           :class="tab === '{{ tab_key }}' ? 'bg-[#002583] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
           class="px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors whitespace-nowrap"
           style="border:none;cursor:pointer;font-family:inherit;">
@@ -131,40 +143,40 @@
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;margin-bottom:14px;">
 
    {# TL: Stats + Executive summary + 3-axis strictness #}
-   <div style="background:#fff;border:1px solid #E5E8EF;border-radius:12px;padding:14px 18px;">
+   <div class="card card-pad">
     {% if stats %}
     <p style="font-size:10px;font-weight:800;color:#002583;text-transform:uppercase;letter-spacing:.07em;margin:0 0 10px;">Run statistics</p>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px 14px;margin-bottom:12px;">
      <div>
-      <p style="font-size:9px;font-weight:800;color:#002583;text-transform:uppercase;letter-spacing:.06em;margin:0 0 3px;">Obligations</p>
-      <p style="font-size:20px;font-weight:800;color:#002583;margin:0;line-height:1;">{{ stats.count }}</p>
+      <p class="text-section-label">Obligations</p>
+      <p class="text-stat-value">{{ stats.count }}</p>
      </div>
      <div>
-      <p style="font-size:9px;font-weight:800;color:#002583;text-transform:uppercase;letter-spacing:.06em;margin:0 0 3px;">Verified</p>
-      <p style="font-size:20px;font-weight:800;color:#002583;margin:0;line-height:1;">{{ stats.verified }}<span style="font-size:11px;color:#002583;font-weight:500;">/{{ stats.count }}</span></p>
+      <p class="text-section-label">Verified</p>
+      <p class="text-stat-value">{{ stats.verified }}<span style="font-size:11px;color:#002583;font-weight:500;">/{{ stats.count }}</span></p>
      </div>
      <div>
-      <p style="font-size:9px;font-weight:800;color:#002583;text-transform:uppercase;letter-spacing:.06em;margin:0 0 3px;">Avg AI risk</p>
-      <p style="font-size:20px;font-weight:800;color:#002583;margin:0;line-height:1;">{{ stats.avg_hall|floatformat:2 }}</p>
+      <p class="text-section-label">Avg AI risk</p>
+      <p class="text-stat-value">{{ stats.avg_hall|floatformat:2 }}</p>
      </div>
      <div>
-      <p style="font-size:9px;font-weight:800;color:#002583;text-transform:uppercase;letter-spacing:.06em;margin:0 0 3px;">Equivalent</p>
-      <p style="font-size:20px;font-weight:800;color:#002583;margin:0;line-height:1;">{{ stats.equiv }}</p>
+      <p class="text-section-label">Equivalent</p>
+      <p class="text-stat-value">{{ stats.equiv }}</p>
      </div>
      <div>
-      <p style="font-size:9px;font-weight:800;color:#002583;text-transform:uppercase;letter-spacing:.06em;margin:0 0 3px;">Conflicts</p>
-      <p style="font-size:20px;font-weight:800;color:#002583;margin:0;line-height:1;">{{ stats.conflicts }}</p>
+      <p class="text-section-label">Conflicts</p>
+      <p class="text-stat-value">{{ stats.conflicts }}</p>
      </div>
     </div>
 
     <div style="border-top:1px solid #E5E8EF;padding-top:10px;display:flex;flex-direction:column;gap:8px;">
      {% for axis_label, axis in axes %}
-     <div style="display:flex;align-items:center;gap:8px;">
+     <div class="flex-center-gap-md">
       <p style="flex-shrink:0;width:100px;font-size:9px;font-weight:800;color:#002583;text-transform:uppercase;letter-spacing:.06em;margin:0;">{{ axis_label }}</p>
       <div style="display:flex;gap:5px;flex-wrap:wrap;font-size:10.5px;color:#002583;">
-       <span style="padding:2px 7px;border:1px solid #E5E8EF;border-radius:5px;"><strong>A</strong> {{ axis.a }}</span>
-       <span style="padding:2px 7px;border:1px solid #E5E8EF;border-radius:5px;"><strong>B</strong> {{ axis.b }}</span>
-       <span style="padding:2px 7px;border:1px solid #E5E8EF;border-radius:5px;"><strong>≈</strong> {{ axis.equiv }}</span>
+       <span class="chip"><strong>A</strong> {{ axis.a }}</span>
+       <span class="chip"><strong>B</strong> {{ axis.b }}</span>
+       <span class="chip"><strong>≈</strong> {{ axis.equiv }}</span>
        <span style="padding:2px 7px;border:1px solid #E5E8EF;border-radius:5px;color:#888;"><strong>n/a</strong> {{ axis.na }}</span>
       </div>
      </div>
@@ -175,15 +187,15 @@
     {% if report.summary %}
     <div style="margin-top:14px;padding-top:11px;border-top:1px solid #E5E8EF;">
      <p style="font-size:9.5px;font-weight:800;color:#002583;text-transform:uppercase;letter-spacing:.07em;margin:0 0 5px;">Executive summary</p>
-     <p style="font-size:11.5px;color:#002583;line-height:1.55;margin:0;">{{ report.summary }}</p>
+     <p class="text-body-primary">{{ report.summary }}</p>
     </div>
     {% endif %}
    </div>
 
    {# TR: BBK compliance-impact narrative + 4 bucket counts #}
    {% if bbk %}
-   <div style="background:#fff;border:1px solid #E5E8EF;border-radius:12px;padding:14px 18px;">
-    <p style="font-size:10px;font-weight:800;color:#002583;text-transform:uppercase;letter-spacing:.07em;margin:0 0 8px;">Compliance impact for BBK</p>
+   <div class="card card-pad">
+    <p class="text-uppercase-label-lg">Compliance impact for BBK</p>
     {% if bbk.compliance_impact %}
     <p style="font-size:11.5px;color:#002583;line-height:1.6;margin:0 0 11px;padding:10px 13px;background:#FAFBFD;border-left:3px solid #002583;border-radius:0 8px 8px 0;">{{ bbk.compliance_impact }}</p>
     {% endif %}
@@ -194,22 +206,22 @@
      <div style="border:1px solid #FDE0E0;border-radius:8px;padding:8px 11px;background:#FFF7F7;">
       <p style="font-size:9px;font-weight:800;color:#A33;text-transform:uppercase;letter-spacing:.07em;margin:0 0 2px;">Conflicts</p>
       <p style="font-size:18px;font-weight:800;color:#A33;margin:0;line-height:1;">{{ bbk.totals.conflicts }}</p>
-      <p style="font-size:9.5px;color:#666;margin:3px 0 0;">Legal review needed</p>
+      <p class="text-muted-custom-sm">Legal review needed</p>
      </div>
-     <div style="border:1px solid #FFE9A8;border-radius:8px;padding:8px 11px;background:#FFFBEB;">
-      <p style="font-size:9px;font-weight:800;color:#7A5500;text-transform:uppercase;letter-spacing:.07em;margin:0 0 2px;">Procedural</p>
-      <p style="font-size:18px;font-weight:800;color:#7A5500;margin:0;line-height:1;">{{ bbk.totals.procedural_actions }}</p>
-      <p style="font-size:9.5px;color:#666;margin:3px 0 0;">Adopt stricter process</p>
+     <div class="alert-warning">
+      <p class="text-alert-label">Procedural</p>
+      <p class="text-alert-value">{{ bbk.totals.procedural_actions }}</p>
+      <p class="text-muted-custom-sm">Adopt stricter process</p>
      </div>
-     <div style="border:1px solid #FFE9A8;border-radius:8px;padding:8px 11px;background:#FFFBEB;">
-      <p style="font-size:9px;font-weight:800;color:#7A5500;text-transform:uppercase;letter-spacing:.07em;margin:0 0 2px;">Substantive</p>
-      <p style="font-size:18px;font-weight:800;color:#7A5500;margin:0;line-height:1;">{{ bbk.totals.substantive_gaps }}</p>
-      <p style="font-size:9.5px;color:#666;margin:3px 0 0;">Broader scope on one side</p>
+     <div class="alert-warning">
+      <p class="text-alert-label">Substantive</p>
+      <p class="text-alert-value">{{ bbk.totals.substantive_gaps }}</p>
+      <p class="text-muted-custom-sm">Broader scope on one side</p>
      </div>
      <div style="border:1px solid #C8E5CC;border-radius:8px;padding:8px 11px;background:#F4FBF5;">
       <p style="font-size:9px;font-weight:800;color:#196B2A;text-transform:uppercase;letter-spacing:.07em;margin:0 0 2px;">Aligned</p>
       <p style="font-size:18px;font-weight:800;color:#196B2A;margin:0;line-height:1;">{{ bbk.totals.aligned }}</p>
-      <p style="font-size:9.5px;color:#666;margin:3px 0 0;">No new action</p>
+      <p class="text-muted-custom-sm">No new action</p>
      </div>
     </div>
    </div>
@@ -222,10 +234,10 @@
     <div style="overflow-x:auto;">
     <table style="width:100%;border-collapse:collapse;font-size:11px;color:#002583;">
      <thead>
-      <tr style="border-bottom:1px solid #E5E8EF;">
-       <th style="text-align:left;padding:5px 6px;font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:#7B8499;">Sev.</th>
-       <th style="text-align:left;padding:5px 6px;font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:#7B8499;">Action</th>
-       <th style="text-align:left;padding:5px 6px;font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:#7B8499;">Detail</th>
+      <tr class="border-b">
+       <th class="th-text">Sev.</th>
+       <th class="th-text">Action</th>
+       <th class="th-text">Detail</th>
       </tr>
      </thead>
      <tbody>
@@ -251,7 +263,7 @@
    {% if bbk.buckets.conflicts or bbk.buckets.unilateral_a or bbk.buckets.unilateral_b %}
    <div style="background:#fff;border:1px solid #E5E8EF;border-radius:12px;padding:14px 18px;height:100%;">
     {% if bbk.buckets.conflicts %}
-    <p style="font-size:10px;font-weight:800;color:#002583;text-transform:uppercase;letter-spacing:.07em;margin:0 0 8px;">Conflicts — escalate to legal</p>
+    <p class="text-uppercase-label-lg">Conflicts — escalate to legal</p>
     {% for r in bbk.buckets.conflicts %}
     <div style="border-left:3px solid #A33;padding:5px 11px;margin-bottom:6px;">
      <p style="font-size:11px;font-weight:700;color:#002583;margin:0;">#{{ r.index }} — {{ r.topic }}</p>
@@ -385,7 +397,7 @@
     {# Three strictness axes — colour-coded chip per value (A=navy, B=amber, Equivalent=green, N/A=grey). #}
     <div style="padding:9px 16px;background:#fafbfd;border-bottom:1px solid #E5E8EF;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
      <div title="Procedural: process / deadlines / form requirements." style="cursor:help;">
-      <p style="font-size:8.5px;font-weight:800;color:#002583;text-transform:uppercase;letter-spacing:.07em;margin:0 0 2px;">Procedural</p>
+      <p class="text-micro">Procedural</p>
       <span style="display:inline-block;padding:2px 8px;border-radius:5px;font-size:11px;font-weight:700;
        {% if o.procedural_stricter == 'A' %}background:#E7ECF7;color:#002583;border:1px solid #5A6BBE;
        {% elif o.procedural_stricter == 'B' %}background:#FCF1DC;color:#7A5500;border:1px solid #E5B45F;
@@ -393,7 +405,7 @@
        {% else %}background:#F0F2F8;color:#7B8499;border:1px solid #D1D7E3;{% endif %}">{{ o.procedural_stricter|default:"N/A" }}</span>
      </div>
      <div title="Substantive: scope / eligibility / what is covered." style="cursor:help;">
-      <p style="font-size:8.5px;font-weight:800;color:#002583;text-transform:uppercase;letter-spacing:.07em;margin:0 0 2px;">Substantive</p>
+      <p class="text-micro">Substantive</p>
       <span style="display:inline-block;padding:2px 8px;border-radius:5px;font-size:11px;font-weight:700;
        {% if o.substantive_stricter == 'A' %}background:#E7ECF7;color:#002583;border:1px solid #5A6BBE;
        {% elif o.substantive_stricter == 'B' %}background:#FCF1DC;color:#7A5500;border:1px solid #E5B45F;
@@ -401,7 +413,7 @@
        {% else %}background:#F0F2F8;color:#7B8499;border:1px solid #D1D7E3;{% endif %}">{{ o.substantive_stricter|default:"N/A" }}</span>
      </div>
      <div title="Enforcement: penalties / regulator powers / sanctions." style="cursor:help;">
-      <p style="font-size:8.5px;font-weight:800;color:#002583;text-transform:uppercase;letter-spacing:.07em;margin:0 0 2px;">Enforcement</p>
+      <p class="text-micro">Enforcement</p>
       <span style="display:inline-block;padding:2px 8px;border-radius:5px;font-size:11px;font-weight:700;
        {% if o.enforcement_stricter == 'A' %}background:#E7ECF7;color:#002583;border:1px solid #5A6BBE;
        {% elif o.enforcement_stricter == 'B' %}background:#FCF1DC;color:#7A5500;border:1px solid #E5B45F;
@@ -414,15 +426,15 @@
 
      {# Side A — navy accents on white-blue tint #}
      <div style="border-left:3px solid #5A6BBE;background:#F7F9FE;border-radius:0 8px 8px 0;padding:10px 12px;">
-      <p style="font-size:9px;font-weight:800;color:#002583;text-transform:uppercase;letter-spacing:.07em;margin:0 0 3px;">
+      <p class="text-uppercase-label">
        <span style="background:#002583;color:#fff;padding:1px 6px;border-radius:3px;margin-right:5px;">A</span>{{ reg_a.jurisdiction|capfirst }} — {{ o.reg_a_citation|truncatechars:60 }}
       </p>
       <p style="font-size:12px;color:#002583;line-height:1.55;margin:0 0 8px;">{{ o.reg_a_requirement|default:"(no requirement extracted)" }}</p>
 
       {% if o.reg_a_evidence %}
       <div style="margin-top:8px;padding:8px 11px;background:#fff;border-left:2px solid #5A6BBE;border-radius:0 6px 6px 0;">
-       <p style="font-size:8.5px;font-weight:800;color:#002583;text-transform:uppercase;letter-spacing:.07em;margin:0 0 3px;">Verbatim quote ({{ o.reg_a_evidence|length }} chars)</p>
-       <p style="font-size:11px;color:#002583;font-style:italic;line-height:1.55;margin:0;">"{{ o.reg_a_evidence }}"</p>
+       <p class="text-micro">Verbatim quote ({{ o.reg_a_evidence|length }} chars)</p>
+       <p class="text-italic-primary">"{{ o.reg_a_evidence }}"</p>
       </div>
       {% endif %}
 
@@ -438,15 +450,15 @@
 
      {# Side B — amber accents on cream tint #}
      <div style="border-left:3px solid #E5B45F;background:#FFFCF4;border-radius:0 8px 8px 0;padding:10px 12px;">
-      <p style="font-size:9px;font-weight:800;color:#002583;text-transform:uppercase;letter-spacing:.07em;margin:0 0 3px;">
+      <p class="text-uppercase-label">
        <span style="background:#FFB800;color:#3F2A00;padding:1px 6px;border-radius:3px;margin-right:5px;">B</span>{{ reg_b.jurisdiction|capfirst }} — {{ o.reg_b_citation|default:"No match"|truncatechars:60 }}
       </p>
       <p style="font-size:12px;color:#002583;line-height:1.55;margin:0 0 8px;">{{ o.reg_b_requirement|default:"(no requirement extracted)" }}</p>
 
       {% if o.reg_b_evidence %}
       <div style="margin-top:8px;padding:8px 11px;background:#fff;border-left:2px solid #E5B45F;border-radius:0 6px 6px 0;">
-       <p style="font-size:8.5px;font-weight:800;color:#002583;text-transform:uppercase;letter-spacing:.07em;margin:0 0 3px;">Verbatim quote ({{ o.reg_b_evidence|length }} chars)</p>
-       <p style="font-size:11px;color:#002583;font-style:italic;line-height:1.55;margin:0;">"{{ o.reg_b_evidence }}"</p>
+       <p class="text-micro">Verbatim quote ({{ o.reg_b_evidence|length }} chars)</p>
+       <p class="text-italic-primary">"{{ o.reg_b_evidence }}"</p>
       </div>
       {% endif %}
 
@@ -462,15 +474,15 @@
     </div>
 
     {% if o.key_difference %}
-    <div style="padding:9px 16px;background:#ffffff;border-top:1px solid #E5E8EF;">
-     <p style="font-size:9px;font-weight:800;color:#002583;text-transform:uppercase;letter-spacing:.07em;margin:0 0 3px;">Key difference</p>
-     <p style="font-size:11.5px;color:#002583;line-height:1.55;margin:0;">{{ o.key_difference }}</p>
+    <div class="footer-bar">
+     <p class="text-uppercase-label">Key difference</p>
+     <p class="text-body-primary">{{ o.key_difference }}</p>
     </div>
     {% endif %}
 
     {% if o.notes %}
-    <div style="padding:9px 16px;background:#ffffff;border-top:1px solid #E5E8EF;">
-     <p style="font-size:9px;font-weight:800;color:#002583;text-transform:uppercase;letter-spacing:.07em;margin:0 0 3px;">Notes</p>
+    <div class="footer-bar">
+     <p class="text-uppercase-label">Notes</p>
      <p style="font-size:11px;color:#002583;line-height:1.55;margin:0;">{{ o.notes }}</p>
     </div>
     {% endif %}
@@ -483,12 +495,12 @@
     <button type="button"
             @click="idx = (idx - 1 + total) % total"
             :disabled="total <= 1"
-            style="background:#fff;border:1px solid #E5E8EF;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;color:#002583;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:inherit;"
+            class="btn-card"
             :style="total <= 1 ? 'opacity:0.4;cursor:not-allowed;' : ''">
      <span style="font-size:14px;line-height:1;">←</span> Prev
     </button>
 
-    <div style="display:flex;align-items:center;gap:8px;">
+    <div class="flex-center-gap-md">
      <span style="font-size:11px;font-weight:700;color:#002583;">
       Obligation <span x-text="idx + 1"></span> / {{ report.obligations|length }}
      </span>
@@ -506,7 +518,7 @@
     <button type="button"
             @click="idx = (idx + 1) % total"
             :disabled="total <= 1"
-            style="background:#fff;border:1px solid #E5E8EF;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;color:#002583;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:inherit;"
+            class="btn-card"
             :style="total <= 1 ? 'opacity:0.4;cursor:not-allowed;' : ''">
      Next <span style="font-size:14px;line-height:1;">→</span>
     </button>
@@ -550,24 +562,24 @@
  {# ── Charts tab ───────────────────────────────────────────────────────── #}
  <div x-show="tab === 'charts'" x-cloak>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-   <div style="background:#fff;border:1px solid #E5E8EF;border-radius:12px;padding:14px 18px;">
-    <p style="font-size:10px;font-weight:800;color:#002583;text-transform:uppercase;letter-spacing:.07em;margin:0 0 8px;">Confidence distribution</p>
-    <p style="font-size:11px;color:#666;margin:0 0 10px;">How sure the model is about each row's classification + citations.</p>
+   <div class="card card-pad">
+    <p class="text-uppercase-label-lg">Confidence distribution</p>
+    <p class="text-muted-custom">How sure the model is about each row's classification + citations.</p>
     <canvas id="chart-confidence" height="180"></canvas>
    </div>
-   <div style="background:#fff;border:1px solid #E5E8EF;border-radius:12px;padding:14px 18px;">
-    <p style="font-size:10px;font-weight:800;color:#002583;text-transform:uppercase;letter-spacing:.07em;margin:0 0 8px;">AI risk distribution</p>
-    <p style="font-size:11px;color:#666;margin:0 0 10px;">NLI hallucination risk per row (0 = entailed by chunks, 1 = unsupported).</p>
+   <div class="card card-pad">
+    <p class="text-uppercase-label-lg">AI risk distribution</p>
+    <p class="text-muted-custom">NLI hallucination risk per row (0 = entailed by chunks, 1 = unsupported).</p>
     <canvas id="chart-risk" height="180"></canvas>
    </div>
-   <div style="background:#fff;border:1px solid #E5E8EF;border-radius:12px;padding:14px 18px;">
-    <p style="font-size:10px;font-weight:800;color:#002583;text-transform:uppercase;letter-spacing:.07em;margin:0 0 8px;">Strictness by axis</p>
-    <p style="font-size:11px;color:#666;margin:0 0 10px;">Who's stricter, broken out across procedural / substantive / enforcement.</p>
+   <div class="card card-pad">
+    <p class="text-uppercase-label-lg">Strictness by axis</p>
+    <p class="text-muted-custom">Who's stricter, broken out across procedural / substantive / enforcement.</p>
     <canvas id="chart-strictness" height="180"></canvas>
    </div>
-   <div style="background:#fff;border:1px solid #E5E8EF;border-radius:12px;padding:14px 18px;">
-    <p style="font-size:10px;font-weight:800;color:#002583;text-transform:uppercase;letter-spacing:.07em;margin:0 0 8px;">Equivalence breakdown</p>
-    <p style="font-size:11px;color:#666;margin:0 0 10px;">How obligations were classified — equivalent vs different vs only-in-one.</p>
+   <div class="card card-pad">
+    <p class="text-uppercase-label-lg">Equivalence breakdown</p>
+    <p class="text-muted-custom">How obligations were classified — equivalent vs different vs only-in-one.</p>
     <canvas id="chart-equivalence" height="180"></canvas>
    </div>
   </div>

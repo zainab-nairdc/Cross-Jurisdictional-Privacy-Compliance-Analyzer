@@ -1312,7 +1312,12 @@ class ObligationMappingTransitionView(View):
             pass
 
         from django.template.loader import render_to_string
-        html = render_to_string('partials/_review_mapping_card.html', {'item': obj})
+        ctx = {
+            'item': obj,
+            'previous_lifecycle': old_lifecycle,
+            'show_undo_toast': action in ('approved', 'rejected'),
+        }
+        html = render_to_string('partials/_review_mapping_card.html', ctx)
         return HttpResponse(html)
 
 

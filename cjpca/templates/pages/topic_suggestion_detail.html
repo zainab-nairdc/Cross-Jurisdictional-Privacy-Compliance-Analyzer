@@ -173,11 +173,11 @@
      {% csrf_token %}
      <input type="hidden" name="action" value="approve">
      <div>
-      <label style="font-size:10px;font-weight:700;color:#6B7280;">Name</label>
+      <label class="text-semibold">Name</label>
       <input name="name" class="sd-in" style="width:100%;" value="{{ suggestion.proposed_name }}">
      </div>
      <div>
-      <label style="font-size:10px;font-weight:700;color:#6B7280;">Parent topic (blank = new top-level)</label>
+      <label class="text-semibold">Parent topic (blank = new top-level)</label>
       <select name="parent_topic" class="sd-in" style="width:100%;">
        <option value="">— new top-level topic —</option>
        {% for t in topic_options %}{% if t.depth == 0 %}
@@ -186,11 +186,11 @@
       </select>
      </div>
      <div>
-      <label style="font-size:10px;font-weight:700;color:#6B7280;">Subcategory tag (optional)</label>
+      <label class="text-semibold">Subcategory tag (optional)</label>
       <input name="subcategory" class="sd-in" style="width:100%;" value="{{ suggestion.proposed_subcategory }}">
      </div>
      <div>
-      <label style="font-size:10px;font-weight:700;color:#6B7280;">Note</label>
+      <label class="text-semibold">Note</label>
       <input name="note" class="sd-in" style="width:100%;" placeholder="why this is genuinely new">
      </div>
      <div style="grid-column:1 / -1;">

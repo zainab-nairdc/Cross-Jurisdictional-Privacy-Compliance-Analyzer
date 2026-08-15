@@ -65,7 +65,7 @@
   <div style="background:#fff;border:1px solid #E5E8EF;border-radius:10px;overflow:hidden;margin-bottom:16px;">
    {% for s in suggestions %}
     <a class="ts-row" href="{% url 'library-topic-suggestion-detail' s.pk %}">
-     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+     <div class="flex-center-wrap">
       <span style="font-size:13px;font-weight:700;color:#002583;">{{ s.proposed_name }}</span>
       <span class="ts-badge s-{{ s.status }}">{{ s.get_status_display }}</span>
       {% if s.origin == 'human' %}<span class="ts-badge s-active">manual</span>{% endif %}
@@ -101,11 +101,11 @@
          style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:start;">
     {% csrf_token %}
     <div>
-     <label style="font-size:10px;font-weight:700;color:#6B7280;">Topic name</label>
+     <label class="text-semibold">Topic name</label>
      <input name="name" class="ts-in" placeholder="e.g. Automated decision-making" required>
     </div>
     <div>
-     <label style="font-size:10px;font-weight:700;color:#6B7280;">Parent topic (leave blank for a new top-level topic)</label>
+     <label class="text-semibold">Parent topic (leave blank for a new top-level topic)</label>
      <select name="parent_topic" class="ts-in">
       <option value="">— new top-level topic —</option>
       {% for t in topic_options %}{% if t.depth == 0 %}
@@ -114,15 +114,15 @@
      </select>
     </div>
     <div>
-     <label style="font-size:10px;font-weight:700;color:#6B7280;">Subcategory tag (optional)</label>
+     <label class="text-semibold">Subcategory tag (optional)</label>
      <input name="subcategory" class="ts-in" placeholder="e.g. adm_register">
     </div>
     <div>
-     <label style="font-size:10px;font-weight:700;color:#6B7280;">Why the current taxonomy is insufficient</label>
+     <label class="text-semibold">Why the current taxonomy is insufficient</label>
      <input name="why_insufficient" class="ts-in" placeholder="which topics you considered and why they fall short">
     </div>
     <div style="grid-column:1 / -1;">
-     <label style="font-size:10px;font-weight:700;color:#6B7280;">What this concept is</label>
+     <label class="text-semibold">What this concept is</label>
      <input name="reason" class="ts-in" placeholder="one sentence">
     </div>
     <div style="grid-column:1 / -1;">

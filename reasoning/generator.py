@@ -51,10 +51,18 @@ def _build_ollama_llm():
         base_url        = cfg.llm.fallback_base_url,
         format          = "json",
         num_ctx         = cfg.llm.fallback_num_ctx,
-        request_timeout = cfg.llm.timeout_sec,
         num_predict     = cfg.llm.max_tokens,
-        # Keep the model resident in GPU VRAM for 30 min between calls. Without
-        # this, Ollama unloads after ~5 min idle and the next request pays a
+        # The timeout MUST go through client_kwargs. ChatOllama is a pydantic
+        # model with extra='ignore', so an unknown kwarg (this used to be
+        # `request_timeout=`) is silently DISCARDED — no error, no warning, and
+        # no timeout. A generation could then run unbounded: on CPU-only
+        # inference a num_predict=8000 call takes tens of minutes, which is
+        # what made comparison runs look hung with no way to interrupt them.
+        # client_kwargs is forwarded to the underlying ollama.Client, where
+        # `timeout` is a real parameter.
+        client_kwargs   = {"timeout": cfg.llm.timeout_sec},
+        # Keep the model resident for 30 min between calls. Without this,
+        # Ollama unloads after ~5 min idle and the next request pays a
         # 10-15s reload that can blow the request timeout mid-demo.
         keep_alive      = "30m",
     )

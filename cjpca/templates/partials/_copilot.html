@@ -33,7 +33,7 @@
          if (val) this.sources = [];                  // a specific document clears country sources
        }
      }"
-     x-init="$watch('mode', v => localStorage.setItem('copilot_mode', v))">
+      x-init="localStorage.getItem('copilot_mode') && (mode = localStorage.getItem('copilot_mode')); $watch('mode', v => localStorage.setItem('copilot_mode', v))">
 
  {# ── Fullscreen shell: history sidebar + chat column ─────────────────── #}
  <div class="cp-shell">
@@ -109,14 +109,16 @@
  {# Compact toolbar — mode segmented control (scope chip sits in the row below in Document Q&A) #}
  <div style="padding:9px 16px;border-bottom:1px solid #E5E8EF;flex-shrink:0;background:#fff;display:flex;align-items:center;gap:10px;">
   <div style="display:inline-flex;gap:3px;background:#F4F6FB;border-radius:999px;padding:3px;border:1px solid #E5E8EF;">
-   <button type="button" @click="mode = 'approved'"
-           :class="mode === 'approved' ? 'cp-mode cp-mode-active' : 'cp-mode'">
-    Approved
-   </button>
-   <button type="button" @click="mode = 'document'"
-           :class="mode === 'document' ? 'cp-mode cp-mode-active' : 'cp-mode'">
-    Document Q&amp;A
-   </button>
+    <button type="button" @click="mode = 'approved'"
+            :class="mode === 'approved' ? 'cp-mode cp-mode-active' : 'cp-mode'"
+            title="Answers grounded in reviewer-approved comparison results">
+     Approved
+    </button>
+    <button type="button" @click="mode = 'document'"
+            :class="mode === 'document' ? 'cp-mode cp-mode-active' : 'cp-mode'"
+            title="Answers grounded in a specific document you select">
+     Document Q&amp;A
+    </button>
   </div>
   <span x-show="mode === 'document'" x-cloak style="font-size:10.5px;color:#94A3B8;">Grounded in the document you pick below</span>
  </div>
@@ -404,8 +406,16 @@
  .cp-cite-draft { border-color:#FFE0A6; color:#B07A00; background:#FFF6E0; }
  .cp-cite-clickable { transition:background .12s,border-color .12s; }
  .cp-cite-clickable:hover { background:#EEF2FB; border-color:#B9C8EC; }
- .cp-act-btn { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:7px; border:none; background:none; color:#94A3B8; cursor:pointer; transition:background .1s,color .1s; }
- .cp-act-btn:hover { background:#EEF2FB; color:#002583; }
+  .cp-act-btn { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:7px; border:none; background:none; color:#94A3B8; cursor:pointer; transition:background .1s,color .1s; position:relative; }
+  .cp-act-btn:hover { background:#EEF2FB; color:#002583; }
+  .cp-fb-btn { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:7px; border:none; background:none; color:#94A3B8; cursor:pointer; transition:background .1s,color .1s; position:relative; }
+  .cp-fb-btn:hover { background:#EEF2FB; color:#002583; }
+  .cp-fb-btn.fb-up { color:#16A34A; background:#EAF7EE; }
+  .cp-fb-btn.fb-down { color:#DC2626; background:#FCE8E8; }
+  .cp-fb-btn.fb-up:hover { background:#D1F2D9; }
+  .cp-fb-btn.fb-down:hover { background:#FBD5D5; }
+  .cp-fb-btn::after { content: attr(data-label); position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%) scale(0.8); padding: 3px 8px; border-radius: 5px; background: #1F2937; color: #fff; font-size: 10px; font-weight: 600; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .15s, transform .15s; z-index: 5; }
+  .cp-fb-btn:hover::after { opacity: 1; transform: translateX(-50%) scale(1); }
 
  /* Sources button in the input bar — layout lives in the class so Alpine's
     :style highlight (bg/border/color only) can't wipe the flex row. */
@@ -606,19 +616,51 @@
    saveHistory();
  };
 
- window.cpOnError = function(evt) {
-   removeTypingBubble();
-   const m = document.getElementById('cp-messages');
-   if (m) {
-     const div = document.createElement('div');
-     div.className = 'flex gap-2';
-     div.innerHTML =
-       '<div class="flex-1 bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs text-red-700">'
-       + 'Could not reach Copilot. Try again in a moment.'
-       + '</div>';
-     m.appendChild(div);
-   }
- };
+  window.cpOnError = function(evt) {
+    removeTypingBubble();
+    const m = document.getElementById('cp-messages');
+    if (m) {
+      const div = document.createElement('div');
+      div.className = 'flex gap-2';
+      div.innerHTML =
+        '<div class="flex-1 bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs text-red-700">'
+        + 'Could not reach Copilot. Try again in a moment.'
+        + '</div>';
+      m.appendChild(div);
+    }
+  };
+
+  window.cpFeedback = function(btn) {
+    const bubble = btn.closest('[data-cp-ai]');
+    if (!bubble) return;
+    const message_id = bubble.dataset.messageId || '';
+    const chunk_ids = (bubble.dataset.chunkIds || '').split(',').filter(Boolean);
+    const user_message = bubble.querySelector('[data-user-msg]')?.textContent?.trim() || '';
+    const feedback = btn.dataset.fb;
+    if (!message_id || !feedback) return;
+
+    const csrf = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+    const fd = new FormData();
+    fd.append('message_id', message_id);
+    fd.append('user_message', user_message);
+    fd.append('feedback', feedback);
+    chunk_ids.forEach(id => fd.append('chunk_ids', id));
+
+    btn.disabled = true;
+    fetch('{% url "copilot-feedback" %}', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': csrf },
+      body: fd,
+      credentials: 'same-origin',
+    }).then(r => {
+      btn.disabled = false;
+      if (!r.ok) return;
+      bubble.querySelectorAll('.cp-fb-btn').forEach(b => b.classList.remove('fb-up', 'fb-down'));
+      btn.classList.add(feedback === 'up' ? 'fb-up' : 'fb-down');
+    }).catch(() => {
+      btn.disabled = false;
+    });
+  };
 
  // ── Multi-conversation history (ChatGPT-style) ──────────────────────────
  const CONV_KEY = 'cp_conversations_v1';

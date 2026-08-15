@@ -130,7 +130,7 @@
 
    {# Header #}
    <div style="padding:17px 22px 14px;border-bottom:1px solid #EEF1F7;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
-    <p style="font-size:15px;font-weight:800;color:#0F172A;margin:0;">Filter documents</p>
+    <p class="text-display">Filter documents</p>
     <button @click="filtersOpen=false" aria-label="Close"
       style="width:30px;height:30px;border-radius:8px;border:none;background:#F4F6FB;color:#5A6685;cursor:pointer;display:flex;align-items:center;justify-content:center;"
       onmouseover="this.style.background='#E9EDF5'" onmouseout="this.style.background='#F4F6FB'">
@@ -141,24 +141,24 @@
    {# Body — one section per filter dimension #}
    <div style="flex:1;overflow-y:auto;padding:18px 22px;display:flex;flex-direction:column;gap:20px;">
     <div>
-     <p style="font-size:10px;font-weight:800;color:#94A0B8;text-transform:uppercase;letter-spacing:.06em;margin:0 0 9px;">Jurisdiction</p>
-     <div style="display:flex;flex-wrap:wrap;gap:8px;">
+     <p class="text-uppercase-label-muted">Jurisdiction</p>
+     <div class="flex-wrap">
       <template x-for="f in jurFilters" :key="f.val">
        <button @click="jurFilter = f.val; selectedDoc = null" class="f-chip" :class="jurFilter === f.val ? 'on' : ''" x-text="f.label"></button>
       </template>
      </div>
     </div>
     <div>
-     <p style="font-size:10px;font-weight:800;color:#94A0B8;text-transform:uppercase;letter-spacing:.06em;margin:0 0 9px;">Type</p>
-     <div style="display:flex;flex-wrap:wrap;gap:8px;">
+     <p class="text-uppercase-label-muted">Type</p>
+     <div class="flex-wrap">
       <template x-for="t in typeFilters" :key="t.val">
        <button @click="typeFilter = (typeFilter === t.val ? 'all' : t.val); selectedDoc = null" class="f-chip" :class="typeFilter === t.val ? 'on' : ''" x-text="t.label"></button>
       </template>
      </div>
     </div>
     <div x-show="categoryFilters.length > 1">
-     <p style="font-size:10px;font-weight:800;color:#94A0B8;text-transform:uppercase;letter-spacing:.06em;margin:0 0 9px;">Category</p>
-     <div style="display:flex;flex-wrap:wrap;gap:8px;">
+     <p class="text-uppercase-label-muted">Category</p>
+     <div class="flex-wrap">
       <template x-for="cf in categoryFilters" :key="cf.val">
        <button @click="categoryFilter = cf.val; selectedDoc = null" class="f-chip" :class="categoryFilter === cf.val ? 'on' : ''" x-text="cf.label"></button>
       </template>
@@ -166,8 +166,8 @@
     </div>
     {# Version status — in force / upcoming / superseded, from Document.version_status #}
     <div>
-     <p style="font-size:10px;font-weight:800;color:#94A0B8;text-transform:uppercase;letter-spacing:.06em;margin:0 0 9px;">Version status</p>
-     <div style="display:flex;flex-wrap:wrap;gap:8px;">
+     <p class="text-uppercase-label-muted">Version status</p>
+     <div class="flex-wrap">
       <template x-for="v in versionFilters" :key="v.val">
        <button @click="versionFilter = v.val; selectedDoc = null" class="f-chip" :class="versionFilter === v.val ? 'on' : ''" x-text="v.label"></button>
       </template>
@@ -290,7 +290,7 @@
  <template x-if="selectedDoc?.status === 'failed'">
  <div style="padding:12px 13px;border-radius:10px;background:#FEF3F2;border:1px solid #FBCBC6;">
  <div style="display:flex;align-items:flex-start;gap:8px;">
- <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#D92D20" stroke-width="2" style="flex-shrink:0;margin-top:1px;"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+ <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#D92D20" stroke-width="2" class="flex-shrink-0 mt-1"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
  <div style="min-width:0;flex:1;">
  <p style="font-size:10px;font-weight:800;color:#B42318;text-transform:uppercase;letter-spacing:.05em;">Needs attention — upload issue</p>
  <p style="font-size:11.5px;color:#7A271A;line-height:1.5;margin-top:3px;" x-text="selectedDoc?.attention?.summary"></p>
@@ -312,7 +312,7 @@
  {# Superseded badge — pin to top so analysts don't miss it #}
  <template x-if="selectedDoc?.superseded">
  <div style="padding:8px 10px;border-radius:8px;background:#ffffff;border:1px solid #002583;display:flex;align-items:flex-start;gap:6px;">
- <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="2" style="flex-shrink:0;margin-top:1px;">
+ <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="2" class="flex-shrink-0 mt-1">
  <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
  </svg>
  <div style="min-width:0;">
@@ -330,20 +330,20 @@
  <col>
  </colgroup>
  <tbody>
- <tr style="border-bottom:1px solid #EEF1F7;">
- <td style="padding:6px 0;font-size:10px;color:#7B8499;vertical-align:middle;">Status</td>
+ <tr class="border-b-light">
+ <td class="text-muted-middle">Status</td>
  <td style="padding:6px 0;vertical-align:middle;">
  <span x-show="selectedDoc?.status === 'indexed'" style="font-size:10.5px;font-weight:600;color:#1B7F3A;">Ready to use</span>
  <span x-show="selectedDoc?.status === 'processing'" style="font-size:10.5px;font-weight:600;color:#B07A00;" class="animate-pulse">Getting ready…</span>
  <span x-show="selectedDoc?.status === 'failed'" style="font-size:10.5px;font-weight:600;color:#D93939;">Upload issue</span>
  </td>
  </tr>
- <tr x-show="selectedDoc?.regulation_category" style="border-bottom:1px solid #EEF1F7;">
- <td style="padding:6px 0;font-size:10px;color:#7B8499;vertical-align:middle;">Category</td>
+ <tr x-show="selectedDoc?.regulation_category" class="border-b-light">
+ <td class="text-muted-middle">Category</td>
  <td style="padding:6px 0;font-size:10.5px;vertical-align:middle;word-break:break-word;text-transform:capitalize;" :style="selectedDoc?.regulation_category ? 'color:#14213D;' : 'color:#B8C0D0;'" x-text="selectedDoc?.regulation_category || '—'"></td>
  </tr>
- <tr x-show="selectedDoc?.privacy_relevance" style="border-bottom:1px solid #EEF1F7;">
- <td style="padding:6px 0;font-size:10px;color:#7B8499;vertical-align:middle;">Privacy relevance</td>
+ <tr x-show="selectedDoc?.privacy_relevance" class="border-b-light">
+ <td class="text-muted-middle">Privacy relevance</td>
  <td style="padding:6px 0;line-height:1;vertical-align:middle;">
  <span x-show="selectedDoc?.privacy_relevance" :class="'rel-pill rel-pill-' + (selectedDoc?.privacy_relevance || 'none')">
  <span class="rel-dot"></span><span x-text="selectedDoc?.privacy_relevance"></span>
@@ -351,16 +351,16 @@
  <span x-show="!selectedDoc?.privacy_relevance" style="font-size:10.5px;color:#B8C0D0;">—</span>
  </td>
  </tr>
- <tr x-show="selectedDoc?.issuing_authority" style="border-bottom:1px solid #EEF1F7;">
- <td style="padding:6px 0;font-size:10px;color:#7B8499;vertical-align:middle;">Issued by</td>
- <td style="padding:6px 0;font-size:10.5px;vertical-align:middle;word-break:break-word;" :style="selectedDoc?.issuing_authority ? 'color:#14213D;' : 'color:#B8C0D0;'" x-text="selectedDoc?.issuing_authority || '—'"></td>
+ <tr x-show="selectedDoc?.issuing_authority" class="border-b-light">
+ <td class="text-muted-middle">Issued by</td>
+ <td class="text-cell" :style="selectedDoc?.issuing_authority ? 'color:#14213D;' : 'color:#B8C0D0;'" x-text="selectedDoc?.issuing_authority || '—'"></td>
  </tr>
- <tr x-show="selectedDoc?.section_identifiers" style="border-bottom:1px solid #EEF1F7;">
- <td style="padding:6px 0;font-size:10px;color:#7B8499;vertical-align:middle;">Articles</td>
- <td style="padding:6px 0;font-size:10.5px;vertical-align:middle;word-break:break-word;" :style="selectedDoc?.section_identifiers ? 'color:#14213D;' : 'color:#B8C0D0;'" x-text="selectedDoc?.section_identifiers || '—'"></td>
+ <tr x-show="selectedDoc?.section_identifiers" class="border-b-light">
+ <td class="text-muted-middle">Articles</td>
+ <td class="text-cell" :style="selectedDoc?.section_identifiers ? 'color:#14213D;' : 'color:#B8C0D0;'" x-text="selectedDoc?.section_identifiers || '—'"></td>
  </tr>
  <tr x-show="selectedDoc?.chunk_count">
- <td style="padding:6px 0;font-size:10px;color:#7B8499;vertical-align:middle;">Sections</td>
+ <td class="text-muted-middle">Sections</td>
  <td style="padding:6px 0;font-size:10.5px;vertical-align:middle;" :style="selectedDoc?.chunk_count ? 'color:#14213D;' : 'color:#B8C0D0;'" x-text="selectedDoc?.chunk_count || '—'"></td>
  </tr>
  </tbody>
@@ -404,7 +404,7 @@
 
  {# View structure — Legal-Node hierarchy #}
  <button @click="openStructure(selectedDoc?.id)"
- style="display:flex;align-items:center;justify-content:center;gap:6px;padding:7px;border-radius:7px;border:1px solid #E5E8EF;color:#002583;font-size:11px;font-weight:500;background:#fff;cursor:pointer;width:100%;">
+ class="btn-block">
  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg>
  View structure
  </button>
@@ -414,7 +414,7 @@
  :title="comparisonReady ? 'Open the comparison picker with this document as Regulation A' : 'Only indexed documents can be compared'"
  {# object form, not a string: a string :style sets cssText and wipes the static style below #}
  :style="comparisonReady ? {} : { opacity: '.5', pointerEvents: 'none' }"
- style="display:flex;align-items:center;justify-content:center;gap:6px;padding:7px;border-radius:7px;border:1px solid #E5E8EF;color:#002583;font-size:11px;font-weight:500;text-decoration:none;background:#fff;">
+ class="btn-link-block">
  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
  <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/>
  </svg>
@@ -424,7 +424,7 @@
  {# Download original #}
  <template x-if="selectedDoc?.file_url">
  <a :href="selectedDoc.file_url" target="_blank" rel="noopener"
- style="display:flex;align-items:center;justify-content:center;gap:6px;padding:7px;border-radius:7px;border:1px solid #E5E8EF;color:#002583;font-size:11px;font-weight:500;text-decoration:none;background:#fff;">
+ class="btn-link-block">
  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
  <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M12 3v13.5m0 0l-3.75-3.75M12 16.5l3.75-3.75"/>
  </svg>
@@ -435,7 +435,7 @@
  {# Delete — admin only; opens a styled confirmation (no native browser popup) #}
  {% if is_admin %}
  <button type="button" @click="openDeleteConfirm()"
- style="display:flex;align-items:center;justify-content:center;gap:6px;padding:7px;border-radius:7px;border:1px solid #E5E8EF;color:#002583;font-size:11px;font-weight:500;background:#fff;cursor:pointer;width:100%;">
+ class="btn-block">
  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
  <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/>
  </svg>
@@ -458,7 +458,7 @@
      <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#D92D20" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/></svg>
     </span>
     <div style="min-width:0;">
-     <p style="font-size:15px;font-weight:800;color:#0F172A;margin:0;">Delete this document?</p>
+     <p class="text-display">Delete this document?</p>
      <p style="font-size:12.5px;color:#667085;line-height:1.5;margin:6px 0 0;"><b style="color:#14213D;" x-text="selectedDoc?.name"></b> will be permanently removed from the library, along with its indexed content. This can’t be undone.</p>
     </div>
    </div>
@@ -472,8 +472,8 @@
      <label class="del-opt" :style="learningMode==='keep' ? { borderColor: '#002583', background: '#F5F7FE' } : {}">
       <input type="radio" name="learning_mode" value="keep" x-model="learningMode" style="margin-top:2px;accent-color:#002583;">
       <span>
-       <b style="font-size:12.5px;color:#14213D;">Keep what it learned</b>
-       <span style="display:block;font-size:11.5px;color:#667085;line-height:1.5;margin-top:2px;">
+       <b class="text-heading-dark">Keep what it learned</b>
+       <span class="text-help">
         Approved exemplars keep steering future comparisons, and reviewer decisions stay in the audit trail, marked as coming from a deleted source.
        </span>
       </span>
@@ -481,8 +481,8 @@
      <label class="del-opt" :style="learningMode==='purge' ? { borderColor: '#D92D20', background: '#FEF6F5' } : {}">
       <input type="radio" name="learning_mode" value="purge" x-model="learningMode" style="margin-top:2px;accent-color:#D92D20;">
       <span>
-       <b style="font-size:12.5px;color:#14213D;">Remove everything</b>
-       <span style="display:block;font-size:11.5px;color:#667085;line-height:1.5;margin-top:2px;">
+       <b class="text-heading-dark">Remove everything</b>
+       <span class="text-help">
         Deletes
         <b x-text="(selectedDoc?.learned_signals ?? 0) + ' reviewer decision' + ((selectedDoc?.learned_signals ?? 0) === 1 ? '' : 's')"></b>
         and
@@ -563,7 +563,7 @@
    <div style="flex:1;overflow-y:auto;padding:22px 24px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:26px;align-items:start;">
 
     {# Left: facts + scope + concepts #}
-    <div style="min-width:0;display:flex;flex-direction:column;gap:22px;">
+    <div class="col-stack gap-4">
      <div>
       <p class="dm-sec">Details</p>
       <dl style="margin:0;">
@@ -594,7 +594,7 @@
     </div>
 
     {# Right: version management + refs/notes #}
-    <div style="min-width:0;display:flex;flex-direction:column;gap:22px;">
+    <div class="col-stack gap-4">
      {% if is_admin %}
      <div>
       <p class="dm-sec">Version</p>
@@ -641,11 +641,11 @@
      {% endif %}
      <div x-show="selectedDoc?.cross_references">
       <p class="dm-sec">Cross-references</p>
-      <p style="font-size:12.5px;line-height:1.6;color:#3A4560;margin:0;" x-text="selectedDoc?.cross_references"></p>
+      <p class="text-body-secondary" x-text="selectedDoc?.cross_references"></p>
      </div>
      <div x-show="selectedDoc?.notes">
       <p class="dm-sec">Notes</p>
-      <p style="font-size:12.5px;line-height:1.6;color:#3A4560;margin:0;" x-text="selectedDoc?.notes"></p>
+      <p class="text-body-secondary" x-text="selectedDoc?.notes"></p>
      </div>
     </div>
    </div>
@@ -680,7 +680,7 @@
  </div>
  {# HTMX-loaded viewer body #}
  <div id="doc-viewer-body" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;">
- <div style="display:flex;align-items:center;justify-content:center;height:100%;gap:8px;color:#002583;">
+ <div class="flex-center-full gap-2">
  <div style="width:18px;height:18px;border:2px solid #E5E8EF;border-top-color:#002583;border-radius:50%;animation:viewer-spin .7s linear infinite;"></div>
  <span style="font-size:11px;">Loading…</span>
  </div>
@@ -1121,7 +1121,7 @@ function closeStructure() {
 function closeViewer() {
  document.getElementById('doc-viewer-modal').style.display = 'none';
  document.getElementById('doc-viewer-body').innerHTML =
- '<div style="display:flex;align-items:center;justify-content:center;height:100%;gap:8px;color:#002583;">' +
+ '<div class="flex-center-full gap-2">' +
  '<div style="width:18px;height:18px;border:2px solid #E5E8EF;border-top-color:#002583;border-radius:50%;animation:viewer-spin .7s linear infinite;"></div>' +
  '<span style="font-size:11px;">Loading\u2026</span></div>';
 }
@@ -1182,10 +1182,10 @@ function regsPage_filterTopic(topicId) {
  <input x-model="item.name" :placeholder="item.file.name"
  style="flex:1;font-size:11px;border:none;outline:none;color:#002583;min-width:0;"
  title="Editable document name">
- <span style="font-size:9px;color:#002583;flex-shrink:0;" x-text="formatSize(item.file.size)"></span>
- <span x-show="item.status==='uploading'" style="font-size:9px;color:#002583;flex-shrink:0;">Uploading…</span>
- <span x-show="item.status==='done'" style="font-size:9px;color:#002583;flex-shrink:0;">✓ Done</span>
- <span x-show="item.status==='error'" style="font-size:9px;color:#002583;flex-shrink:0;">Failed</span>
+ <span class="text-2xs-primary-shrink" x-text="formatSize(item.file.size)"></span>
+ <span x-show="item.status==='uploading'" class="text-2xs-primary-shrink">Uploading…</span>
+ <span x-show="item.status==='done'" class="text-2xs-primary-shrink">✓ Done</span>
+ <span x-show="item.status==='error'" class="text-2xs-primary-shrink">Failed</span>
  <button x-show="item.status==='pending'" @click="removeFromQueue(idx)"
  style="background:none;border:none;cursor:pointer;color:#ffffff;font-size:16px;line-height:1;flex-shrink:0;">&times;</button>
  </div>
@@ -1195,10 +1195,10 @@ function regsPage_filterTopic(topicId) {
 
  {# Shared metadata #}
  <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#002583;margin-bottom:10px;">Shared metadata (applies to all files)</p>
- <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+ <div class="grid-2">
  <div>
- <label style="display:block;font-size:10px;font-weight:600;color:#002583;margin-bottom:4px;">Jurisdiction <span style="color:#002583;">*</span></label>
- <select x-model="shared.jurisdiction" style="width:100%;border:1px solid #E5E8EF;border-radius:7px;padding:6px 8px;font-size:11px;color:#002583;outline:none;">
+ <label class="text-block-label">Jurisdiction <span style="color:#002583;">*</span></label>
+ <select x-model="shared.jurisdiction" class="input-sm">
  <option value="">— Select —</option>
  <option value="bahrain">Bahrain</option>
  <option value="india">India</option>
@@ -1208,46 +1208,46 @@ function regsPage_filterTopic(topicId) {
  </select>
  </div>
  <div>
- <label style="display:block;font-size:10px;font-weight:600;color:#002583;margin-bottom:4px;">Language</label>
- <select x-model="shared.language" style="width:100%;border:1px solid #E5E8EF;border-radius:7px;padding:6px 8px;font-size:11px;color:#002583;outline:none;">
+ <label class="text-block-label">Language</label>
+ <select x-model="shared.language" class="input-sm">
  <option value="en">English</option>
  <option value="ar">Arabic</option>
  </select>
  </div>
  <div>
- <label style="display:block;font-size:10px;font-weight:600;color:#002583;margin-bottom:4px;">Effective date <span style="color:#002583;">*</span></label>
+ <label class="text-block-label">Effective date <span style="color:#002583;">*</span></label>
  <input type="date" x-model="shared.effective_date"
- style="width:100%;border:1px solid #E5E8EF;border-radius:7px;padding:6px 8px;font-size:11px;color:#002583;outline:none;">
+ class="input-sm">
  <p x-show="effectiveDateHint" x-cloak x-text="effectiveDateHint"
  style="display:flex;align-items:center;gap:4px;margin:4px 0 0;font-size:10px;font-weight:600;color:#B07A00;"></p>
  </div>
  </div>
  <div style="margin-bottom:10px;">
- <label style="display:block;font-size:10px;font-weight:600;color:#002583;margin-bottom:4px;">Issuing authority <span style="color:#002583;">*</span></label>
+ <label class="text-block-label">Issuing authority <span style="color:#002583;">*</span></label>
  <input type="text" x-model="shared.issuing_authority" placeholder="e.g. Central Bank of Bahrain"
- style="width:100%;border:1px solid #E5E8EF;border-radius:7px;padding:6px 8px;font-size:11px;color:#002583;outline:none;">
+ class="input-sm">
  </div>
  <div style="margin-bottom:10px;">
- <label style="display:block;font-size:10px;font-weight:600;color:#002583;margin-bottom:4px;">Full / official name <span style="color:#002583;">*</span></label>
+ <label class="text-block-label">Full / official name <span style="color:#002583;">*</span></label>
  <textarea x-model="shared.full_name" rows="2" placeholder="e.g. Qatar PDPL — Law No. 13 of 2016 (becomes the citation title — keep it short)"
- style="width:100%;border:1px solid #E5E8EF;border-radius:7px;padding:6px 8px;font-size:11px;color:#002583;outline:none;resize:none;"></textarea>
+ class="input-area"></textarea>
  </div>
- <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+ <div class="grid-2">
  <div>
- <label style="display:block;font-size:10px;font-weight:600;color:#002583;margin-bottom:4px;">Version / year</label>
+ <label class="text-block-label">Version / year</label>
  <input type="text" x-model="shared.version" placeholder="e.g. 2024"
- style="width:100%;border:1px solid #E5E8EF;border-radius:7px;padding:6px 8px;font-size:11px;color:#002583;outline:none;">
+ class="input-sm">
  </div>
  <div>
- <label style="display:block;font-size:10px;font-weight:600;color:#002583;margin-bottom:4px;">Source URL</label>
+ <label class="text-block-label">Source URL</label>
  <input type="url" x-model="shared.source_url" placeholder="https://…"
- style="width:100%;border:1px solid #E5E8EF;border-radius:7px;padding:6px 8px;font-size:11px;color:#002583;outline:none;">
+ class="input-sm">
  </div>
  </div>
  <div style="margin-bottom:4px;">
- <label style="display:block;font-size:10px;font-weight:600;color:#002583;margin-bottom:4px;">Internal notes</label>
+ <label class="text-block-label">Internal notes</label>
  <textarea x-model="shared.notes" rows="2"
- style="width:100%;border:1px solid #E5E8EF;border-radius:7px;padding:6px 8px;font-size:11px;color:#002583;outline:none;resize:none;"></textarea>
+ class="input-area"></textarea>
  </div>
 
  {# Error message #}

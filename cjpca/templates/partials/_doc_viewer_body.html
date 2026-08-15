@@ -7,7 +7,7 @@ Context: doc, chunks (list[str]), sections (list[{index, heading}])
 <div style="padding:14px 20px;border-bottom:1px solid #E5E8EF;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0;background:#ffffff;">
  <div style="min-width:0;">
  <p style="font-size:13px;font-weight:700;color:#002583;margin:0 0 3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ doc.name }}</p>
- <div style="display:flex;align-items:center;gap:8px;">
+ <div class="flex-center-gap-md">
  <span style="font-size:10px;color:#002583;">{{ chunks|length }} sections</span>
  <span style="font-size:10px;color:#ffffff;">·</span>
  <span style="padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700;background:#ffffff;color:#002583;">{{ doc.get_jurisdiction_display }}</span>

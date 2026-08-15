@@ -2,6 +2,11 @@
 Context: result (ComparisonResult), run (ComparisonRun)
 hx_target: set only when rendered from Review page
 {% endcomment %}
+{% if feedback_warning %}
+<div style="padding:8px 14px;background:#FFF7F0;border-bottom:1px solid #FFE9A8;font-size:11px;color:#7A5500;">
+  ⚠ {{ feedback_warning }}
+</div>
+{% endif %}
 <div style="display:flex;flex-direction:column;">
 
  {# ── Header strip ── #}
@@ -56,7 +61,7 @@ hx_target: set only when rendered from Review page
  {# Reg A clause #}
  <div style="padding:10px 14px;border-bottom:1px solid #E5E8EF;">
  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
- <div style="display:flex;align-items:center;gap:7px;">
+ <div class="flex-center-gap-lg">
  <div style="width:8px;height:8px;border-radius:50%;background:#002583;flex-shrink:0;"></div>
  <p style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:#002583;margin:0;">
  {{ run.reg_a.name|default:"Reg A" }} — {{ result.citation_a }}
@@ -95,7 +100,7 @@ hx_target: set only when rendered from Review page
  {# Reg B clause #}
  <div style="padding:10px 14px;border-bottom:1px solid #E5E8EF;">
  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
- <div style="display:flex;align-items:center;gap:7px;">
+ <div class="flex-center-gap-lg">
  <div style="width:8px;height:8px;border-radius:50%;background:#002583;flex-shrink:0;"></div>
  <p style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:#002583;margin:0;">
  {{ run.reg_b.name|default:"Reg B" }} — {{ result.citation_b|default:"No match" }}
@@ -177,75 +182,64 @@ hx_target: set only when rendered from Review page
 
  </div>
 
- {# ── Footer: status + review CTA ── #}
- {% if not hx_target %}
- <div style="position:sticky;bottom:0;padding:10px 14px;border-top:1px solid #E5E8EF;display:flex;align-items:center;justify-content:space-between;background:#ffffff;box-shadow:0 -2px 8px rgba(0,0,0,.06);z-index:10;">
- <div style="display:flex;align-items:center;gap:8px;">
- <span style="font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#002583;">Status</span>
- <span style="padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;
- {% if result.lifecycle == 'approved' %}background:#ffffff;color:#002583;
- {% elif result.lifecycle == 'rejected' %}background:#ffffff;color:#002583;
- {% elif result.lifecycle == 'reviewed' %}background:#ffffff;color:#002583;
- {% else %}background:#ffffff;color:#002583;{% endif %}">
- {{ result.lifecycle|title }}
- </span>
- </div>
- <a href="{% url 'review' %}"
- style="display:flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;background:#002583;color:#fff;font-size:11px;font-weight:700;text-decoration:none;">
- Review &amp; Validate
- <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
- </a>
- </div>
- {% endif %}
+  {# ── Footer: status + review CTA ── #}
+  {% if not hx_target %}
+  <div style="position:sticky;bottom:0;padding:10px 14px;border-top:1px solid #E5E8EF;display:flex;align-items:center;justify-content:space-between;background:#ffffff;box-shadow:0 -2px 8px rgba(0,0,0,.06);z-index:10;">
+  <div class="flex-center-gap-md">
+  <span style="font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#002583;">Status</span>
+  <span style="padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;
+  {% if result.lifecycle == 'approved' %}background:#E1F4E5;color:#1B7F3A;
+  {% elif result.lifecycle == 'rejected' %}background:#FCE8E8;color:#D93939;
+  {% elif result.lifecycle == 'reviewed' %}background:#E5E8EF;color:#002583;
+  {% else %}background:#FFF6E0;color:#B07A00;{% endif %}">
+  {{ result.lifecycle|title }}
+  </span>
+  </div>
+  <a href="{% url 'review' %}"
+  style="display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;background:#002583;color:#fff;font-size:11px;font-weight:700;text-decoration:none;font-family:inherit;transition:background .12s;"
+  onmouseover="this.style.background='#001D66'" onmouseout="this.style.background='#002583'">
+  Review &amp; Validate
+  <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+  </a>
+  </div>
+  {% endif %}
 
- {# Review actions (Review page only) #}
- {% if hx_target %}
- <div style="padding:14px 18px;border-top:2px solid #E5E8EF;flex-shrink:0;background:#ffffff;">
- <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
- {% if result.lifecycle != 'approved' %}
- <form hx-post="{% url 'comparison-result-transition' result.pk %}" hx-target="{{ hx_target }}" hx-swap="innerHTML">
- {% csrf_token %}
- <input type="hidden" name="action" value="approved">
- <button type="submit" style="display:flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;font-size:11px;font-weight:700;background:#002583;color:#fff;border:none;cursor:pointer;">
- <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
- Approve
- </button>
- </form>
- {% endif %}
- {% if result.lifecycle != 'rejected' %}
- <form hx-post="{% url 'comparison-result-transition' result.pk %}" hx-target="{{ hx_target }}" hx-swap="innerHTML">
- {% csrf_token %}
- <input type="hidden" name="action" value="rejected">
- <button type="submit" style="display:flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;font-size:11px;font-weight:700;background:#002583;color:#fff;border:none;cursor:pointer;">
- <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
- Reject
- </button>
- </form>
- {% endif %}
- {% if result.lifecycle != 'draft' %}
- <form hx-post="{% url 'comparison-result-transition' result.pk %}" hx-target="{{ hx_target }}" hx-swap="innerHTML">
- {% csrf_token %}
- <input type="hidden" name="action" value="reset">
- <button type="submit" style="padding:7px 12px;border-radius:8px;font-size:11px;font-weight:600;background:#ffffff;color:#002583;border:1px solid #E5E8EF;cursor:pointer;">Reset</button>
- </form>
- {% endif %}
- <span style="margin-left:auto;padding:4px 10px;border-radius:20px;font-size:10px;font-weight:700;
- {% if result.lifecycle == 'approved' %}background:#ffffff;color:#002583;
- {% elif result.lifecycle == 'rejected' %}background:#ffffff;color:#002583;
- {% elif result.lifecycle == 'reviewed' %}background:#ffffff;color:#002583;
- {% else %}background:#ffffff;color:#002583;{% endif %}">
- {{ result.lifecycle|title }}
- </span>
- </div>
- <form hx-post="{% url 'comparison-result-note' result.pk %}" hx-swap="none">
- {% csrf_token %}
- <textarea name="note" rows="2" placeholder="Add a reviewer note…"
- style="width:100%;padding:8px 10px;border:1px solid #E5E8EF;border-radius:8px;font-size:11px;color:#002583;resize:vertical;font-family:inherit;outline:none;box-sizing:border-box;">{{ result.reviewer_note }}</textarea>
- <div style="display:flex;justify-content:flex-end;margin-top:4px;">
- <button type="submit" style="padding:5px 14px;border-radius:6px;font-size:10px;font-weight:700;background:#002583;color:#fff;border:none;cursor:pointer;">Save note</button>
- </div>
- </form>
- </div>
- {% endif %}
+    {% if hx_target %}
+    {% include 'partials/_clause_review_actions.html' %}
+    {% endif %}
+
+{% if previous_lifecycle %}
+<script>
+ (function() {
+  var prev = '{{ previous_lifecycle }}';
+  var pk = '{{ result.pk }}';
+  var target = '{% if hx_target %}{{ hx_target }}{% else %}#rv-detail{% endif %}';
+  window.showToast(
+    'Marked as {{ result.lifecycle|title }}',
+    'Undo',
+    function() {
+     var form = new FormData();
+     form.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]')?.value || '');
+     form.append('action', prev);
+     form.append('from_review', '{% if hx_target %}1{% else %}0{% endif %}');
+     fetch('/comparison/item/' + pk + '/transition/', {
+       method: 'POST',
+       body: form,
+       headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || '' },
+       credentials: 'same-origin'
+     })
+     .then(function(r) { if (r.ok) return r.text(); })
+     .then(function(html) {
+       var el = document.querySelector(target);
+       if (el && html) { el.innerHTML = html; }
+     })
+     .catch(function() {});
+    },
+   5000
+  );
+ })();
+</script>
+{% endif %}
+
 
 </div>

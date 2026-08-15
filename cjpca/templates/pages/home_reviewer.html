@@ -62,7 +62,7 @@
 
    <a href="{% url 'review' %}" class="an-card kpi-card" style="text-decoration:none;
     padding:14px 16px;border-left:4px solid #FFB800;display:block;">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+    <div class="flex-between-start gap-2">
      <span class="an-label">Pending review</span>
      <div style="width:30px;height:30px;border-radius:8px;background:#FFF6E0;display:flex;
       align-items:center;justify-content:center;">
@@ -74,12 +74,12 @@
       color:#B07A00;letter-spacing:-.03em;">{{ pending_review }}</span>
      <span style="font-size:11px;color:#6B7280;">item{{ pending_review|pluralize }}</span>
     </div>
-    <p style="font-size:10px;color:#6B7280;margin-top:6px;margin-bottom:0;">awaiting your decision</p>
+    <p class="text-muted mt-2">awaiting your decision</p>
    </a>
 
    <a href="{% url 'review' %}?status=approved" class="an-card kpi-card" style="text-decoration:none;
     padding:14px 16px;border-left:4px solid #1B7F3A;display:block;">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+    <div class="flex-between-start gap-2">
      <span class="an-label">Approved</span>
      <div style="width:30px;height:30px;border-radius:8px;background:#E1F4E5;display:flex;
       align-items:center;justify-content:center;">
@@ -91,12 +91,12 @@
       color:#1B7F3A;letter-spacing:-.03em;">{{ approved_total }}</span>
      <span style="font-size:11px;color:#6B7280;">total</span>
     </div>
-    <p style="font-size:10px;color:#6B7280;margin-top:6px;margin-bottom:0;">comparison results approved</p>
+    <p class="text-muted mt-2">comparison results approved</p>
    </a>
 
    <a href="{% url 'review' %}?status=rejected" class="an-card kpi-card" style="text-decoration:none;
     padding:14px 16px;border-left:4px solid #D93939;display:block;">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+    <div class="flex-between-start gap-2">
      <span class="an-label">Rejected</span>
      <div style="width:30px;height:30px;border-radius:8px;background:#FCE8E8;display:flex;
       align-items:center;justify-content:center;">
@@ -108,12 +108,12 @@
       color:#D93939;letter-spacing:-.03em;">{{ rejected_total }}</span>
      <span style="font-size:11px;color:#6B7280;">total</span>
     </div>
-    <p style="font-size:10px;color:#6B7280;margin-top:6px;margin-bottom:0;">flagged for analyst rework</p>
+    <p class="text-muted mt-2">flagged for analyst rework</p>
    </a>
 
    <a href="{% url 'history' %}" class="an-card kpi-card" style="text-decoration:none;
     padding:14px 16px;border-left:4px solid #002583;display:block;">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+    <div class="flex-between-start gap-2">
      <span class="an-label">Reviewed total</span>
      <div style="width:30px;height:30px;border-radius:8px;background:#E5E8EF;display:flex;
       align-items:center;justify-content:center;">
@@ -125,7 +125,7 @@
       color:#002583;letter-spacing:-.03em;">{{ reviewed_total }}</span>
      <span style="font-size:11px;color:#6B7280;">decisions</span>
     </div>
-    <p style="font-size:10px;color:#6B7280;margin-top:6px;margin-bottom:0;">approved + rejected</p>
+    <p class="text-muted mt-2">approved + rejected</p>
    </a>
 
   </div>
@@ -141,7 +141,7 @@
       color:#B07A00;padding:2px 7px;border-radius:20px;">{{ submitted_runs|length }}</span>{% endif %}
     </div>
     {% if submitted_runs %}
-     <div style="flex:1;min-height:0;overflow-y:auto;">
+     <div class="flex-1-scroll">
       {% for run in submitted_runs %}
        <a href="{% url 'comparison-workspace' pk=run.pk %}" class="hrow">
         <span class="pill" style="background:#FFF6E0;color:#B07A00;flex-shrink:0;margin-top:1px;">Awaits</span>
@@ -180,7 +180,7 @@
     <div style="padding:10px 14px 8px;border-bottom:1px solid #EEF1F6;flex-shrink:0;
      display:flex;align-items:center;justify-content:space-between;">
      <span class="an-label">Recent work activity</span>
-     <a href="{% url 'history' %}" style="font-size:10px;color:#002583;text-decoration:none;font-weight:700;">View log →</a>
+     <a href="{% url 'history' %}" class="text-link-bold">View log →</a>
     </div>
     {% if recent_events %}
      <div style="flex:1;min-height:0;overflow-y:auto;padding:6px 0;">
@@ -223,7 +223,7 @@
      <span class="an-label">Mappings with gaps</span>
     </div>
     {% if mapping_review_queue %}
-     <div style="flex:1;min-height:0;overflow-y:auto;">
+     <div class="flex-1-scroll">
       {% for ma in mapping_review_queue %}
        <a href="{% url 'mapping-workspace' pk=ma.pk %}" class="hrow">
         <span class="pill" style="background:#FFF6E0;color:#B07A00;flex-shrink:0;margin-top:1px;">{{ ma.gap_count }} gap{{ ma.gap_count|pluralize }}</span>

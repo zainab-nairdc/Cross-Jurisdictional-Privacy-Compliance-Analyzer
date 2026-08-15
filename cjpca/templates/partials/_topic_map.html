@@ -22,7 +22,7 @@ Each topic: principle_id, label, color_dot, color_light, pair_count,
  {# ── Page title ── #}
  <div style="margin-bottom:18px;">
  <p style="font-size:14px;font-weight:700;color:#002583;margin:0 0 3px;">Topic Coverage Map</p>
- <p style="font-size:11px;color:#002583;margin:0;">Clause coverage and divergence across privacy principles — {{ run.reg_a.name }} vs {{ run.reg_b.name }}</p>
+ <p class="text-sm-primary-no-margin">Clause coverage and divergence across privacy principles — {{ run.reg_a.name }} vs {{ run.reg_b.name }}</p>
  </div>
 
  {# ── Summary stats row ── #}
@@ -52,10 +52,10 @@ Each topic: principle_id, label, color_dot, color_light, pair_count,
  {# ── Global relationship legend ── #}
  <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:18px;padding:10px 14px;background:#ffffff;border:1px solid #E5E8EF;border-radius:10px;">
  <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#002583;flex-shrink:0;">Relationships</span>
- <div style="display:flex;align-items:center;gap:5px;"><div style="width:8px;height:8px;border-radius:2px;background:#002583;"></div><span style="font-size:9px;color:#002583;">Equivalent</span></div>
- <div style="display:flex;align-items:center;gap:5px;"><div style="width:8px;height:8px;border-radius:2px;background:#002583;"></div><span style="font-size:9px;color:#002583;">One Side Stricter</span></div>
- <div style="display:flex;align-items:center;gap:5px;"><div style="width:8px;height:8px;border-radius:2px;background:#002583;"></div><span style="font-size:9px;color:#002583;">Additional Clause</span></div>
- <div style="display:flex;align-items:center;gap:5px;"><div style="width:8px;height:8px;border-radius:2px;background:#002583;"></div><span style="font-size:9px;color:#002583;">Conflicting</span></div>
+ <div class="flex-center-gap-sm"><div class="icon-dot"></div><span class="text-2xs-primary">Equivalent</span></div>
+ <div class="flex-center-gap-sm"><div class="icon-dot"></div><span class="text-2xs-primary">One Side Stricter</span></div>
+ <div class="flex-center-gap-sm"><div class="icon-dot"></div><span class="text-2xs-primary">Additional Clause</span></div>
+ <div class="flex-center-gap-sm"><div class="icon-dot"></div><span class="text-2xs-primary">Conflicting</span></div>
  </div>
 
  {# ── Topic cards — 2 column grid ── #}
@@ -102,14 +102,14 @@ Each topic: principle_id, label, color_dot, color_light, pair_count,
  <div>
  <p class="tm-label" style="margin-bottom:7px;">Clause Coverage</p>
  <div style="display:flex;flex-direction:column;gap:5px;">
- <div style="display:flex;align-items:center;gap:8px;">
+ <div class="flex-center-gap-md">
  <span style="font-size:9px;font-weight:800;color:#002583;width:12px;flex-shrink:0;">A</span>
  <div style="flex:1;height:8px;background:#ffffff;border-radius:4px;overflow:hidden;">
  <div style="height:100%;width:{{ topic.bar_width_a }}%;background:#002583;border-radius:4px;"></div>
  </div>
  <span style="font-size:9px;font-weight:700;color:#002583;width:24px;text-align:right;flex-shrink:0;">{{ topic.a_count }}</span>
  </div>
- <div style="display:flex;align-items:center;gap:8px;">
+ <div class="flex-center-gap-md">
  <span style="font-size:9px;font-weight:800;color:#002583;width:12px;flex-shrink:0;">B</span>
  <div style="flex:1;height:8px;background:#ffffff;border-radius:4px;overflow:hidden;">
  <div style="height:100%;width:{{ topic.bar_width_b }}%;background:#002583;border-radius:4px;"></div>
@@ -269,7 +269,7 @@ document.addEventListener('keydown', function(e) {
  </svg>
  <div>
  <p style="font-size:13px;font-weight:600;color:#002583;margin:0 0 4px;">No topic data available</p>
- <p style="font-size:11px;color:#002583;margin:0;">Run the comparison to see the topic map.</p>
+ <p class="text-sm-primary-no-margin">Run the comparison to see the topic map.</p>
  </div>
 </div>
 {% endif %}

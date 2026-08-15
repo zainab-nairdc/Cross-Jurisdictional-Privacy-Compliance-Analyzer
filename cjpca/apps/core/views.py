@@ -147,6 +147,13 @@ def _retrieve_regulatory(message: str, doc_title: str = '', jurisdiction: str = 
             elif js:
                 kwargs['jurisdictions'] = js
         nodes = hybrid_search(**kwargs)
+        # Apply reviewer feedback so approved clauses surface and rejected ones
+        # sink in the Copilot's raw-regulatory retrieval path too.
+        try:
+            from reasoning.workflows import _apply_feedback
+            nodes = _apply_feedback(nodes)
+        except Exception:
+            pass
     except Exception:
         return '(No relevant regulatory context found.)', []
 
@@ -545,6 +552,10 @@ class CopilotMessageView(View):
         # 'document' = pure document Q&A against the picked scope (doc or country).
         mode: str            = (request.POST.get('copilot_mode') or 'approved').strip()
 
+        import uuid
+        message_id = uuid.uuid4().hex
+        chunk_ids = []
+
         # ── Intent gate ───────────────────────────────────────────────────────
         # Greetings, capability questions ("what can you do?") and "what
         # documents exist?" get a direct, helpful answer. Without this they were
@@ -564,6 +575,8 @@ class CopilotMessageView(View):
                 'citations':          [],
                 'data_quality':       'guidance',
                 'fallback_msg':       None,
+                'message_id':         message_id,
+                'chunk_ids':          chunk_ids,
             })
 
         # ── Arabic documents ──────────────────────────────────────────────────
@@ -612,6 +625,8 @@ class CopilotMessageView(View):
                     'citations':          _cits,
                     'data_quality':       'regulatory',
                     'fallback_msg':       None,
+                    'message_id':         message_id,
+                    'chunk_ids':          chunk_ids,
                 })
 
         if jurisdiction:
@@ -642,6 +657,8 @@ class CopilotMessageView(View):
                     'data_quality':    'guidance',
                     'data_label':      'Document Q&A — pick a scope',
                     'fallback_msg':    None,
+                    'message_id':      message_id,
+                    'chunk_ids':       chunk_ids,
                 })
             reg_ctx, reg_cits = _retrieve_regulatory(message, doc_title=doc_title)
             retrieval = {
@@ -679,6 +696,11 @@ class CopilotMessageView(View):
                     elif js:
                         kwargs_h['jurisdictions'] = js
                 nodes = hybrid_search(**kwargs_h)
+                try:
+                    from reasoning.workflows import _apply_feedback
+                    nodes = _apply_feedback(nodes)
+                except Exception:
+                    pass
             except Exception:
                 nodes = []
             # Structure-aware augmentation ("read like a person"): similarity
@@ -856,6 +878,8 @@ class CopilotMessageView(View):
         history.append({'role': 'assistant', 'content': ai_response})
         request.session['copilot_history'] = history[-20:]
 
+        _chunk_ids = [c.get('node_id') for c in chunks if c.get('node_id')]
+
         return render(request, 'partials/_copilot_fragment.html', {
             'user_message':       message,
             'ai_response':        ai_response,
@@ -864,6 +888,8 @@ class CopilotMessageView(View):
             'citations':     retrieval['citations'],
             'data_quality':  retrieval['data_quality'],
             'fallback_msg':  retrieval['fallback_msg'],
+            'message_id':    message_id,
+            'chunk_ids':     _chunk_ids,
         })
 
 
@@ -1014,3 +1040,70 @@ class SiteSettingsView(View):
                 pass
 
         return HttpResponseRedirect(f"{reverse('site-settings')}?saved=1")
+
+
+@method_decorator(role_required(*COPILOT_ROLES), name='dispatch')
+class CopilotFeedbackView(View):
+    """POST /copilot/feedback/ — record thumbs up/down on a Copilot answer.
+
+    Body (form-encoded or JSON):
+      message_id   — unique ID for this Q&A pair (from the fragment template)
+      user_message — the question the user asked
+      feedback     — 'up' or 'down'
+      chunk_ids    — optional list of chunk node_ids the answer was grounded on
+    """
+
+    def post(self, request):
+        import json
+        import logging
+        from django.http import JsonResponse
+        from apps.feedback.services import record_feedback
+
+        log = logging.getLogger(__name__)
+        try:
+            if request.content_type == 'application/json':
+                body = json.loads(request.body)
+            else:
+                body = request.POST
+            message_id = (body.get('message_id') or '').strip()
+            user_message = (body.get('user_message') or '').strip()
+            raw_feedback = (body.get('feedback') or '').strip().lower()
+            chunk_ids = body.get('chunk_ids') or []
+
+            if not message_id or not raw_feedback:
+                return JsonResponse({'error': 'message_id and feedback required'}, status=400)
+
+            kind = 'approve' if raw_feedback == 'up' else (
+                   'reject' if raw_feedback == 'down' else 'modify')
+
+            # Normalise chunk_ids to a list of strings
+            if isinstance(chunk_ids, str):
+                chunk_ids = [c.strip() for c in chunk_ids.split(',') if c.strip()]
+            else:
+                chunk_ids = [str(c) for c in (chunk_ids or []) if c]
+
+            snapshot = {
+                'message_id': message_id,
+                'user_message': user_message,
+                'feedback': raw_feedback,
+            }
+            if chunk_ids:
+                snapshot['chunk_id_a'] = chunk_ids[0]
+            if len(chunk_ids) > 1:
+                snapshot['chunk_id_b'] = chunk_ids[1]
+
+            sig = record_feedback(
+                kind=kind,
+                source_id=0,
+                source_app='copilot',
+                topic='',
+                query=user_message,
+                before=snapshot,
+                actor=request.user if request.user.is_authenticated else None,
+            )
+            log.info('copilot feedback recorded: message_id=%s kind=%s chunks=%d',
+                     message_id, kind, len(chunk_ids))
+            return JsonResponse({'status': 'ok', 'kind': kind})
+        except Exception as exc:
+            log.exception('copilot feedback failed')
+            return JsonResponse({'error': str(exc)}, status=500)

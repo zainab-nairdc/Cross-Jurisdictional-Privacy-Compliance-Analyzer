@@ -93,6 +93,13 @@ class Command(BaseCommand):
                                  'you lose the post-ingest sanity check.')
         parser.add_argument('--keep-bbk', action='store_true',
                             help='Preserve BBK internal policies during the wipe.')
+        parser.add_argument('--resume', action='store_true',
+                            help='Continue a partial ingest: SKIP the stage-2 '
+                                 'wipe, skip files already indexed, and retry '
+                                 'the rest. Use after an interrupted run so '
+                                 'you keep completed work (and any documents '
+                                 'uploaded through the web wizard) instead of '
+                                 'starting over.')
         parser.add_argument('--per-file-timeout', type=int, default=900,
                             help='Stage 1 per-file Docling timeout in seconds '
                                  '(default: 900).')
@@ -113,14 +120,17 @@ class Command(BaseCommand):
         skip_convert = opts['skip_convert']
         skip_verify  = opts['skip_verify']
         keep_bbk     = opts['keep_bbk']
+        resume       = opts['resume']
         timeout_s    = opts['per_file_timeout']
 
         # Build & print the plan
         plan = []
         if not skip_convert:
             plan.append(('1', 'Convert PDFs / DOCX -> Markdown'))
-        plan.append(('2', f'Wipe stores{" (keep BBK)" if keep_bbk else ""}'))
-        plan.append(('3', 'Per-file ingest: chunk -> scan -> embed -> index'))
+        if not resume:
+            plan.append(('2', f'Wipe stores{" (keep BBK)" if keep_bbk else ""}'))
+        plan.append(('3', 'Per-file ingest: chunk -> scan -> embed -> index'
+                          f'{" (resume: skip already-indexed)" if resume else ""}'))
         plan.append(('4', 'Import metadata.csv into Document rows'))
         plan.append(('5', 'Recount Document.chunk_count from BM25'))
         if not skip_verify:
@@ -142,8 +152,14 @@ class Command(BaseCommand):
         if not skip_convert:
             self._stage('1', 'Convert PDFs / DOCX -> Markdown',
                         self._stage_1_convert, timeout_s=timeout_s)
-        self._stage('2', 'Wipe stores', self._stage_2_wipe, keep_bbk=keep_bbk)
-        self._stage('3', 'Per-file ingest', self._stage_3_ingest, keep_bbk=keep_bbk)
+        if resume:
+            self.stdout.write(self.style.WARNING(
+                ' Stage 2 (wipe) SKIPPED -- resuming into the existing index.'))
+            self.stdout.write('')
+        else:
+            self._stage('2', 'Wipe stores', self._stage_2_wipe, keep_bbk=keep_bbk)
+        self._stage('3', 'Per-file ingest', self._stage_3_ingest,
+                    keep_bbk=keep_bbk, resume=resume)
         self._stage('4', 'Import metadata',  self._stage_4_import_metadata)
         self._stage('5', 'Recount chunks',   self._stage_5_recount)
         if not skip_verify:
@@ -341,7 +357,7 @@ class Command(BaseCommand):
 
     # ── STAGE 3: per-file ingest (chunk -> scan -> embed -> index) ───────────
 
-    def _stage_3_ingest(self, *, keep_bbk: bool) -> None:
+    def _stage_3_ingest(self, *, keep_bbk: bool, resume: bool = False) -> None:
         """Walk regulations + internal_policies, copy files into MEDIA_ROOT,
         create Document + IngestionJob rows, and run the pipeline stages
         directly on each file's processed markdown. Bypasses pipeline.py —
@@ -366,11 +382,25 @@ class Command(BaseCommand):
         from ingestion.embedder import get_model
         st_model = get_model()
 
-        ingested = failed = 0
+        ingested = failed = skipped = 0
         for i, src in enumerate(reg_files + pol_files, 1):
             doc_type      = Document.POLICY if src in pol_files else Document.REGULATION
             jurisdiction  = self._jurisdiction_for(src, doc_type)
             name          = src.stem.replace('_', ' ').replace('-', ' ')
+            rel_file      = f'documents/{src.name}'
+
+            # On a resume the wipe did not run, so rows from the interrupted
+            # attempt are still here. Match on the file path (exact, unlike the
+            # derived display name) to decide: already INDEXED -> skip; present
+            # but unfinished -> reuse that row rather than creating a duplicate.
+            prior = (Document.objects.filter(file=rel_file).order_by('-pk').first()
+                     if resume else None)
+            if prior is not None and prior.status == Document.INDEXED:
+                self.stdout.write(
+                    f'  [{i:>2}/{total}] {name[:55]:55s}  ({jurisdiction})')
+                self.stdout.write('      already indexed -- skipped')
+                skipped += 1
+                continue
 
             self.stdout.write(
                 f'  [{i:>2}/{total}] {name[:55]:55s}  ({jurisdiction})'
@@ -384,13 +414,19 @@ class Command(BaseCommand):
                 failed += 1
                 continue
 
-            doc = Document.objects.create(
-                name         = name,
-                doc_type     = doc_type,
-                jurisdiction = jurisdiction,
-                status       = Document.PROCESSING,
-                file         = f'documents/{src.name}',
-            )
+            if prior is not None:
+                doc = prior
+                doc.status = Document.PROCESSING
+                doc.save(update_fields=['status'])
+                self.stdout.write('      retrying previously unfinished document')
+            else:
+                doc = Document.objects.create(
+                    name         = name,
+                    doc_type     = doc_type,
+                    jurisdiction = jurisdiction,
+                    status       = Document.PROCESSING,
+                    file         = rel_file,
+                )
             job = IngestionJob.objects.create(document=doc, status=IngestionJob.QUEUED)
 
             try:
@@ -404,6 +440,25 @@ class Command(BaseCommand):
                     f'      -> indexed: {len(leaves)} leaves + {len(parents)} parents'
                 ))
                 ingested += 1
+            except KeyboardInterrupt:
+                # Ctrl+C is a BaseException, so the `except Exception` below
+                # never saw it: the in-flight document was abandoned mid-write
+                # and left stuck at PROCESSING with a QUEUED job forever, and
+                # nothing would ever pick it up again. Mark it failed, say how
+                # to continue, then re-raise so the interrupt still stops the
+                # command promptly.
+                self.stdout.write(self.style.WARNING(
+                    '      INTERRUPTED -- marked failed so it is retried'))
+                doc.status = Document.FAILED
+                doc.save(update_fields=['status'])
+                job.status        = IngestionJob.FAILED
+                job.error_message = 'interrupted by user (Ctrl+C)'
+                job.save(update_fields=['status', 'error_message', 'updated_at'])
+                self.stdout.write(self.style.WARNING(
+                    f'  Stopped at {i}/{total}. Continue without losing the '
+                    f'{ingested} document(s) done in this run:\n'
+                    f'    python manage.py full_ingest --apply --resume'))
+                raise
             except Exception as exc:
                 self.stdout.write(self.style.ERROR(f'      FAILED: {exc}'))
                 doc.status = Document.FAILED
@@ -413,7 +468,9 @@ class Command(BaseCommand):
                 job.save(update_fields=['status', 'error_message', 'updated_at'])
                 failed += 1
 
-        self.stdout.write(f'  Stage 3 summary: ingested={ingested}  failed={failed}')
+        self.stdout.write(
+            f'  Stage 3 summary: ingested={ingested}  failed={failed}  '
+            f'skipped={skipped}')
 
     def _jurisdiction_for(self, path: Path, doc_type: str) -> str:
         from apps.library.models import Document

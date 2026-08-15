@@ -30,7 +30,7 @@
  <span style="font-size:10px;color:#002583;">Historical gaps from approved mapping analyses</span>
  {% endif %}
  </div>
- <div style="display:flex;align-items:center;gap:8px;">
+ <div class="flex-center-gap-md">
  {# Run-AI CTA is analyst-only — new analyses are analyst territory. #}
  {% if user_role == 'analyst' %}
  <a href="{% url 'analytics-cross-gap' %}"
@@ -57,9 +57,9 @@
  {% if gap.priority == 'high' %}
  <span style="padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;background:color-mix(in srgb,#002583 10%,transparent);color:#002583;white-space:nowrap;flex-shrink:0;">High</span>
  {% elif gap.priority == 'medium' %}
- <span style="padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;background:#ffffff;color:#002583;white-space:nowrap;flex-shrink:0;">Medium</span>
+ <span class="badge badge-primary">Medium</span>
  {% else %}
- <span style="padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;background:#ffffff;color:#002583;white-space:nowrap;flex-shrink:0;">Low</span>
+ <span class="badge badge-primary">Low</span>
  {% endif %}
  </div>
  <p style="font-size:10px;color:#002583;font-weight:500;margin-bottom:3px;line-height:1.4;">{{ gap.obligation_mapping.obligation_title|truncatechars:80 }}</p>

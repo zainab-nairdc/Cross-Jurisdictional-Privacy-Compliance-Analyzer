@@ -13,6 +13,7 @@ from apps.comparison.models import (
     AuditEvent, ComparisonResult, ComparisonRun,
     PAIR_CONFIGS, REL_COLORS, REL_BG, REL_LABELS,
 )
+from apps.feedback.models import GoldExemplar
 from apps.mapping.models import ObligationMapping
 
 REVIEW_ROLES = ('reviewer',)
@@ -56,6 +57,10 @@ def _enrich(results):
         r.status_meta  = LIFECYCLE_META.get(r.lifecycle, LIFECYCLE_META['draft'])
         r.rv_rel_color = REL_COLOR_REVIEW.get(r.relationship, '#FFB800')
         r.rv_rel_bg    = REL_BG_REVIEW.get(r.relationship, '#E5E8EF')
+        r.is_gold      = (
+            r.lifecycle == 'approved'
+            and GoldExemplar.objects.filter(source_id=r.pk, active=True).exists()
+        )
     return results
 
 

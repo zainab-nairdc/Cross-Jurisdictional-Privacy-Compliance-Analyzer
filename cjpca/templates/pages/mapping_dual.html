@@ -98,7 +98,7 @@
  <p style="font-size:10px;color:#002583;font-style:italic;line-height:1.5;margin:0 0 5px;border-left:2px solid #002583;padding-left:7px;">"{{ item.regulation_evidence|truncatechars:140 }}"</p>
  {% endif %}
  {% if item.policy_section and item.policy_section != "None identified" %}
- <p style="font-size:10px;color:#002583;margin:0;">Policy: <span style="color:#002583;">{{ item.policy_section|truncatechars:80 }}</span></p>
+ <p class="text-xs-primary">Policy: <span style="color:#002583;">{{ item.policy_section|truncatechars:80 }}</span></p>
  {% endif %}
  {% if item.gap_description %}
  <p style="font-size:10.5px;color:#002583;margin:5px 0 0;line-height:1.45;"><strong>Gap:</strong> {{ item.gap_description|truncatechars:140 }}</p>

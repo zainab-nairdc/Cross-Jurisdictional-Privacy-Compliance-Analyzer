@@ -101,9 +101,21 @@ def build_fewshot(topic, k=3) -> str:
 RETIRED_KEY = '_retired'
 
 
+def _decay_weight(created_at, half_life_days):
+    """Exponential decay: weight *= 0.5 ^ (age_days / half_life_days).
+    Returns 1.0 for future dates, 0.0 for None."""
+    if not half_life_days or not created_at:
+        return 1.0
+    import math
+    from django.utils import timezone
+    age_days = max(0, (timezone.now() - created_at).total_seconds() / 86400.0)
+    return math.pow(0.5, age_days / half_life_days)
+
+
 def chunk_feedback_scores(topic=None, version_scope=True):
-    """Net feedback per chunk_id: approve -> +1 on the row's chunks, reject -> -1.
-    This is the retrieval lever's memory — which chunks reviewers blessed or rejected.
+    """Net feedback per chunk_id: approve -> +1 on the row's chunks, reject -> -1,
+    modify -> +0.5. This is the retrieval lever's memory — which chunks reviewers
+    blessed or rejected.
 
     Scoping (all three matter for regulatory defensibility):
 
@@ -123,30 +135,41 @@ def chunk_feedback_scores(topic=None, version_scope=True):
     Retired signals (see RETIRED_KEY) are skipped: retained for audit, inert for
     retrieval.
 
-    NOTE (known limitation): only 'approve' and 'reject' carry weight. A 'modify'
-    signal is stored with full before/after detail but contributes 0 here — a
-    reviewer CORRECTING an answer currently teaches the retrieval layer nothing.
-    Left unchanged deliberately; weighting it needs a product/evaluation decision.
+    Decay: when FEEDBACK_DECAY_HALF_LIFE_DAYS is set in settings, each signal's
+    weight is multiplied by 0.5 ^ (age_days / half_life_days). A 90-day half-life
+    means a 6-month-old approval contributes ~0.25 of its original weight.
     """
     from .models import FeedbackSignal
+    from django.conf import settings
     qs = FeedbackSignal.objects.all()
     if version_scope:
         tax, model = _versions()
         qs = qs.filter(taxonomy_version=tax, model_version=model)
     if topic:
         qs = qs.filter(topic__iexact=topic)
-    scores: dict[str, int] = {}
-    for s in qs.only('kind', 'before'):
-        w = 1 if s.kind == 'approve' else (-1 if s.kind == 'reject' else 0)
+    half_life = getattr(settings, 'FEEDBACK_DECAY_HALF_LIFE_DAYS', None)
+    scores: dict[str, float] = {}
+    for s in qs.only('kind', 'before', 'created_at'):
+        if s.kind == 'approve':
+            w = 1.0
+        elif s.kind == 'reject':
+            w = -1.0
+        elif s.kind == 'modify':
+            w = 0.5
+        else:
+            w = 0.0
         if not w:
             continue
         b = s.before or {}
         if b.get(RETIRED_KEY):
             continue
+        w *= _decay_weight(s.created_at, half_life)
+        if not w:
+            continue
         for key in ('chunk_id_a', 'chunk_id_b'):
             cid = b.get(key)
             if cid:
-                scores[cid] = scores.get(cid, 0) + w
+                scores[cid] = scores.get(cid, 0.0) + w
     return scores
 
 
@@ -277,23 +300,21 @@ def purge_document_learning(doc, mode='keep'):
 
 def capture_comparison_transition(result, new_lifecycle, actor=None):
     """Called from the reviewer transition view. Records the decision and, on
-    approval, promotes the row to a gold exemplar. Best-effort: never raises into
-    the review flow."""
+    approval, promotes the row to a gold exemplar. Returns the FeedbackSignal
+    or raises on failure so the caller can surface the error."""
+    import logging
+    log = logging.getLogger(__name__)
     try:
         kind = {'approved': 'approve', 'rejected': 'reject'}.get(new_lifecycle, 'modify')
-        # Topic key — MUST match the topic the retrieval was scoped by, because
-        # chunk_feedback_scores(topic=...) filters on equality with it.
-        # ComparisonRun.topics holds the analyst-selected taxonomy tags that were
-        # pushed down into _scoped_retrieve, so it is authoritative. principle_ids
-        # is only a fuzzy text probe (_detect_principles) that can match several
-        # unrelated tags and return them in TAXONOMY dict order — using it first
-        # would file feedback under a topic the run never retrieved against.
-        # Falls back to it for full-scope runs, which carry no selected topic.
         topic = ''
         if result.run_id and getattr(result.run, 'topics', None):
             topic = str(result.run.topics[0])
-        elif getattr(result, 'principle_ids', None):
-            topic = str(result.principle_ids[0])
+        else:
+            log.warning(
+                'capture_comparison_transition: result %s has no run topics; '
+                'feedback recorded without topic scoping',
+                result.pk,
+            )
         reg_a = result.run.reg_a.name if result.run_id else ''
         reg_b = result.run.reg_b.name if result.run_id else ''
         query = f'{result.citation_a} vs {result.citation_b or "—"}'
@@ -306,8 +327,6 @@ def capture_comparison_transition(result, new_lifecycle, actor=None):
             'citation_a':           result.citation_a,
             'citation_b':           result.citation_b,
             'key_difference':       result.key_difference,
-            # chunk ids drive the RETRIEVAL lever: approved chunks get boosted on
-            # future retrievals, rejected chunks demoted.
             'chunk_id_a':           getattr(result, 'chunk_id_a', '') or '',
             'chunk_id_b':           getattr(result, 'chunk_id_b', '') or '',
         }
@@ -318,6 +337,5 @@ def capture_comparison_transition(result, new_lifecycle, actor=None):
                             payload=snapshot, approved_by=actor, source_id=result.pk)
         return sig
     except Exception:
-        import logging
-        logging.getLogger(__name__).exception('capture_comparison_transition failed')
-        return None
+        log.exception('capture_comparison_transition failed for result %s', getattr(result, 'pk', '?'))
+        raise

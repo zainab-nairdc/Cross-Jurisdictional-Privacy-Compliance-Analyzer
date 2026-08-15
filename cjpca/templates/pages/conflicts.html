@@ -104,14 +104,14 @@
 
  <div style="padding:10px 14px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
  <div style="border-left:2px solid #002583;padding-left:10px;">
- <p style="font-size:9px;font-weight:800;color:#002583;text-transform:uppercase;letter-spacing:.07em;margin:0 0 3px;">{{ r.run.reg_a.jurisdiction|capfirst }} — {{ r.citation_a }}</p>
+ <p class="text-uppercase-label">{{ r.run.reg_a.jurisdiction|capfirst }} — {{ r.citation_a }}</p>
  <p style="font-size:11px;color:#002583;line-height:1.55;margin:0;">{{ r.clause_text_a|default:r.preview_a|truncatechars:280 }}</p>
  {% if r.evidence_a %}
  <p style="font-size:10px;color:#002583;font-style:italic;line-height:1.5;margin:5px 0 0;">"{{ r.evidence_a|truncatechars:140 }}"</p>
  {% endif %}
  </div>
  <div style="border-left:2px solid #002583;padding-left:10px;">
- <p style="font-size:9px;font-weight:800;color:#002583;text-transform:uppercase;letter-spacing:.07em;margin:0 0 3px;">{{ r.run.reg_b.jurisdiction|capfirst }} — {{ r.citation_b|default:"No match" }}</p>
+ <p class="text-uppercase-label">{{ r.run.reg_b.jurisdiction|capfirst }} — {{ r.citation_b|default:"No match" }}</p>
  <p style="font-size:11px;color:#002583;line-height:1.55;margin:0;">{{ r.clause_text_b|default:r.preview_b|truncatechars:280 }}</p>
  {% if r.evidence_b %}
  <p style="font-size:10px;color:#002583;font-style:italic;line-height:1.5;margin:5px 0 0;">"{{ r.evidence_b|truncatechars:140 }}"</p>
@@ -121,7 +121,7 @@
 
  {% if r.key_difference %}
  <div style="padding:8px 14px;border-top:1px solid #E5E8EF;background:#ffffff;">
- <p style="font-size:9px;font-weight:800;color:#002583;text-transform:uppercase;letter-spacing:.07em;margin:0 0 3px;">Key difference</p>
+ <p class="text-uppercase-label">Key difference</p>
  <p style="font-size:11px;color:#002583;line-height:1.55;margin:0;">{{ r.key_difference }}</p>
  </div>
  {% endif %}

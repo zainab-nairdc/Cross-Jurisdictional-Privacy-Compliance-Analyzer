@@ -37,28 +37,28 @@
  </div>
  <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
  <div style="display:flex;align-items:center;gap:12px;">
- <div style="display:flex;align-items:center;gap:5px;">
+ <div class="flex-center-gap-sm">
  <div style="width:8px;height:8px;border-radius:50%;background:#002583;"></div>
  <span style="font-size:10px;color:#002583;">{{ counts.equivalent }} equiv</span>
  </div>
- <div style="display:flex;align-items:center;gap:5px;">
+ <div class="flex-center-gap-sm">
  <div style="width:8px;height:8px;border-radius:50%;background:#002583;"></div>
  <span style="font-size:10px;color:#002583;">{{ counts.partial }} partial</span>
  </div>
- <div style="display:flex;align-items:center;gap:5px;">
+ <div class="flex-center-gap-sm">
  <div style="width:8px;height:8px;border-radius:50%;background:#002583;opacity:.45;"></div>
  <span style="font-size:10px;color:#002583;">{{ counts.similar }} similar</span>
  </div>
- <div style="display:flex;align-items:center;gap:5px;">
+ <div class="flex-center-gap-sm">
  <div style="width:8px;height:8px;border-radius:50%;background:#002583;opacity:.45;"></div>
  <span style="font-size:10px;color:#002583;">{{ counts.none }} no match</span>
  </div>
  <span style="font-size:10px;color:#002583;">· {{ pairs|length }} pair{{ pairs|length|pluralize }}</span>
  </div>
  {% if analysis.status == 'complete' %}
- <span style="padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;background:#ffffff;color:#002583;">Complete</span>
+ <span class="badge badge-primary badge-lg">Complete</span>
  {% else %}
- <span style="padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;background:#ffffff;color:#002583;">{{ analysis.status|title }}</span>
+ <span class="badge badge-primary badge-lg">{{ analysis.status|title }}</span>
  {% endif %}
  </div>
  </div>
@@ -108,7 +108,7 @@
  style="flex-shrink:0;"
  >
  <div style="padding:12px 14px;border-top:1px solid rgba(27,58,107,0.08);">
- <p style="font-size:10px;color:#002583;margin:0;">Computing strictness…</p>
+ <p class="text-xs-primary">Computing strictness…</p>
  </div>
  </div>
  <div class="flex-1 overflow-y-auto" style="padding:10px;border-top:1px solid #E5E8EF;">
@@ -126,13 +126,13 @@
  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:4px;">
  <span style="font-size:10px;font-weight:700;color:#002583;line-height:1.3;">{{ pair.reg_a_article }}</span>
  {% if pair.match_type == 'equivalent' %}
- <span style="padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;background:#ffffff;color:#002583;white-space:nowrap;flex-shrink:0;">Equivalent</span>
+ <span class="badge badge-primary">Equivalent</span>
  {% elif pair.match_type == 'partial' %}
- <span style="padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;background:#ffffff;color:#002583;white-space:nowrap;flex-shrink:0;">Partial</span>
+ <span class="badge badge-primary">Partial</span>
  {% elif pair.match_type == 'similar' %}
- <span style="padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;background:#ffffff;color:#002583;white-space:nowrap;flex-shrink:0;">Similar</span>
+ <span class="badge badge-primary">Similar</span>
  {% else %}
- <span style="padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;background:#ffffff;color:#002583;white-space:nowrap;flex-shrink:0;">No match</span>
+ <span class="badge badge-primary">No match</span>
  {% endif %}
  </div>
  <p style="font-size:10px;color:#002583;">Pair {{ forloop.counter }} · {{ pair.similarity_score|floatformat:0 }}% match</p>
@@ -159,7 +159,7 @@
  style="flex-shrink:0;"
  >
  <div style="padding:12px 14px;border-top:1px solid rgba(27,58,107,0.08);">
- <p style="font-size:10px;color:#002583;margin:0;">Computing strictness…</p>
+ <p class="text-xs-primary">Computing strictness…</p>
  </div>
  </div>
  <div class="flex-1 overflow-y-auto" style="padding:10px;border-top:1px solid #E5E8EF;">
@@ -181,13 +181,13 @@
  <span style="font-size:10px;font-weight:500;color:#002583;font-style:italic;">No equivalent</span>
  {% endif %}
  {% if pair.match_type == 'equivalent' %}
- <span style="padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;background:#ffffff;color:#002583;white-space:nowrap;flex-shrink:0;">Equivalent</span>
+ <span class="badge badge-primary">Equivalent</span>
  {% elif pair.match_type == 'partial' %}
- <span style="padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;background:#ffffff;color:#002583;white-space:nowrap;flex-shrink:0;">Partial</span>
+ <span class="badge badge-primary">Partial</span>
  {% elif pair.match_type == 'similar' %}
- <span style="padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;background:#ffffff;color:#002583;white-space:nowrap;flex-shrink:0;">Similar</span>
+ <span class="badge badge-primary">Similar</span>
  {% else %}
- <span style="padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;background:#ffffff;color:#002583;white-space:nowrap;flex-shrink:0;">No match</span>
+ <span class="badge badge-primary">No match</span>
  {% endif %}
  </div>
  {% if pair.reg_b_article %}
@@ -209,7 +209,7 @@
  <div class="flex flex-col bg-white overflow-hidden flex-shrink-0" style="width:292px;">
  <div style="padding:10px 14px;border-bottom:1px solid #E5E8EF;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;">
  <p style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:#002583;">AI Analysis</p>
- <span style="font-size:9px;color:#002583;">Click a pair to load</span>
+ <span class="text-2xs-primary">Click a pair to load</span>
  </div>
  <div id="analysis-panel" class="flex-1 overflow-y-auto">
  {% include 'partials/_analysis_panel.html' %}
@@ -233,10 +233,10 @@
  <div style="position:absolute;bottom:14px;left:14px;background:rgba(255,255,255,.97);border:1px solid #E5E8EF;border-radius:10px;padding:10px 13px;z-index:10;">
  <p style="font-size:8px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#002583;margin-bottom:8px;">Edge Confidence</p>
  <div style="display:flex;flex-direction:column;gap:6px;">
- <div style="display:flex;align-items:center;gap:8px;"><svg width="30" height="5"><line x1="0" y1="2.5" x2="30" y2="2.5" stroke="#002583" stroke-width="4.5"/></svg><span style="font-size:10px;color:#002583;">Equivalent</span></div>
- <div style="display:flex;align-items:center;gap:8px;"><svg width="30" height="5"><line x1="0" y1="2.5" x2="30" y2="2.5" stroke="#002583" stroke-width="2.5"/></svg><span style="font-size:10px;color:#002583;">Partial</span></div>
- <div style="display:flex;align-items:center;gap:8px;"><svg width="30" height="5"><line x1="0" y1="2.5" x2="30" y2="2.5" stroke="#002583" stroke-width="1.5" stroke-dasharray="6,3"/></svg><span style="font-size:10px;color:#002583;">Similar</span></div>
- <div style="display:flex;align-items:center;gap:8px;"><svg width="30" height="5"><line x1="0" y1="2.5" x2="30" y2="2.5" stroke="#002583" stroke-width="1" stroke-dasharray="3,5"/></svg><span style="font-size:10px;color:#002583;">No match</span></div>
+ <div class="flex-center-gap-md"><svg width="30" height="5"><line x1="0" y1="2.5" x2="30" y2="2.5" stroke="#002583" stroke-width="4.5"/></svg><span style="font-size:10px;color:#002583;">Equivalent</span></div>
+ <div class="flex-center-gap-md"><svg width="30" height="5"><line x1="0" y1="2.5" x2="30" y2="2.5" stroke="#002583" stroke-width="2.5"/></svg><span style="font-size:10px;color:#002583;">Partial</span></div>
+ <div class="flex-center-gap-md"><svg width="30" height="5"><line x1="0" y1="2.5" x2="30" y2="2.5" stroke="#002583" stroke-width="1.5" stroke-dasharray="6,3"/></svg><span style="font-size:10px;color:#002583;">Similar</span></div>
+ <div class="flex-center-gap-md"><svg width="30" height="5"><line x1="0" y1="2.5" x2="30" y2="2.5" stroke="#002583" stroke-width="1" stroke-dasharray="3,5"/></svg><span style="font-size:10px;color:#002583;">No match</span></div>
  </div>
  </div>
  <div id="graph-controls" style="position:absolute;bottom:14px;right:14px;display:flex;flex-direction:column;align-items:flex-end;gap:6px;z-index:10;transition:right .2s;">
@@ -297,7 +297,7 @@
 
  <div id="content-overlay" style="flex:1;min-height:0;overflow:hidden;background:#fff;display:none;">
  <div style="display:flex;align-items:center;justify-content:center;height:100%;">
- <p style="font-size:11px;color:#002583;">Term overlay not available in V1.</p>
+ <p class="text-sm-primary">Term overlay not available in V1.</p>
  </div>
  </div>
 

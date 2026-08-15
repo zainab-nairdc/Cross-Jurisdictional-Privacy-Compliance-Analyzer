@@ -7,7 +7,7 @@
 
    <div style="padding:18px 24px 14px;border-bottom:1px solid #EEF1F7;flex-shrink:0;">
     {% if not page_mode %}
-    <div style="display:flex;align-items:center;justify-content:space-between;">
+    <div class="flex-between">
      <p style="font-size:15px;font-weight:800;color:#14213D;margin:0;">{% if mode == 'policy' %}Add internal policy{% elif mode == 'regulation' %}Add Legal Document{% else %}Add document{% endif %}</p>
      <button @click="open=false" style="background:none;border:none;cursor:pointer;color:#9AA4BC;font-size:22px;line-height:1;">&times;</button>
     </div>

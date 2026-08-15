@@ -30,11 +30,16 @@ class LLMConfig(BaseSettings):
     # with 6-10 obligations × ~500 tokens each + summary. only a ceiling;
     # no extra cost if the model doesn't use it.
     max_tokens:     int = 8000
-    # Tight per-call timeout + single retry. 180s × 2 retries used to mean a
-    # single malformed LLM response could silently burn 9 minutes; bringing
-    # this to 75s × 1 retry caps a bad row at ~2.5 minutes so the workflow
-    # makes visible progress instead of hanging.
-    timeout_sec:    int = 75
+    # Per-call ceiling. This value did NOT apply until the generator was fixed
+    # to pass it via client_kwargs (it was handed to ChatOllama as an unknown
+    # `request_timeout=` kwarg and silently dropped), so calls ran unbounded.
+    #
+    # 75s was tuned for GPU inference. On CPU-only Ollama a num_predict=8000
+    # generation legitimately takes many minutes, and 75s would abort every
+    # substantial call — so the default is a bound that prevents a hang without
+    # failing honest slow work. Drop it back to ~75 on a GPU box, or override
+    # per-environment with REASON_LLM__TIMEOUT_SEC.
+    timeout_sec:    int = 600
     retry_attempts: int = 1
 
     # local fallback. kicks in automatically if the primary openrouter call
@@ -44,7 +49,10 @@ class LLMConfig(BaseSettings):
     # echoed the schema's field descriptions verbatim instead of extracting.
     # qwen2.5:7b-instruct follows the structured-extraction prompt reliably and
     # fits an 8 GB GPU (Q4). Override with REASON_LLM__FALLBACK_MODEL if needed.
-    fallback_model:    str  = "qwen2.5:7b-instruct"
+    # Must match an Ollama tag EXACTLY — Ollama does not resolve "7b-instruct"
+    # to the "7b" tag, it 404s with "model not found", which surfaced as a
+    # failed comparison run. `ollama list` is the source of truth.
+    fallback_model:    str  = "qwen2.5:7b"
     fallback_base_url: str  = "http://localhost:11434"
     fallback_num_ctx:  int  = 8192
 

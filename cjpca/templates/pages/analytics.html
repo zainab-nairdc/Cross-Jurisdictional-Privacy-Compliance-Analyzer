@@ -174,7 +174,7 @@
       <span class="meta-v">{{ meta_policies }}</span>
      </div>
     </div>
-    <div style="display:flex;align-items:center;gap:8px;">
+    <div class="flex-center-gap-md">
      <button class="tbtn tbtn-ghost" onclick="exportActions()">
       <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
       Export
@@ -235,8 +235,8 @@
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;">
 
    {# Compliance score #}
-   <div class="kpi" style="background:#fff;border-color:#E5E7EB;">
-    <div style="display:flex;align-items:center;justify-content:space-between;">
+   <div class="kpi" class="border-primary">
+    <div class="flex-between">
      <div class="kpi-icon" style="background:#F1F5F9;"><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#475569" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
      {% if coverage_total %}<span style="font-size:11px;font-weight:600;color:{% if mapping_compliance_pct < 50 %}#B91C1C{% else %}#94A3B8{% endif %};">{% if mapping_compliance_pct >= 80 %}On track{% elif mapping_compliance_pct >= 50 %}At risk{% else %}Below target{% endif %}</span>{% endif %}
     </div>
@@ -254,7 +254,7 @@
 
    {# Critical actions — the one card allowed to go red #}
    <div class="kpi" style="background:#fff;border-color:{% if action_critical %}#FECACA{% else %}#E5E7EB{% endif %};">
-    <div style="display:flex;align-items:center;justify-content:space-between;">
+    <div class="flex-between">
      <div class="kpi-icon" style="background:{% if action_critical %}#FEE2E2{% else %}#F1F5F9{% endif %};">
       <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="{% if action_critical %}#DC2626{% else %}#475569{% endif %}" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
      </div>
@@ -266,8 +266,8 @@
    </div>
 
    {# Open conflicts #}
-   <div class="kpi" style="background:#fff;border-color:#E5E7EB;">
-    <div style="display:flex;align-items:center;justify-content:space-between;">
+   <div class="kpi" class="border-primary">
+    <div class="flex-between">
      <div class="kpi-icon" style="background:#F1F5F9;"><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#475569" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/></svg></div>
      {% if conflicts_delta and conflicts_delta.dir != 'flat' %}
      <span class="delta" style="color:{% if conflicts_delta.dir == 'up' %}#B91C1C{% else %}#15803D{% endif %};">
@@ -280,8 +280,8 @@
    </div>
 
    {# AI accuracy — suppressed at small sample so we don't flex a fake 100% #}
-   <div class="kpi" style="background:#fff;border-color:#E5E7EB;">
-    <div style="display:flex;align-items:center;justify-content:space-between;">
+   <div class="kpi" class="border-primary">
+    <div class="flex-between">
      <div class="kpi-icon" style="background:#F1F5F9;"><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#475569" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg></div>
      {% if accuracy_reliable and accuracy_delta and accuracy_delta.dir != 'flat' and accuracy_delta.mag_pct is not None %}
      <span class="delta" style="color:{% if accuracy_delta.dir == 'up' %}#15803D{% else %}#B91C1C{% endif %};">
@@ -336,8 +336,8 @@
     <div style="width:52px;height:52px;border-radius:14px;background:#F0FDF4;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;">
      <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#16A34A" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
     </div>
-    <p style="font-size:14px;font-weight:700;color:#0F172A;margin:0 0 4px;">Nothing to remediate</p>
-    <p style="font-size:12px;color:#64748B;margin:0;">No open gaps or conflicts across your runs.</p>
+    <p class="text-heading-lg">Nothing to remediate</p>
+    <p class="text-muted">No open gaps or conflicts across your runs.</p>
    </div>
    {% endif %}
   </div>
@@ -345,7 +345,7 @@
   {# Trends — the accuracy chart only renders when there's real data to plot #}
   <div style="display:grid;grid-template-columns:{% if accuracy_has_data %}1fr 1fr{% else %}1fr{% endif %};gap:16px;">
    <div class="card card-pad">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+    <div class="flex-between-start gap-3">
      <div>
       <p class="sec-eyebrow">Trending — last 6 months</p>
       <p class="sec-title">Gap resolution</p>
@@ -364,7 +364,7 @@
    </div>
    {% if accuracy_has_data %}
    <div class="card card-pad">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+    <div class="flex-between-start gap-3">
      <div>
       <p class="sec-eyebrow">Trending — last 6 months</p>
       <p class="sec-title">Review agreement</p>
@@ -397,7 +397,7 @@
     <select class="fsel" x-model="kf"><option value="all">All types</option><option value="gap">Policy gaps</option><option value="conflict">Clause conflicts</option></select>
     <select class="fsel" x-model="sf"><option value="all">All statuses</option><option value="Open">Open</option><option value="Draft">Draft</option><option value="Reviewed">Reviewed</option><option value="Rejected">Rejected</option></select>
    </div>
-   <div style="display:flex;align-items:center;gap:10px;" x-show="selCount() > 0" x-cloak>
+   <div class="flex-center gap-3" x-show="selCount() > 0" x-cloak>
     <span style="font-size:12px;font-weight:600;color:#334155;"><span x-text="selCount()"></span> selected</span>
     <button class="tbtn tbtn-ghost" @click="exportSel()">
      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
@@ -452,8 +452,8 @@
     <div style="width:54px;height:54px;border-radius:15px;background:#F0FDF4;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;">
      <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#16A34A" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
     </div>
-    <p style="font-size:14px;font-weight:700;color:#0F172A;margin:0 0 4px;">No open action items</p>
-    <p style="font-size:12px;color:#64748B;margin:0;">Every gap and conflict has been resolved or approved.</p>
+    <p class="text-heading-lg">No open action items</p>
+    <p class="text-muted">Every gap and conflict has been resolved or approved.</p>
    </div>
    {% endif %}
   </div>
@@ -468,8 +468,8 @@
   {# ── KPI row ── #}
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;">
    {# Coverage #}
-   <div class="kpi" style="background:#fff;border-color:#E5E7EB;">
-    <div style="display:flex;align-items:center;justify-content:space-between;">
+   <div class="kpi" class="border-primary">
+    <div class="flex-between">
      <div class="kpi-icon" style="background:#F1F5F9;"><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#475569" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
      {% if coverage_total %}<span style="font-size:11px;font-weight:600;color:{% if mapping_compliance_pct < 50 %}#B91C1C{% else %}#94A3B8{% endif %};">{% if mapping_compliance_pct >= 80 %}On track{% elif mapping_compliance_pct >= 50 %}At risk{% else %}Below target{% endif %}</span>{% endif %}
     </div>
@@ -478,8 +478,8 @@
     {% if coverage_total %}<div class="mini-track" style="margin-top:12px;background:#F1F5F9;"><div class="mini-fill" style="width:{% widthratio coverage_done coverage_total 100 %}%;background:#334155;"></div></div><p class="kpi-sub">{{ coverage_done }} of {{ coverage_total }} obligations</p>{% else %}<p class="kpi-sub" style="margin-top:12px;">No policy mappings yet</p>{% endif %}
    </div>
    {# Conflicts — with real sparkline #}
-   <div class="kpi" style="background:#fff;border-color:#E5E7EB;">
-    <div style="display:flex;align-items:center;justify-content:space-between;">
+   <div class="kpi" class="border-primary">
+    <div class="flex-between">
      <div class="kpi-icon" style="background:#F1F5F9;"><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#475569" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/></svg></div>
      {% if conflicts_delta and conflicts_delta.dir != 'flat' %}<span class="delta" style="color:{% if conflicts_delta.dir == 'up' %}#B91C1C{% else %}#15803D{% endif %};"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4"><path stroke-linecap="round" stroke-linejoin="round" d="{% if conflicts_delta.dir == 'up' %}M4.5 15.75l7.5-7.5 7.5 7.5{% else %}M19.5 8.25l-7.5 7.5-7.5-7.5{% endif %}"/></svg>{{ conflicts_delta.mag_diff }}</span>{% endif %}
     </div>
@@ -488,8 +488,8 @@
     <div class="spark" style="margin-top:12px;">{% for v in spark_conflicts %}<span style="height:{% if spark_conflicts_max %}{% widthratio v spark_conflicts_max 100 %}{% else %}0{% endif %}%;background:{% if v %}#C7D2FE{% else %}#EEF2F6{% endif %};"></span>{% endfor %}</div>
    </div>
    {# Equivalent #}
-   <div class="kpi" style="background:#fff;border-color:#E5E7EB;">
-    <div style="display:flex;align-items:center;justify-content:space-between;">
+   <div class="kpi" class="border-primary">
+    <div class="flex-between">
      <div class="kpi-icon" style="background:#F1F5F9;"><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#475569" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9"/></svg></div>
     </div>
     <p class="kpi-val" style="color:#0F172A;">{% if total_results %}{{ equivalent_pct }}%{% else %}—{% endif %}</p>
@@ -497,8 +497,8 @@
     <p class="kpi-sub" style="margin-top:12px;">aligned across jurisdictions</p>
    </div>
    {# Avg confidence #}
-   <div class="kpi" style="background:#fff;border-color:#E5E7EB;">
-    <div style="display:flex;align-items:center;justify-content:space-between;">
+   <div class="kpi" class="border-primary">
+    <div class="flex-between">
      <div class="kpi-icon" style="background:#F1F5F9;"><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#475569" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg></div>
     </div>
     <p class="kpi-val" style="color:#0F172A;">{% if total_results %}{{ avg_confidence_pct }}%{% else %}—{% endif %}</p>
@@ -538,14 +538,14 @@
     {% for j in mapping_jurisdictions %}
     <div>
      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;">
-      <div style="display:flex;align-items:center;gap:10px;">
+      <div class="flex-center gap-3">
        <span style="font-size:13px;font-weight:700;color:#0F172A;min-width:82px;">{{ j.label }}</span>
        <span style="font-size:11.5px;color:#94A3B8;">{{ j.total }} obligation{{ j.total|pluralize }}</span>
       </div>
       <div style="display:flex;align-items:center;gap:16px;">
-       <span style="font-size:11px;color:#475569;"><strong style="color:#16A34A;">{{ j.covered }}</strong> covered</span>
-       <span style="font-size:11px;color:#475569;"><strong style="color:#D97706;">{{ j.partial }}</strong> partial</span>
-       <span style="font-size:11px;color:#475569;"><strong style="color:#DC2626;">{{ j.gaps }}</strong> gaps</span>
+       <span class="text-body-sm"><strong style="color:#16A34A;">{{ j.covered }}</strong> covered</span>
+       <span class="text-body-sm"><strong style="color:#D97706;">{{ j.partial }}</strong> partial</span>
+       <span class="text-body-sm"><strong style="color:#DC2626;">{{ j.gaps }}</strong> gaps</span>
        <span style="font-size:14px;font-weight:800;color:{% if j.pct >= 80 %}#15803D{% elif j.pct >= 50 %}#B45309{% else %}#B91C1C{% endif %};font-variant-numeric:tabular-nums;">{{ j.pct }}%</span>
       </div>
      </div>

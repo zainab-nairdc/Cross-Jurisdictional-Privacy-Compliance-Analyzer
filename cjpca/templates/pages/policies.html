@@ -171,7 +171,7 @@
  <col>
  </colgroup>
  <tbody>
- <tr style="border-bottom:1px solid #E5E8EF;">
+ <tr class="border-b">
  <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;vertical-align:middle;">Status</td>
  <td style="padding:5px 0;vertical-align:middle;">
  <span x-show="selectedDoc?.status === 'indexed'" style="font-size:10px;font-weight:600;color:#002583;">Ready to use</span>
@@ -179,12 +179,12 @@
  <span x-show="selectedDoc?.status === 'failed'" style="font-size:10px;font-weight:600;color:#002583;">Upload issue</span>
  </td>
  </tr>
- <tr style="border-bottom:1px solid #E5E8EF;">
+ <tr class="border-b">
  <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;">Type</td>
  <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;word-break:break-word;" x-text="selectedDoc?.type_label"></td>
  </tr>
  <template x-if="selectedDoc?.regulation_category">
- <tr style="border-bottom:1px solid #E5E8EF;">
+ <tr class="border-b">
  <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;">Category</td>
  <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;word-break:break-word;text-transform:capitalize;" x-text="selectedDoc?.regulation_category"></td>
  </tr>
@@ -194,13 +194,13 @@
  <template x-if="selectedDoc?.applicable_sector">
  </template>
  <template x-if="selectedDoc?.issuing_authority">
- <tr style="border-bottom:1px solid #E5E8EF;">
+ <tr class="border-b">
  <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;">Department</td>
  <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;word-break:break-word;" x-text="selectedDoc?.issuing_authority"></td>
  </tr>
  </template>
  <template x-if="selectedDoc?.effective_date">
- <tr style="border-bottom:1px solid #E5E8EF;">
+ <tr class="border-b">
  <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;">Effective</td>
  <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;" x-text="selectedDoc?.effective_date"></td>
  </tr>
@@ -212,13 +212,13 @@
  <template x-if="selectedDoc?.version">
  </template>
  <template x-if="selectedDoc?.section_identifiers">
- <tr style="border-bottom:1px solid #E5E8EF;">
+ <tr class="border-b">
  <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;">Sections</td>
  <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;word-break:break-word;" x-text="selectedDoc?.section_identifiers"></td>
  </tr>
  </template>
  <template x-if="selectedDoc?.parent_regulation">
- <tr style="border-bottom:1px solid #E5E8EF;">
+ <tr class="border-b">
  <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;">Maps to</td>
  <td style="padding:5px 0;font-size:10px;color:#002583;vertical-align:middle;word-break:break-word;font-family:'Satoshi',sans-serif;" x-text="selectedDoc?.parent_regulation"></td>
  </tr>

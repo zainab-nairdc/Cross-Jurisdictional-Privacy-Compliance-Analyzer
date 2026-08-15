@@ -45,6 +45,9 @@ INSTALLED_APPS = [
     'channels',
     'django_htmx',
     'widget_tweaks',
+    'django_otp',
+    'django_otp.plugins.otp_totp',
+    'django_otp.plugins.otp_static',
     # project apps
     'apps.core.apps.CoreConfig',
     'apps.home.apps.HomeConfig',
@@ -231,6 +234,9 @@ FEEDBACK_RERANK_ENABLED = True
 # early run, +0.070 on 2026-08-11) does not establish usefulness either way.
 # Do not enable without a non-circular evaluation.
 FEEDBACK_FEWSHOT_ENABLED = False
+# Optional recency decay for feedback signals. Set to a number of days (e.g. 90)
+# to halve a signal's weight every that many days. None/0 = disabled (permanent).
+FEEDBACK_DECAY_HALF_LIFE_DAYS = None
 
 # ── Structure-aware retrieval (navigator-lite) ───────────────────────────────
 # "Read like a person": for a Copilot question, similarity finds the document,

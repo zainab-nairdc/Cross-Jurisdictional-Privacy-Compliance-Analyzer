@@ -4,6 +4,8 @@ from . import views
 urlpatterns = [
     # POST /copilot/message/
     path('copilot/message/', views.CopilotMessageView.as_view(), name='copilot-message'),
+    # POST /copilot/feedback/ — thumbs up/down on a Copilot answer
+    path('copilot/feedback/', views.CopilotFeedbackView.as_view(), name='copilot-feedback'),
     # POST /copilot/clear/
     path('copilot/clear/', views.CopilotClearView.as_view(), name='copilot-clear'),
     # POST /copilot/toggle-drafts/ (legacy — kept for backwards compat)

@@ -226,7 +226,35 @@ reviewer can decide with full context.
     </form>
    {% endif %}
   </div>
+   </div>
+  </div>
  </div>
-
-</div>
+ {% if show_undo_toast %}
+ <script>
+  (function() {
+   var prev = '{{ previous_lifecycle }}';
+   var pk = '{{ item.pk }}';
+   var target = '#rv-map-card-{{ item.pk }}';
+   window.showToast(
+     'Marked as {{ item.lifecycle|title }}',
+     'Undo',
+     function() {
+      var form = new FormData();
+      form.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]')?.value || '');
+      form.append('action', 'reset');
+      fetch("{% url 'mapping-obligation-transition' item.pk %}", {
+        method: 'POST',
+        body: form,
+        headers: {'X-Requested-With': 'XMLHttpRequest'},
+      }).then(function(r) { if (r.ok) return r.text(); }).then(function(html) {
+        if (html) {
+          var el = document.querySelector(target);
+          if (el) { el.outerHTML = html; }
+        }
+      });
+     }
+   );
+  })();
+ </script>
+ {% endif %}
 {% endwith %}

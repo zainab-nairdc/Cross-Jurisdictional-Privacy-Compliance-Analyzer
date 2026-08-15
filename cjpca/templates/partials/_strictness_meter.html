@@ -48,7 +48,7 @@ Context: result (StrictnessResult dataclass)
  <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;">
  <div>
  <p style="font-size:13px;font-weight:700;color:#002583;margin:0 0 3px;">Strictness breakdown</p>
- <p style="font-size:11px;color:#002583;margin:0;">{{ result.document_name }}</p>
+ <p class="text-sm-primary-no-margin">{{ result.document_name }}</p>
  </div>
  <button
  @click="open = false"
@@ -82,7 +82,7 @@ Context: result (StrictnessResult dataclass)
  </thead>
  <tbody>
  {% for key, comp in result.components.items %}
- <tr style="border-bottom:1px solid #E5E8EF;">
+ <tr class="border-b">
  <td style="padding:7px 8px;color:#002583;font-family:'Satoshi',system-ui,sans-serif;">{{ comp.label }}</td>
  <td style="padding:7px 8px;text-align:right;font-family:'Satoshi',sans-serif;color:#002583;">{{ comp.value }}</td>
  <td style="padding:7px 8px;text-align:right;font-family:'Satoshi',sans-serif;color:#002583;">{{ comp.normalized }}</td>

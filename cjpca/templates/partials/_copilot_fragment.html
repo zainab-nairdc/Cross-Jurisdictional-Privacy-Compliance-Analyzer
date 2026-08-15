@@ -3,7 +3,10 @@
 HTMX fragment — AI bubble only. The user bubble is rendered client-side
 on submit so the message shows instantly with a typing indicator.
 {% endcomment %}
-<div class="cp-ai flex gap-2" data-cp-ai>
+<div class="cp-ai flex gap-2" data-cp-ai
+     data-message-id="{{ message_id|default:'' }}"
+     data-chunk-ids="{{ chunk_ids|join:','|default:'' }}"
+     data-user-msg="{{ user_message|escapejs }}">
  <img src="{% static 'img/cjpca-copilot-icon.svg' %}" alt="Copilot" class="flex-shrink-0 mt-0.5" style="width:24px;height:24px;border-radius:7px;">
  <div class="cp-ai-wrap flex-1 min-w-0">
   {# Answer — rich markdown (bold, lists, paragraphs) #}
@@ -61,13 +64,20 @@ on submit so the message shows instantly with a typing indicator.
    </div>
   {% endif %}
 
-  {# Message actions — copy / regenerate #}
+  {# Message actions — copy / regenerate / feedback #}
   <div class="cp-actions" style="display:flex;align-items:center;gap:2px;margin-top:7px;">
    <button type="button" class="cp-act-btn" title="Copy answer" onclick="cpCopyAnswer(this)">
     <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m11.25 6.376V16.5"/></svg>
    </button>
    <button type="button" class="cp-act-btn" title="Regenerate" onclick="cpRegenerate(this)">
     <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992V4.356M20.015 9.348a8.25 8.25 0 10.007 5.652M3.985 14.652H-.007"/></svg>
+   </button>
+   <span style="width:1px;height:14px;background:#E5E8EF;margin:0 4px;"></span>
+    <button type="button" class="cp-fb-btn" data-label="Accurate" title="This answer is accurate and helpful" data-fb="up" onclick="cpFeedback(this)">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M6.633 10.5c.806 0 1.533-.446 2.031-1.08a8.25 8.25 0 012.958-2.166c1.254-.624 2.667-.624 3.92 0 1.254.624 2.25 1.558 2.958 2.166.498.634 1.225 1.08 2.031 1.08h.006c1.091 0 1.981-.89 1.981-1.981v-9.75c0-1.091-.89-1.981-1.981-1.981h-.006c-1.091 0-1.981.89-1.981 1.981v9.75c0 1.091.89 1.981 1.981 1.981h.006zM6.633 10.5H4.5m2.133 0L6.633 10.5zM12 15.75h.007v.008H12v-.008z"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 15.75c-1.148 0-2.248-.31-3.232-.882a8.25 8.25 0 01-2.958-2.166c-.624-1.254-.624-2.667 0-3.92.624-1.254 1.558-2.25 2.166-2.958.498-.634 1.08-1.225 1.08-2.031 0-.598-.24-1.163-.66-1.58a1.931 1.931 0 00-1.375-.61H4.5c-1.091 0-1.981.89-1.981 1.981v9.75c0 1.091.89 1.981 1.981 1.981h.006c1.091 0 1.981-.89 1.981-1.981v-2.133c0-.598.24-1.163.66-1.58a1.931 1.931 0 011.375-.61c.806 0 1.533.446 2.031 1.08.498.634 1.225 1.08 2.031 1.08h.006c1.091 0 1.981-.89 1.981-1.981v-2.133c0-.598-.24-1.163-.66-1.58a1.931 1.931 0 00-1.375-.61 8.25 8.25 0 01-3.232-.882z"/></svg>
+   </button>
+    <button type="button" class="cp-fb-btn" data-label="Needs improvement" title="This answer needs improvement" data-fb="down" onclick="cpFeedback(this)">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 15h9.75m-9.75 0H15m-9.75 0L7.5 15zM12 3.75v9.75m0-9.75c-1.148 0-2.248.31-3.232.882a8.25 8.25 0 00-2.958 2.166c-.624 1.254-.624 2.667 0 3.92.624 1.254 1.558 2.25 2.166 2.958.498.634 1.08 1.225 1.08 2.031 0 .598-.24 1.163-.66 1.58a1.931 1.931 0 00-.61 1.375c0 .806.446 1.533 1.08 2.031.634.498 1.08 1.225 1.08 2.031 0 .598-.24 1.163-.66 1.58a1.931 1.931 0 00-.61 1.375c0 .598.24 1.163.66 1.58a1.931 1.931 0 001.375.61c.806 0 1.533-.446 2.031-1.08.498-.634 1.225-1.08 2.031-1.08h.006c1.091 0 1.981.89 1.981 1.981v9.75c0 1.091.89 1.981 1.981 1.981h.006c1.091 0 1.981-.89 1.981-1.981v-2.133c0-.598-.24-1.163-.66-1.58a1.931 1.931 0 00-1.375-.61c-.806 0-1.533.446-2.031 1.08-.498.634-1.225 1.08-2.031 1.08h-.006c-1.091 0-1.981-.89-1.981-1.981v-2.133c0-.598.24-1.163.66-1.58a1.931 1.931 0 011.375-.61c.806 0 1.533.446 2.031 1.08.498.634 1.225 1.08 2.031 1.08h.006c1.091 0 1.981-.89 1.981-1.981v-2.133c0-.598-.24-1.163-.66-1.58a1.931 1.931 0 00-1.375-.61z"/></svg>
    </button>
   </div>
  </div>

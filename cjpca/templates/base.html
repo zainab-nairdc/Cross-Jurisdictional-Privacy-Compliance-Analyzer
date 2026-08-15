@@ -16,22 +16,227 @@
  {# Tailwind compiled output — run: npx tailwindcss -i static/css/tailwind.css -o static/css/output.css --watch #}
  <link rel="stylesheet" href="{% static 'css/output.css' %}">
 
- {# HTMX 2.x #}
- <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js" defer></script>
+  {# HTMX 2.x #}
+  <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js" defer></script>
 
- {# Alpine.js 3 — must load before defer scripts that reference x-data #}
- <script defer src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js"></script>
+  {# Alpine.js 3 — must load before defer scripts that reference x-data #}
+  <script defer src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js"></script>
 
- {# Prevent Alpine x-cloak flash #}
- <style>[x-cloak]{display:none!important}</style>
+  {# Design system tokens — single source of truth for colors #}
+   <style>
+    :root {
+     --color-primary:       #002583;
+     --color-primary-dark:  #001D66;
+     --color-success:       #1B7F3A;
+     --color-success-dark:  #166830;
+     --color-success-light: #E1F4E5;
+     --color-danger:        #D93939;
+     --color-danger-dark:   #B3261E;
+     --color-danger-light:  #FCE8E8;
+     --color-warning:       #B07A00;
+     --color-warning-light: #FFF6E0;
+     --color-neutral-100:   #F4F6FB;
+     --color-neutral-200:   #E5E8EF;
+     --color-neutral-300:   #CBD5E1;
+     --color-neutral-400:   #94A3B8;
+     --color-neutral-500:   #6B7280;
+     --color-neutral-600:   #475569;
+     --color-neutral-700:   #334155;
+     --color-neutral-800:   #1F2937;
+     --color-neutral-900:   #002583;
+    }
+    [x-cloak]{display:none!important}
+   </style>
 
- <style>
- main .flex.items-center.justify-between.flex-shrink-0 { padding-right: 60px !important; }
- main > * > div[style*="border-bottom"][style*="flex-shrink:0"]:first-child,
- main > * > * > div[style*="border-bottom"][style*="flex-shrink:0"]:first-child {
- padding-right: 60px !important;
- }
- </style>
+   <style>
+    .skel { background: linear-gradient(90deg, #E5E8EF 25%, #F4F6FB 50%, #E5E8EF 75%); background-size: 200% 100%; animation: skel 1.2s ease-in-out infinite; border-radius: 6px; }
+    @keyframes skel { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+    .toast-container { position:fixed; bottom:20px; right:20px; z-index:99999; display:flex; flex-direction:column; gap:8px; }
+    .toast { background:#fff; border:1px solid #E5E8EF; border-radius:10px; padding:12px 16px; box-shadow:0 8px 24px rgba(0,0,0,.12); display:flex; align-items:center; gap:10px; min-width:280px; max-width:420px; animation: toastIn .25s ease; }
+    @keyframes toastIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
+    .toast.leaving { animation: toastOut .2s ease forwards; }
+    @keyframes toastOut { to{opacity:0;transform:translateY(10px)} }
+    .toast-undo { padding:4px 10px; border-radius:6px; background:#002583; color:#fff; border:none; font-size:10px; font-weight:700; cursor:pointer; font-family:inherit; white-space:nowrap; }
+    .toast-undo:hover { background:#001D66; }
+    .toast-msg { flex:1; font-size:11px; color:#002583; line-height:1.4; }
+   </style>
+
+   {# Design system — reusable component classes #}
+   <style>
+    /* ── Buttons ─────────────────────────────────────────── */
+    .btn { display:inline-flex; align-items:center; gap:5px; padding:7px 14px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; font-family:inherit; transition:background .12s, transform .12s; border:none; white-space:nowrap; }
+    .btn:active { transform:scale(.98); }
+    .btn-primary { background:#002583; color:#fff; box-shadow:0 1px 4px rgba(0,37,131,.22); }
+    .btn-primary:hover { background:#001D66; }
+    .btn-primary:disabled, .btn-primary.is-disabled { opacity:.4; cursor:not-allowed; box-shadow:none; }
+    .btn-success { background:#1B7F3A; color:#fff; box-shadow:0 1px 4px rgba(27,127,58,.22); }
+    .btn-success:hover { background:#166830; }
+    .btn-danger { background:#fff; color:#D93939; border:1.5px solid #FCE8E8; }
+    .btn-danger:hover { background:#FCE8E8; }
+    .btn-ghost { background:rgba(0,37,131,0.08); color:#002583; border:none; }
+    .btn-ghost:hover { background:rgba(0,37,131,0.15); }
+    .btn-outline { background:#fff; color:#6B7280; border:1px solid #E5E8EF; }
+    .btn-outline:hover { background:#F7F9FC; }
+    .btn-sm { padding:5px 10px; font-size:10px; border-radius:6px; }
+
+    /* ── Cards ──────────────────────────────────────────── */
+    .card { background:#fff; border:1px solid #E5E8EF; border-radius:12px; box-shadow:0 1px 3px rgba(27,48,104,0.06); }
+    .card-flat { background:#fff; border:1px solid #E5E8EF; border-radius:12px; box-shadow:none; }
+    .card-body { padding:14px 16px; }
+    .card-pad { padding:14px 18px; }
+
+    /* ── Badges / chips ─────────────────────────────────── */
+    .badge { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:20px; font-size:9px; font-weight:700; line-height:1.5; white-space:nowrap; }
+    .badge-sm { display:inline-flex; align-items:center; gap:4px; padding:1px 6px; border-radius:4px; font-size:9px; font-weight:700; white-space:nowrap; flex-shrink:0; }
+    .badge-primary { background:rgba(0,37,131,0.08); color:#002583; }
+    .badge-success { background:#E1F4E5; color:#1B7F3A; }
+    .badge-danger { background:#FCE8E8; color:#D93939; }
+    .badge-warning { background:#FFF6E0; color:#B07A00; }
+    .badge-neutral { background:#F4F6FB; color:#6B7280; }
+
+    /* ── Typography ─────────────────────────────────────── */
+    .text-label { font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; color:#6B7280; }
+    .text-heading { font-size:13.5px; font-weight:700; color:#1F2937; }
+    .text-body { font-size:11.5px; color:#1F2937; line-height:1.55; }
+    .text-muted { font-size:10px; color:#6B7280; }
+    .text-link { color:#002583; text-decoration:none; }
+    .text-link-bold { font-size:10px; color:#002583; text-decoration:none; font-weight:700; }
+    .text-link:hover { text-decoration:underline; }
+    .text-title { font-size:12px; font-weight:600; color:#002583; margin:0; line-height:1.3; }
+    .text-semibold { font-size:10px; font-weight:700; color:#6B7280; }
+    .text-xs-primary { font-size:10px; color:#002583; margin:0; }
+    .text-block-label { display:block; font-size:10px; font-weight:600; color:#002583; margin-bottom:4px; }
+    .icon-box { width:26px; height:26px; border-radius:7px; background:#002583; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .icon-dot { width:8px; height:8px; border-radius:2px; background:#002583; flex-shrink:0; }
+    .text-st { font-size:10.5px; color:var(--st-text); }
+    .text-sm-primary { font-size:11px; color:#002583; }
+    .text-2xs-primary { font-size:9px; color:#002583; }
+    .text-2xs-primary-shrink { font-size:9px; color:#002583; flex-shrink:0; }
+    .text-uppercase-label-muted { font-size:10px; font-weight:800; color:#94A0B8; text-transform:uppercase; letter-spacing:.06em; margin:0 0 9px; }
+    .text-uppercase-label { font-size:9px; font-weight:800; color:#002583; text-transform:uppercase; letter-spacing:.07em; margin:0 0 3px; }
+    .text-uppercase-label-lg { font-size:10px; font-weight:800; color:#002583; text-transform:uppercase; letter-spacing:.07em; margin:0 0 8px; }
+    .flex-center-gap-sm { display:flex; align-items:center; gap:5px; }
+    .flex-center-gap-md { display:flex; align-items:center; gap:8px; }
+    .flex-center-gap-lg { display:flex; align-items:center; gap:7px; }
+    .flex-center-wrap { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .flex-wrap { display:flex; flex-wrap:wrap; gap:8px; }
+    .text-muted-middle { padding:6px 0; font-size:10px; color:#7B8499; vertical-align:middle; }
+    .flex-1-scroll { flex:1; min-height:0; overflow-y:auto; }
+    .badge-lg { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:20px; font-size:10px; font-weight:700; white-space:nowrap; }
+    .text-sm-primary-no-margin { font-size:11px; color:#002583; margin:0; }
+    .border-primary { background:#fff; border-color:#E5E7EB; }
+    .text-body-sm { font-size:11px; color:#475569; }
+    .text-heading-lg { font-size:14px; font-weight:700; color:#0F172A; margin:0 0 4px; }
+    .text-section-label { font-size:9px; font-weight:800; color:#002583; text-transform:uppercase; letter-spacing:.06em; margin:0 0 3px; }
+    .text-stat-value { font-size:20px; font-weight:800; color:#002583; margin:0; line-height:1; }
+    .text-muted-custom { font-size:11px; color:#666; margin:0 0 10px; }
+    .text-muted-custom-sm { font-size:9.5px; color:#666; margin:3px 0 0; }
+    .chip { padding:2px 7px; border:1px solid #E5E8EF; border-radius:5px; }
+    .th-text { text-align:left; padding:5px 6px; font-size:9px; text-transform:uppercase; letter-spacing:.07em; color:#7B8499; }
+    .text-micro { font-size:8.5px; font-weight:800; color:#002583; text-transform:uppercase; letter-spacing:.07em; margin:0 0 2px; }
+    .text-body-primary { font-size:11.5px; color:#002583; line-height:1.55; margin:0; }
+    .btn-card { background:#fff; border:1px solid #E5E8EF; border-radius:8px; padding:7px 14px; font-size:12px; font-weight:700; color:#002583; cursor:pointer; display:flex; align-items:center; gap:6px; font-family:inherit; }
+    .text-italic-primary { font-size:11px; color:#002583; font-style:italic; line-height:1.55; margin:0; }
+    .footer-bar { padding:9px 16px; background:#ffffff; border-top:1px solid #E5E8EF; }
+    .alert-warning { border:1px solid #FFE9A8; border-radius:8px; padding:8px 11px; background:#FFFBEB; }
+    .text-alert-label { font-size:9px; font-weight:800; color:#7A5500; text-transform:uppercase; letter-spacing:.07em; margin:0 0 2px; }
+    .text-alert-value { font-size:18px; font-weight:800; color:#7A5500; margin:0; line-height:1; }
+    .text-label-muted { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:#6B7280; margin-top:1px; }
+    .text-9-muted { font-size:9px; color:#6B7280; }
+    .text-11-muted { font-size:11px; color:#6B7280; margin:0; line-height:1.5; }
+    .progress-track { width:180px; height:6px; background:#EEF1F6; border-radius:3px; overflow:hidden; }
+    .progress-fill { height:100%; display:flex; }
+    .text-11-primary { font-size:11px; font-weight:700; color:#002583; }
+    .text-muted-weight-500 { color:#6B7280; font-weight:500; }
+    .border-b-light { border-bottom:1px solid #EEF1F7; }
+    .spinner { width:18px; height:18px; border:2px solid #E5E8EF; border-top-color:#002583; border-radius:50%; animation:viewer-spin .7s linear infinite; }
+    .text-body-secondary { font-size:12.5px; line-height:1.6; color:#3A4560; margin:0; }
+    .text-heading-dark { font-size:12.5px; color:#14213D; }
+    .text-help { display:block; font-size:11.5px; color:#667085; line-height:1.5; margin-top:2px; }
+    .flex-center-full { display:flex; align-items:center; justify-content:center; height:100%; }
+    .text-cell { padding:6px 0; font-size:10.5px; vertical-align:middle; word-break:break-word; }
+    .btn-block { display:flex; align-items:center; justify-content:center; gap:6px; padding:7px; border-radius:7px; border:1px solid #E5E8EF; color:#002583; font-size:11px; font-weight:500; background:#fff; cursor:pointer; width:100%; }
+    .btn-link-block { display:flex; align-items:center; justify-content:center; gap:6px; padding:7px; border-radius:7px; border:1px solid #E5E8EF; color:#002583; font-size:11px; font-weight:500; text-decoration:none; background:#fff; }
+    .col-stack { min-width:0; display:flex; flex-direction:column; }
+    .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
+    .text-display { font-size:15px; font-weight:800; color:#0F172A; margin:0; }
+    .input-area { width:100%; border:1px solid #E5E8EF; border-radius:7px; padding:6px 8px; font-size:11px; color:#002583; outline:none; resize:none; box-sizing:border-box; }
+    .mt-1 { margin-top:1px; }
+
+    /* ── Form controls ──────────────────────────────────── */
+    .input { width:100%; padding:7px 12px; border:1px solid #E5E8EF; border-radius:8px; font-size:11.5px; color:#1F2937; font-family:inherit; outline:none; box-sizing:border-box; background:#fff; transition:border-color .12s; }
+    .input-sm { width:100%; border:1px solid #E5E8EF; border-radius:7px; padding:6px 8px; font-size:11px; color:#002583; outline:none; box-sizing:border-box; }
+    .input:focus { border-color:#002583; }
+    .textarea { width:100%; padding:11px 13px; border-radius:8px; border:1.5px solid #E5E8EF; font-size:12px; color:#1F2937; line-height:1.55; resize:vertical; outline:none; box-sizing:border-box; font-family:inherit; background:#fff; transition:border-color .12s; }
+    .textarea:focus { border-color:#002583; }
+
+    /* ── Layout utilities ───────────────────────────────── */
+    .flex-center { display:flex; align-items:center; }
+    .flex-between-start { display:flex; align-items:flex-start; justify-content:space-between; }
+    .flex-between { display:flex; align-items:center; justify-content:space-between; }
+    .gap-2 { gap:8px; }
+    .gap-3 { gap:12px; }
+    .gap-4 { gap:16px; }
+    .p-3 { padding:12px; }
+    .p-4 { padding:16px; }
+    .px-3 { padding-left:12px; padding-right:12px; }
+    .px-4 { padding-left:16px; padding-right:16px; }
+    .py-2 { padding-top:8px; padding-bottom:8px; }
+    .py-3 { padding-top:12px; padding-bottom:12px; }
+    .mb-2 { margin-bottom:8px; }
+    .mb-3 { margin-bottom:12px; }
+    .mb-4 { margin-bottom:16px; }
+    .mt-2 { margin-top:8px; }
+    .mt-3 { margin-top:12px; }
+    .w-full { width:100%; }
+    .min-w-0 { min-width:0; }
+    .flex-1 { flex:1; }
+    .flex-shrink-0 { flex-shrink:0; }
+    .flex-wrap { flex-wrap:wrap; }
+    .gap-1 { gap:4px; }
+    .gap-1-5 { gap:6px; }
+    .gap-2 { gap:8px; }
+    .gap-3 { gap:12px; }
+    .gap-4 { gap:16px; }
+    .p-3 { padding:12px; }
+    .p-4 { padding:16px; }
+    .px-3 { padding-left:12px; padding-right:12px; }
+    .px-4 { padding-left:16px; padding-right:16px; }
+    .py-2 { padding-top:8px; padding-bottom:8px; }
+    .py-3 { padding-top:12px; padding-bottom:12px; }
+    .mb-2 { margin-bottom:8px; }
+    .mb-3 { margin-bottom:12px; }
+    .mb-4 { margin-bottom:16px; }
+    .mt-2 { margin-top:8px; }
+    .mt-3 { margin-top:12px; }
+    .w-full { width:100%; }
+    .min-w-0 { min-width:0; }
+    .flex-1 { flex:1; }
+    .flex-shrink-0 { flex-shrink:0; }
+    .overflow-auto { overflow:auto; }
+    .overflow-hidden { overflow:hidden; }
+    .text-center { text-align:center; }
+    .text-right { text-align:right; }
+
+    /* ── Tables ─────────────────────────────────────────── */
+    .table { width:100%; border-collapse:collapse; }
+    .table th { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#6B7280; padding:8px 12px; text-align:left; border-bottom:1px solid #E5E8EF; background:#F7F9FC; }
+    .table td { padding:10px 12px; font-size:11.5px; color:#1F2937; border-bottom:1px solid #E5E8EF; vertical-align:middle; }
+    .table tr:hover td { background:#F7F9FC; }
+
+    /* ── Misc ───────────────────────────────────────────── */
+    .divider { border:none; border-top:1px solid #E5E8EF; margin:12px 0; }
+    .border-b { border-bottom:1px solid #E5E8EF; }
+    .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+   </style>
+
+  <style>
+  main .flex.items-center.justify-between.flex-shrink-0 { padding-right: 60px !important; }
+  main > * > div[style*="border-bottom"][style*="flex-shrink:0"]:first-child,
+  main > * > * > div[style*="border-bottom"][style*="flex-shrink:0"]:first-child {
+  padding-right: 60px !important;
+  }
+  </style>
 
  {# Chart.js (loaded on pages that need it via {% block extra_head %}) #}
  {% block extra_head %}{% endblock %}
@@ -39,9 +244,14 @@
 
 {% comment %}Root Alpine state. docViewerChunkId pins the highlight to a specific chunk node_id (rock-solid match), while docViewerArt is the legacy verbatim-quote substring (used when no chunk_id is available).{% endcomment %}
 <body class="h-full font-sans text-sm bg-gray-50 text-gray-900"
- x-data="{ copilotOpen: false, docViewerOpen: false, docViewerDoc: '', docViewerArt: '', docViewerChunkId: '', sidebarOpen: localStorage.getItem('sidebarOpen') !== 'false' }">
+ x-data="{ copilotOpen: sessionStorage.getItem('copilotOpen') === 'true', docViewerOpen: false, docViewerDoc: '', docViewerArt: '', docViewerChunkId: '', sidebarOpen: localStorage.getItem('sidebarOpen') !== 'false' }"
+  x-init="$watch('copilotOpen', v => sessionStorage.setItem('copilotOpen', v))">
 
- {% comment %}App shell — pinned to the viewport rather than relying on being the
+  <a href="#main-content" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;"
+   onfocus="this.style.left='6px';this.style.top='6px';this.style.width='auto';this.style.height='auto';this.style.overflow='visible';this.style.zIndex='99999';"
+   onblur="this.style.left='-9999px'">Skip to main content</a>
+
+  {% comment %}App shell — pinned to the viewport rather than relying on being the
  first in-flow block. It is already exactly viewport-sized (h-screen +
  overflow-hidden); anchoring it means nothing above it in the body flow can
  push the sidebar and main column down. Safe for the fixed overlays inside it:
@@ -52,11 +262,14 @@
  {# Fixed 192px sidebar — always visible #}
  {% include 'partials/_sidebar.html' %}
 
- {# Main = non-scrolling flex column so in-page sticky headers work (see wrapper below) #}
- <main class="flex-1 min-w-0 overflow-hidden flex flex-col">
+   {# Main = non-scrolling flex column so in-page sticky headers work (see wrapper below) #}
+   <main id="main-content" class="flex-1 min-w-0 overflow-hidden flex flex-col">
 
- {# Contextual wizard banner (dismissible, per-page colour) #}
- {% include 'partials/_wizard_banner.html' %}
+  {# Breadcrumb trail — overridable per page #}
+  {% block breadcrumb %}{% endblock %}
+
+  {# Contextual wizard banner (dismissible, per-page colour) #}
+  {% include 'partials/_wizard_banner.html' %}
 
  {# Page area bounded to (main − banner); the page's own scroll container is the real scroller #}
  <div class="flex-1 min-h-0 overflow-y-auto">
@@ -83,9 +296,61 @@
 
  </div>
 
- {# Alpine.js init + custom JS #}
- <script src="{% static 'js/app.js' %}"></script>
+  {# Alpine.js init + custom JS #}
+  <script src="{% static 'js/app.js' %}"></script>
+  <script>
+   window.trapFocus = function(modal) {
+     if (!modal) return;
+     const focusable = modal.querySelectorAll(
+       'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
+     );
+     if (!focusable.length) return;
+     const first = focusable[0];
+     const last = focusable[focusable.length - 1];
+     modal.addEventListener('keydown', function(e) {
+       if (e.key !== 'Tab') return;
+       if (e.shiftKey) {
+         if (document.activeElement === first) {
+           e.preventDefault();
+           last.focus();
+         }
+       } else {
+         if (document.activeElement === last) {
+           e.preventDefault();
+           first.focus();
+         }
+       }
+     });
+     first.focus();
+    };
+   </script>
 
- {% block extra_js %}{% endblock %}
+  {# Toast container — mounted once per page #}
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <script>
+   window.showToast = function(message, undoLabel, undoCallback, duration) {
+     duration = duration || 5000;
+     const container = document.getElementById('toast-container');
+     const toast = document.createElement('div');
+     toast.className = 'toast';
+     toast.innerHTML = '<div class=\"toast-msg\">' + message + '</div>' +
+       (undoLabel ? '<button class=\"toast-undo\">' + undoLabel + '</button>' : '');
+     container.appendChild(toast);
+     const undoBtn = toast.querySelector('.toast-undo');
+     if (undoBtn && undoCallback) {
+       undoBtn.addEventListener('click', function() {
+         undoCallback();
+         toast.remove();
+       });
+     }
+     setTimeout(function() {
+       toast.classList.add('leaving');
+       toast.addEventListener('animationend', function() { toast.remove(); });
+     }, duration);
+   };
+  </script>
+
+  {% block extra_js %}{% endblock %}
 </body>
 </html>

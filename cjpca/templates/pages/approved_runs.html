@@ -116,9 +116,11 @@
        {# Reuse actions appear only for a verified, current assessment. #}
        <span class="ar-meta" style="color:#1E7A3C;font-weight:700;">Verified current — reusable</span>
       {% else %}
-       {# Contextual: carries this assessment's own sources and scope into the
-          picker so the analyst re-runs the SAME comparison. Prefill only —
-          they still submit it, and nothing executes from this link. #}
+       {% comment %}
+       Contextual: carries this assessment's own sources and scope into the
+       picker so the analyst re-runs the SAME comparison. Prefill only —
+       they still submit it, and nothing executes from this link.
+       {% endcomment %}
        <a class="ar-btn" href="{% url 'comparison' %}?reg_a_pk={{ run.reg_a_id }}&reg_b_pk={{ run.reg_b_id }}&scope_mode={{ run.source_snapshot.scope.mode|default:'full' }}{% for t in run.source_snapshot.scope.topics %}&topics={{ t|urlencode }}{% endfor %}">Re-run comparison</a>
        <span class="ar-meta">Reuse unavailable —
         {% if run.currency_state == 'outdated' %}a source has changed{% else %}currency cannot be verified{% endif %}</span>

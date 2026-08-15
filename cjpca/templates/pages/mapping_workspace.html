@@ -219,7 +219,19 @@
 
 {% block content %}
 <div class="flex flex-col h-full overflow-hidden"
- x-data="{activeTab: 'mapping', showSendModal: false}"
+ x-data="{
+   activeTab: (function() {
+     var t = new URLSearchParams(window.location.search).get('tab');
+     return ['mapping','gaps','charts'].indexOf(t) >= 0 ? t : 'mapping';
+   })(),
+   showSendModal: false,
+   switchTab(t) {
+     this.activeTab = t;
+     var url = new URL(window.location);
+     url.searchParams.set('tab', t);
+     history.replaceState(null, '', url);
+   }
+ }"
  x-cloak>
 
  {# ── Page header ──────────────────────────────────────────────────── #}
@@ -251,22 +263,22 @@
  </div>
  </div>
  <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
- <span style="font-size:11px;color:#002583;">{{ analysis.obligation_count }} obligation{{ analysis.obligation_count|pluralize }}</span>
+ <span class="text-sm-primary">{{ analysis.obligation_count }} obligation{{ analysis.obligation_count|pluralize }}</span>
  <span style="width:1px;height:16px;background:#ffffff;"></span>
  {# Status badge #}
  {% if analysis.status == 'complete' %}
- <span style="padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;background:#ffffff;color:#002583;">Complete</span>
+ <span class="badge badge-primary badge-lg">Complete</span>
  {% elif analysis.status == 'review' %}
- <span style="padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;background:#ffffff;color:#002583;">In Review</span>
+ <span class="badge badge-primary badge-lg">In Review</span>
  {% elif analysis.status == 'approved' %}
  <span style="padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;background:#ffffff;color:#002583;display:inline-flex;align-items:center;gap:5px;">
  <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
  Validated
  </span>
  {% elif analysis.status == 'failed' %}
- <span style="padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;background:#ffffff;color:#002583;">Failed</span>
+ <span class="badge badge-primary badge-lg">Failed</span>
  {% else %}
- <span style="padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;background:#ffffff;color:#002583;">{{ analysis.status|title }}</span>
+ <span class="badge badge-primary badge-lg">{{ analysis.status|title }}</span>
  {% endif %}
 
  {# Action buttons — Review (analyst) + Validate (reviewer/admin) #}
@@ -398,7 +410,7 @@
  </style>
  <div style="background:#fff;border-bottom:1px solid #E5E8EF;padding:8px 20px;flex-shrink:0;display:flex;align-items:center;gap:6px;">
 
- <button @click="activeTab='mapping'"
+ <button @click="switchTab('mapping')"
  :style="activeTab==='mapping' ? 'background:#002583;color:#fff;font-weight:600;' : 'background:#ffffff;color:#002583;font-weight:500;'"
  class="mw-tab" style="background:#ffffff;color:#002583;font-weight:500;">
  <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
@@ -407,7 +419,7 @@
  style="padding:1px 7px;border-radius:999px;font-size:9px;font-weight:700;">{{ analysis.obligation_count }}</span>
  </button>
 
- <button @click="activeTab='gaps'"
+ <button @click="switchTab('gaps')"
  :style="activeTab==='gaps' ? 'background:#002583;color:#fff;font-weight:600;' : 'background:#ffffff;color:#002583;font-weight:500;'"
  class="mw-tab" style="background:#ffffff;color:#002583;font-weight:500;">
  <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
@@ -419,7 +431,7 @@
  </button>
 
  {% if chart_data %}
- <button @click="activeTab='charts'; $nextTick(() => setTimeout(initMappingCharts, 0))"
+ <button @click="switchTab('charts'); $nextTick(() => setTimeout(initMappingCharts, 0))"
  :style="activeTab==='charts' ? 'background:#002583;color:#fff;font-weight:600;' : 'background:#ffffff;color:#002583;font-weight:500;'"
  class="mw-tab" style="background:#ffffff;color:#002583;font-weight:500;">
  <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"/></svg>
@@ -512,7 +524,7 @@
          <p style="font-size:13.5px;color:var(--st-text);line-height:1.55;margin:0 0 8px;">
            {{ om.obligation_text|default:om.obligation_title }}
          </p>
-         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+         <div class="flex-center-wrap">
            <span style="font-size:10.5px;color:var(--st-text-muted);">Source: <strong style="color:var(--st-text);">{{ om.article_ref }}</strong></span>
            {% if om.citation_verified %}
            <span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:5px;font-size:9.5px;font-weight:700;background:var(--st-covered-bg);color:var(--st-covered-fg);"
@@ -637,7 +649,7 @@
 
          {# Regulation half #}
          <div class="compare-side">
-           <div style="display:flex;align-items:center;justify-content:space-between;">
+           <div class="flex-between">
              <p style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--st-text-muted);margin:0;">Regulation requirement</p>
              <button onclick="(function(){var r=Alpine.$data(document.body);r.docViewerDoc='{{ om.actual_regulation_doc.pk|default:om.regulation.pk }}';r.docViewerArt='{{ om.regulation_evidence|truncatechars:80|default:om.article_ref|escapejs }}';r.docViewerChunkId='{{ om.regulation_chunk_id|escapejs }}';r.docViewerOpen=true;})()"
                      title="Open the regulation document and scroll to the cited paragraph"
@@ -679,7 +691,7 @@
             opening the policy doc would land on nothing useful. We surface
             that as an explicit "no real match found" note instead.{% endcomment %}
          <div class="compare-side">
-           <div style="display:flex;align-items:center;justify-content:space-between;">
+           <div class="flex-between">
              <p style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--st-text-muted);margin:0;">Policy response</p>
              {% if c != 'none' and om.policy_chunk_id and om.analysis.policy_doc %}
              <button onclick="(function(){var r=Alpine.$data(document.body);r.docViewerDoc='{{ om.actual_policy_doc.pk|default:om.analysis.policy_doc.pk }}';r.docViewerArt='{{ om.evidence_text|truncatechars:80|default:om.evidence_source|escapejs }}';r.docViewerChunkId='{{ om.policy_chunk_id|escapejs }}';r.docViewerOpen=true;})()"
@@ -812,7 +824,7 @@
        <div style="min-width:0;flex:1;">
          <p style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--st-text-muted);margin:0 0 4px;">Regulatory obligation with a gap</p>
          <p style="font-size:13.5px;font-weight:700;color:var(--st-text);line-height:1.5;margin:0 0 8px;">{{ gap.obligation_mapping.obligation_text|default:gap.obligation_mapping.obligation_title }}</p>
-         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+         <div class="flex-center-wrap">
            <span style="font-size:10.5px;color:var(--st-text-muted);">Source: <strong style="color:var(--st-text);">{{ gap.obligation_mapping.article_ref }}</strong></span>
            {% if gap.priority == 'critical' %}
            <span style="padding:2px 9px;border-radius:5px;font-size:9.5px;font-weight:800;background:var(--st-none-bg);color:var(--st-none-fg);">CRITICAL</span>
@@ -954,10 +966,10 @@
          {% if counts.none %}<span style="background:var(--st-none-fg);width:{% widthratio counts.none analysis.obligation_count 100 %}%;"></span>{% endif %}
        </div>
        <div style="display:flex;gap:14px;margin-top:8px;flex-wrap:wrap;">
-         <span style="font-size:10.5px;color:var(--st-text);"><strong style="color:var(--st-covered-fg);">{{ counts.covered }}</strong> covered</span>
-         <span style="font-size:10.5px;color:var(--st-text);"><strong style="color:var(--st-partial-fg);">{{ counts.partial }}</strong> partial</span>
-         <span style="font-size:10.5px;color:var(--st-text);"><strong style="color:var(--st-review-fg);">{{ counts.review }}</strong> review</span>
-         <span style="font-size:10.5px;color:var(--st-text);"><strong style="color:var(--st-none-fg);">{{ counts.none }}</strong> not covered</span>
+         <span class="text-st"><strong style="color:var(--st-covered-fg);">{{ counts.covered }}</strong> covered</span>
+         <span class="text-st"><strong style="color:var(--st-partial-fg);">{{ counts.partial }}</strong> partial</span>
+         <span class="text-st"><strong style="color:var(--st-review-fg);">{{ counts.review }}</strong> review</span>
+         <span class="text-st"><strong style="color:var(--st-none-fg);">{{ counts.none }}</strong> not covered</span>
        </div>
      </div>
    </div>
@@ -986,13 +998,13 @@
          <span style="background:var(--st-none-fg);width:{{ unverified_pct }}%;"></span>
        </div>
        <div style="display:flex;gap:14px;margin-top:8px;flex-wrap:wrap;">
-         <span style="font-size:10.5px;color:var(--st-text);" title="Citation passed all structural checks (label + chunk_id + verbatim evidence all matched).">
+         <span class="text-st" title="Citation passed all structural checks (label + chunk_id + verbatim evidence all matched).">
            <strong style="color:var(--st-covered-fg);">{{ verified_count }}/{{ total_obligations }}</strong> citations verified
          </span>
-         <span style="font-size:10.5px;color:var(--st-text);" title="NLI hallucination risk averaged across all rows. 0 = perfectly entailed, 1 = paraphrased beyond what the chunk says.">
+         <span class="text-st" title="NLI hallucination risk averaged across all rows. 0 = perfectly entailed, 1 = paraphrased beyond what the chunk says.">
            <strong style="color:{% if avg_hall_pct < 20 %}var(--st-covered-fg){% elif avg_hall_pct < 50 %}var(--st-partial-fg){% else %}var(--st-none-fg){% endif %};">{{ avg_hall }}</strong> avg risk
          </span>
-         <span style="font-size:10.5px;color:var(--st-text);" title="Rows where the AI's verdict prose drifts >0.5 from what the cited chunk actually says.">
+         <span class="text-st" title="Rows where the AI's verdict prose drifts >0.5 from what the cited chunk actually says.">
            <strong style="color:{% if high_risk_count == 0 %}var(--st-covered-fg){% else %}var(--st-none-fg){% endif %};">{{ high_risk_count }}</strong> flagged
          </span>
        </div>
@@ -1016,7 +1028,7 @@
  <div style="display:flex;gap:14px;flex-wrap:wrap;">
  <span style="font-size:11px;font-weight:600;color:#1B7F3A;display:inline-flex;align-items:center;gap:5px;"><span style="width:8px;height:8px;border-radius:2px;background:#1B7F3A;"></span>{{ counts.covered }} covered</span>
  <span style="font-size:11px;font-weight:600;color:#B07A00;display:inline-flex;align-items:center;gap:5px;"><span style="width:8px;height:8px;border-radius:2px;background:#FFB800;"></span>{{ counts.partial }} partial</span>
- <span style="font-size:11px;font-weight:600;color:#002583;display:inline-flex;align-items:center;gap:5px;"><span style="width:8px;height:8px;border-radius:2px;background:#002583;"></span>{{ counts.review }} review</span>
+ <span style="font-size:11px;font-weight:600;color:#002583;display:inline-flex;align-items:center;gap:5px;"><span class="icon-dot"></span>{{ counts.review }} review</span>
  <span style="font-size:11px;font-weight:600;color:#D93939;display:inline-flex;align-items:center;gap:5px;"><span style="width:8px;height:8px;border-radius:2px;background:#D93939;"></span>{{ counts.none }} not covered</span>
  </div>
  </div>
@@ -1030,10 +1042,10 @@
  <p style="font-size:11px;color:#6B7280;margin-bottom:14px;">All {{ analysis.obligation_count }} obligations</p>
  <div style="height:180px;position:relative;"><canvas id="mw-chart-donut"></canvas></div>
  <div style="display:flex;flex-direction:column;gap:7px;margin-top:14px;">
- <div style="display:flex;align-items:center;gap:7px;"><div style="width:10px;height:10px;border-radius:3px;background:#1B7F3A;flex-shrink:0;"></div><span style="font-size:11px;color:#1F2937;flex:1;">Covered</span><span style="font-size:11px;font-weight:700;font-family:'Satoshi',sans-serif;color:#1B7F3A;">{{ counts.covered }}</span></div>
- <div style="display:flex;align-items:center;gap:7px;"><div style="width:10px;height:10px;border-radius:3px;background:#FFB800;flex-shrink:0;"></div><span style="font-size:11px;color:#1F2937;flex:1;">Partial</span><span style="font-size:11px;font-weight:700;font-family:'Satoshi',sans-serif;color:#B07A00;">{{ counts.partial }}</span></div>
- <div style="display:flex;align-items:center;gap:7px;"><div style="width:10px;height:10px;border-radius:3px;background:#002583;flex-shrink:0;"></div><span style="font-size:11px;color:#1F2937;flex:1;">Needs review</span><span style="font-size:11px;font-weight:700;font-family:'Satoshi',sans-serif;color:#002583;">{{ counts.review }}</span></div>
- <div style="display:flex;align-items:center;gap:7px;"><div style="width:10px;height:10px;border-radius:3px;background:#D93939;flex-shrink:0;"></div><span style="font-size:11px;color:#1F2937;flex:1;">Not covered</span><span style="font-size:11px;font-weight:700;font-family:'Satoshi',sans-serif;color:#D93939;">{{ counts.none }}</span></div>
+ <div class="flex-center-gap-lg"><div style="width:10px;height:10px;border-radius:3px;background:#1B7F3A;flex-shrink:0;"></div><span style="font-size:11px;color:#1F2937;flex:1;">Covered</span><span style="font-size:11px;font-weight:700;font-family:'Satoshi',sans-serif;color:#1B7F3A;">{{ counts.covered }}</span></div>
+ <div class="flex-center-gap-lg"><div style="width:10px;height:10px;border-radius:3px;background:#FFB800;flex-shrink:0;"></div><span style="font-size:11px;color:#1F2937;flex:1;">Partial</span><span style="font-size:11px;font-weight:700;font-family:'Satoshi',sans-serif;color:#B07A00;">{{ counts.partial }}</span></div>
+ <div class="flex-center-gap-lg"><div style="width:10px;height:10px;border-radius:3px;background:#002583;flex-shrink:0;"></div><span style="font-size:11px;color:#1F2937;flex:1;">Needs review</span><span style="font-size:11px;font-weight:700;font-family:'Satoshi',sans-serif;color:#002583;">{{ counts.review }}</span></div>
+ <div class="flex-center-gap-lg"><div style="width:10px;height:10px;border-radius:3px;background:#D93939;flex-shrink:0;"></div><span style="font-size:11px;color:#1F2937;flex:1;">Not covered</span><span style="font-size:11px;font-weight:700;font-family:'Satoshi',sans-serif;color:#D93939;">{{ counts.none }}</span></div>
  </div>
  </div>
 

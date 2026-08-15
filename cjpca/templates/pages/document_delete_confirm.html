@@ -40,8 +40,10 @@
     {% endfor %}
    {% endif %}
 
-   {# ── Deletion blockers. Shown BEFORE the button so a refusal is visible up
-      front, rather than after the user has committed to the action. ── #}
+   {% comment %}
+   ── Deletion blockers. Shown BEFORE the button so a refusal is visible up
+   front, rather than after the user has committed to the action. ──
+   {% endcomment %}
    {% if blockers %}
     <div style="background:#FFF6E0;border:1px solid #E0B85C;border-radius:8px;padding:14px 16px;margin-bottom:20px;">
      <p style="font-size:13px;font-weight:800;color:#8A6410;margin:0 0 4px;">This document cannot be deleted</p>
@@ -77,17 +79,17 @@
          @submit="if(!matches) $event.preventDefault()">
     {% csrf_token %}
 
-    <p style="font-size:10px;font-weight:700;color:#94A0B8;text-transform:uppercase;letter-spacing:.07em;margin:0 0 8px;">What it learned from this document</p>
+    <p style="font-size:10px;font-weight:700;color:#94A0B8;text-transform:uppercase;letter-spacing:.07em;margin:0 0 8px;">What to do with the learning from this document</p>
     <label style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid #E5E7EB;border-radius:8px;margin-bottom:8px;cursor:pointer;">
      <input type="radio" name="learning_mode" value="keep" checked style="margin-top:3px;">
      <span style="font-size:12.5px;color:#374151;line-height:1.5;">
-      <strong>Keep what it learned.</strong> {{ learning.gold }} approved exemplar{{ learning.gold|pluralize }} keep steering future comparisons and {{ learning.signals }} reviewer decision{{ learning.signals|pluralize }} stay in the audit trail, marked as coming from a deleted source.
+      <strong>Retire for audit.</strong> Keeps {{ learning.signals }} reviewer decision{{ learning.signals|pluralize }} and {{ learning.gold }} approved exemplar{{ learning.gold|pluralize }} in the system for compliance audit, but <strong>removes them from active learning</strong> — they will not influence future retrievals. If the same document is re-ingested later, these records stay inert.
      </span>
     </label>
     <label style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid #E5E7EB;border-radius:8px;margin-bottom:16px;cursor:pointer;">
      <input type="radio" name="learning_mode" value="purge" style="margin-top:3px;">
      <span style="font-size:12.5px;color:#374151;line-height:1.5;">
-      <strong>Remove everything.</strong> Delete those {{ learning.signals }} decision{{ learning.signals|pluralize }} and {{ learning.gold }} exemplar{{ learning.gold|pluralize }} as well. Quality gained from this document is lost.
+      <strong>Delete all learning.</strong> Permanently removes all {{ learning.signals }} decision{{ learning.signals|pluralize }} and {{ learning.gold }} exemplar{{ learning.gold|pluralize }}. Quality gained from this document is lost forever.
      </span>
     </label>
 
@@ -98,8 +100,10 @@
     <div style="display:flex;gap:10px;justify-content:flex-end;">
      <a href="{% url 'library-view' doc.pk %}" style="padding:9px 18px;background:#fff;color:#1F2937;border:1px solid #D1D5DB;border-radius:6px;font-size:13px;font-weight:600;text-decoration:none;">Cancel</a>
      {% if blockers %}
-      {# Disabled outright: the server refuses this anyway, so offering the
-         action would only produce a dead end. #}
+      {% comment %}
+      Disabled outright: the server refuses this anyway, so offering the
+      action would only produce a dead end.
+      {% endcomment %}
       <button type="button" disabled title="Resolve the dependencies listed above first"
               style="padding:9px 18px;color:#fff;border:0;border-radius:6px;font-size:13px;font-weight:700;background:#E7C5C5;cursor:not-allowed;">Delete document</button>
      {% else %}

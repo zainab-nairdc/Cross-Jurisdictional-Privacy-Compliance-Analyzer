@@ -127,7 +127,7 @@
     </form>
 
     <form method="post" action="{% url 'library-requirement-topics' requirement.pk %}"
-          style="display:flex;align-items:center;gap:7px;">
+          class="flex-center-gap-lg">
      {% csrf_token %}
      <input type="hidden" name="action" value="unclassified">
      <input name="note" placeholder="why no topic applies (optional)" class="rd-sel" style="max-width:300px;">

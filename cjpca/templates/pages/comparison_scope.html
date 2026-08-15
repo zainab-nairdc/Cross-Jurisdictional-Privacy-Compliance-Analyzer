@@ -67,7 +67,7 @@
  </a>
  <div style="flex:1;">
  <p style="font-size:14px;font-weight:800;color:#002583;margin:0;letter-spacing:-.02em;">Configure Comparison</p>
- <p style="font-size:11px;color:#002583;margin:0;">Set scope and run</p>
+ <p class="text-sm-primary-no-margin">Set scope and run</p>
  </div>
  </div>
 
@@ -152,7 +152,7 @@
  <button type="button" @click="showAdvanced=!showAdvanced"
  style="display:flex;align-items:center;justify-content:space-between;width:100%;background:none;border:none;cursor:pointer;padding:0;font-family:inherit;">
  <span style="font-size:11px;font-weight:600;color:#002583;">Specific articles</span>
- <div style="display:flex;align-items:center;gap:5px;">
+ <div class="flex-center-gap-sm">
  <span style="font-size:9px;padding:1px 6px;border-radius:4px;background:#ffffff;color:#002583;font-weight:600;">Optional</span>
  <svg :style="showAdvanced?'transform:rotate(180deg)':''" style="transition:transform .15s;" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#002583" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg>
  </div>
@@ -233,12 +233,12 @@
  <span style="font-size:8px;font-weight:700;padding:2px 5px;border-radius:4px;background:#ffffff;color:#002583;white-space:nowrap;flex-shrink:0;">~{{ topic.estimated_pairs }}p</span>
  </div>
  <div style="display:flex;flex-direction:column;gap:3px;">
- <div style="display:flex;align-items:center;gap:5px;">
+ <div class="flex-center-gap-sm">
  <span style="font-size:8px;font-weight:800;color:#002583;width:7px;flex-shrink:0;">A</span>
  <div style="flex:1;height:3px;background:#ffffff;border-radius:2px;overflow:hidden;"><div style="height:100%;width:{{ topic.bar_width_a }}%;background:#002583;border-radius:2px;"></div></div>
  <span style="font-size:8px;color:#002583;width:14px;text-align:right;flex-shrink:0;">{{ topic.articles_a }}</span>
  </div>
- <div style="display:flex;align-items:center;gap:5px;">
+ <div class="flex-center-gap-sm">
  <span style="font-size:8px;font-weight:800;color:#002583;width:7px;flex-shrink:0;">B</span>
  <div style="flex:1;height:3px;background:#ffffff;border-radius:2px;overflow:hidden;"><div style="height:100%;width:{{ topic.bar_width_b }}%;background:#002583;border-radius:2px;"></div></div>
  <span style="font-size:8px;color:#002583;width:14px;text-align:right;flex-shrink:0;">{{ topic.articles_b }}</span>

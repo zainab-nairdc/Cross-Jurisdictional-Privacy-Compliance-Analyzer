@@ -46,7 +46,7 @@
    </h1>
    <p style="font-size:11px;color:#6B7280;margin:2px 0 0;">Your runs, mappings, and coverage progress</p>
   </div>
-  <div style="display:flex;align-items:center;gap:8px;">
+  <div class="flex-center-gap-md">
    <a href="{% url 'comparison' %}"
     style="display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;
      background:#fff;color:#002583;font-size:11px;font-weight:600;text-decoration:none;
@@ -71,7 +71,7 @@
 
    <a href="{% url 'comparison' %}" class="an-card kpi-card" style="text-decoration:none;
     padding:14px 16px;border-left:4px solid #002583;display:block;">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+    <div class="flex-between-start gap-2">
      <span class="an-label">My comparisons</span>
      <div style="width:30px;height:30px;border-radius:8px;background:#E5E8EF;display:flex;
       align-items:center;justify-content:center;">
@@ -83,12 +83,12 @@
       color:#002583;letter-spacing:-.03em;">{{ my_runs_total }}</span>
      <span style="font-size:11px;color:#6B7280;">run{{ my_runs_total|pluralize }}</span>
     </div>
-    <p style="font-size:10px;color:#6B7280;margin-top:6px;margin-bottom:0;">cross-jurisdictional analyses</p>
+    <p class="text-muted mt-2">cross-jurisdictional analyses</p>
    </a>
 
    <a href="{% url 'mapping' %}" class="an-card kpi-card" style="text-decoration:none;
     padding:14px 16px;border-left:4px solid #002583;display:block;">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+    <div class="flex-between-start gap-2">
      <span class="an-label">My mappings</span>
      <div style="width:30px;height:30px;border-radius:8px;background:#E5E8EF;display:flex;
       align-items:center;justify-content:center;">
@@ -100,12 +100,12 @@
       color:#002583;letter-spacing:-.03em;">{{ my_mappings_total }}</span>
      <span style="font-size:11px;color:#6B7280;">map{{ my_mappings_total|pluralize }}</span>
     </div>
-    <p style="font-size:10px;color:#6B7280;margin-top:6px;margin-bottom:0;">policy coverage analyses</p>
+    <p class="text-muted mt-2">policy coverage analyses</p>
    </a>
 
    <a href="{% url 'mapping' %}" class="an-card kpi-card" style="text-decoration:none;
     padding:14px 16px;border-left:4px solid #FFB800;display:block;">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+    <div class="flex-between-start gap-2">
      <span class="an-label">Open gaps</span>
      <div style="width:30px;height:30px;border-radius:8px;background:#FFF6E0;display:flex;
       align-items:center;justify-content:center;">
@@ -117,11 +117,11 @@
       color:#B07A00;letter-spacing:-.03em;">{{ my_open_gaps }}</span>
      <span style="font-size:11px;color:#6B7280;">{% if my_high_gaps %}{{ my_high_gaps }} high-priority{% else %}gaps{% endif %}</span>
     </div>
-    <p style="font-size:10px;color:#6B7280;margin-top:6px;margin-bottom:0;">in your mappings</p>
+    <p class="text-muted mt-2">in your mappings</p>
    </a>
 
    <div class="an-card kpi-card" style="padding:14px 16px;border-left:4px solid #002583;">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+    <div class="flex-between-start gap-2">
      <span class="an-label">Overall coverage</span>
      <div style="width:30px;height:30px;border-radius:8px;background:#E5E8EF;display:flex;
       align-items:center;justify-content:center;">
@@ -133,7 +133,7 @@
       line-height:1;color:#002583;letter-spacing:-.03em;">{{ coverage_pct }}%</span>
     </div>
     <div class="an-track"><div class="an-fill" style="width:{{ coverage_pct }}%;background:#002583;"></div></div>
-    <p style="font-size:10px;color:#6B7280;margin-top:6px;margin-bottom:0;">{{ coverage_covered }} of {{ coverage_total }} obligations</p>
+    <p class="text-muted mt-2">{{ coverage_covered }} of {{ coverage_total }} obligations</p>
    </div>
 
   </div>
@@ -152,8 +152,8 @@
        <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/></svg>
       </div>
       <div style="flex:1;min-width:0;">
-       <p style="font-size:12px;font-weight:600;color:#002583;margin:0;line-height:1.3;">Start comparison</p>
-       <p style="font-size:10px;color:#6B7280;margin:0;">Compare two regulations on a topic</p>
+       <p class="text-title">Start comparison</p>
+       <p class="text-muted">Compare two regulations on a topic</p>
       </div>
       <svg width="8" height="8" fill="none" viewBox="0 0 24 24" stroke="#9CA3AF" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
      </a>
@@ -163,8 +163,8 @@
        <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0z"/></svg>
       </div>
       <div style="flex:1;min-width:0;">
-       <p style="font-size:12px;font-weight:600;color:#002583;margin:0;line-height:1.3;">Run policy mapping</p>
-       <p style="font-size:10px;color:#6B7280;margin:0;">Map policy to regulations</p>
+       <p class="text-title">Run policy mapping</p>
+       <p class="text-muted">Map policy to regulations</p>
       </div>
       <svg width="8" height="8" fill="none" viewBox="0 0 24 24" stroke="#9CA3AF" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
      </a>
@@ -174,8 +174,8 @@
        <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zm9.75-9.75c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v16.5c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V3.375zm-5.625 6c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v10.5c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V9.375z"/></svg>
       </div>
       <div style="flex:1;min-width:0;">
-       <p style="font-size:12px;font-weight:600;color:#002583;margin:0;line-height:1.3;">View analytics</p>
-       <p style="font-size:10px;color:#6B7280;margin:0;">Charts &amp; trends</p>
+       <p class="text-title">View analytics</p>
+       <p class="text-muted">Charts &amp; trends</p>
       </div>
       <svg width="8" height="8" fill="none" viewBox="0 0 24 24" stroke="#9CA3AF" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
      </a>
@@ -185,8 +185,8 @@
        <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"/></svg>
       </div>
       <div style="flex:1;min-width:0;">
-       <p style="font-size:12px;font-weight:600;color:#002583;margin:0;line-height:1.3;">Browse library</p>
-       <p style="font-size:10px;color:#6B7280;margin:0;">Regulations and BBK policies</p>
+       <p class="text-title">Browse library</p>
+       <p class="text-muted">Regulations and BBK policies</p>
       </div>
       <svg width="8" height="8" fill="none" viewBox="0 0 24 24" stroke="#9CA3AF" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
      </a>
@@ -197,10 +197,10 @@
     <div style="padding:10px 14px 8px;border-bottom:1px solid #EEF1F6;flex-shrink:0;
      display:flex;align-items:center;justify-content:space-between;">
      <span class="an-label">My recent comparisons</span>
-     <a href="{% url 'comparison' %}" style="font-size:10px;color:#002583;text-decoration:none;font-weight:700;">View all →</a>
+     <a href="{% url 'comparison' %}" class="text-link-bold">View all →</a>
     </div>
     {% if my_runs %}
-     <div style="flex:1;min-height:0;overflow-y:auto;">
+     <div class="flex-1-scroll">
       {% for run in my_runs %}
        <a href="{% url 'comparison-workspace' pk=run.pk %}" class="hrow">
         <span class="pill" style="background:#E5E8EF;color:#002583;flex-shrink:0;">Comp</span>
@@ -217,7 +217,7 @@
     {% else %}
      <div style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;padding:20px;">
       <p style="font-size:11px;color:#6B7280;margin:0;">No comparison runs yet.</p>
-      <a href="{% url 'comparison' %}" style="font-size:10px;color:#002583;text-decoration:none;font-weight:700;">Start your first →</a>
+      <a href="{% url 'comparison' %}" class="text-link-bold">Start your first →</a>
      </div>
     {% endif %}
    </div>
@@ -226,10 +226,10 @@
     <div style="padding:10px 14px 8px;border-bottom:1px solid #EEF1F6;flex-shrink:0;
      display:flex;align-items:center;justify-content:space-between;">
      <span class="an-label">My recent mappings</span>
-     <a href="{% url 'mapping' %}" style="font-size:10px;color:#002583;text-decoration:none;font-weight:700;">View all →</a>
+     <a href="{% url 'mapping' %}" class="text-link-bold">View all →</a>
     </div>
     {% if my_mappings %}
-     <div style="flex:1;min-height:0;overflow-y:auto;">
+     <div class="flex-1-scroll">
       {% for ma in my_mappings %}
        <a href="{% url 'mapping-workspace' pk=ma.pk %}" class="hrow">
         <span class="pill" style="background:#E5E8EF;color:#002583;flex-shrink:0;">Map</span>
@@ -247,7 +247,7 @@
     {% else %}
      <div style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;padding:20px;">
       <p style="font-size:11px;color:#6B7280;margin:0;">No mappings yet.</p>
-      <a href="{% url 'mapping' %}" style="font-size:10px;color:#002583;text-decoration:none;font-weight:700;">Run your first →</a>
+      <a href="{% url 'mapping' %}" class="text-link-bold">Run your first →</a>
      </div>
     {% endif %}
    </div>

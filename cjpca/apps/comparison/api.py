@@ -328,14 +328,29 @@ class ResultTransitionView(View):
         result.save(update_fields=['lifecycle'])
 
         # RAG feedback loop — capture the reviewer's decision as a labelled signal,
-        # and on approval promote the row to a reusable gold exemplar (best-effort).
+        # and on approval promote the row to a reusable gold exemplar.
+        feedback_warning = None
         try:
             from apps.feedback.services import capture_comparison_transition
             capture_comparison_transition(
                 result, new_lifecycle,
                 actor=request.user if request.user.is_authenticated else None)
-        except Exception:
-            pass
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning(
+                'feedback capture failed for result %s: %s', result.pk, exc)
+            feedback_warning = (
+                'Your review was saved, but the system could not record the '
+                'learning signal. The IT team has been notified.'
+            )
+            from apps.history.audit import log_event, Actions
+            log_event(
+                request.user, Actions.REVIEW_MODIFY,
+                request=request,
+                target_type='comparison.ComparisonResult', target_id=result.pk,
+                description=f'feedback capture failed: {exc}',
+                metadata={'from_lifecycle': old_lifecycle, 'to_lifecycle': new_lifecycle},
+            )
 
         # Cross-cutting AuditLog row in addition to the comparison-specific
         # AuditEvent above (which stays as the lifecycle review-trail).
@@ -374,11 +389,15 @@ class ResultTransitionView(View):
             return render(request, 'partials/_review_card.html', {
                 'result': result,
                 'run':    result.run,
+                'feedback_warning': feedback_warning,
+                'previous_lifecycle': old_lifecycle,
             })
 
         return render(request, 'partials/_clause_detail.html', {
             'result': result,
             'run':    result.run,
+            'feedback_warning': feedback_warning,
+            'previous_lifecycle': old_lifecycle,
         })
 
 

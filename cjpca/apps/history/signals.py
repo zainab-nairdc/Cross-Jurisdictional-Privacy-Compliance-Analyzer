@@ -82,10 +82,6 @@ try:
     def _on_totp_device_saved(sender, instance, created, **kwargs):
         if not instance.confirmed:
             return
-        # We can't easily detect first-time enrollment vs subsequent saves
-        # of an already-confirmed device. Heuristic: only log on creation,
-        # since two_factor's setup wizard creates a device with confirmed=
-        # True only at the moment of successful TOTP validation.
         if not created:
             return
         log_event(
@@ -94,5 +90,5 @@ try:
             target_id=instance.pk,
             description=f'{instance.user.username} enrolled MFA',
         )
-except ImportError:  # pragma: no cover
+except Exception:  # noqa: BLE001
     pass

@@ -68,7 +68,7 @@
  </h1>
  <p style="font-size:11px;color:#002583;margin:2px 0 0;">Here's your privacy compliance overview</p>
  </div>
- <div style="display:flex;align-items:center;gap:8px;">
+ <div class="flex-center-gap-md">
  {% if is_admin %}
  <a href="{% url 'library-regulations' %}"
  style="display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;background:#ffffff;color:#002583;font-size:11px;font-weight:600;text-decoration:none;border:1px solid #E5E8EF;transition:background .12s;"
@@ -96,7 +96,7 @@
 
  {# Pending Review #}
  <a href="{% url 'review' %}" class="an-card kpi-card" style="text-decoration:none;padding:14px 16px;border-left:4px solid #002583;display:block;">
- <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+ <div class="flex-between-start gap-2">
  <span class="an-label">Pending review</span>
  <div style="width:30px;height:30px;border-radius:8px;background:#ffffff;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -112,7 +112,7 @@
 
  {# Open Gaps #}
  <a href="{% url 'mapping' %}" class="an-card kpi-card" style="text-decoration:none;padding:14px 16px;border-left:4px solid #002583;display:block;">
- <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+ <div class="flex-between-start gap-2">
  <span class="an-label">Open gaps</span>
  <div style="width:30px;height:30px;border-radius:8px;background:#ffffff;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
@@ -128,8 +128,8 @@
 
  {# Being Prepared #}
  <a href="{% url 'system-monitoring' %}" class="an-card kpi-card" style="text-decoration:none;padding:14px 16px;border-left:4px solid #002583;display:block;">
- <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
- <span class="an-label" style="display:flex;align-items:center;gap:5px;">
+ <div class="flex-between-start gap-2">
+ <span class="an-label" class="flex-center-gap-sm">
  Being prepared
  {% if ingesting_count %}<span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:#002583;animation:pulsedot 1.4s ease-in-out infinite;flex-shrink:0;"></span>{% endif %}
  </span>
@@ -147,7 +147,7 @@
 
  {# Overall Coverage #}
  <div class="an-card kpi-card" style="padding:14px 16px;border-left:4px solid #002583;">
- <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+ <div class="flex-between-start gap-2">
  <span class="an-label">Overall coverage</span>
  <div style="width:30px;height:30px;border-radius:8px;background:#ffffff;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#002583" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"/></svg>
@@ -179,22 +179,22 @@
 
  {% if user_role == 'analyst' %}
  <a href="{% url 'comparison-analyst' %}" class="qa-row">
- <div style="width:26px;height:26px;border-radius:7px;background:#002583;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+ <div class="icon-box">
  <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/></svg>
  </div>
  <div style="flex:1;min-width:0;">
- <p style="font-size:12px;font-weight:600;color:#002583;margin:0;line-height:1.3;">Start comparison</p>
- <p style="font-size:10px;color:#002583;margin:0;">Compare two regulations on a topic</p>
+ <p class="text-title">Start comparison</p>
+ <p class="text-xs-primary">Compare two regulations on a topic</p>
  </div>
  <svg width="8" height="8" fill="none" viewBox="0 0 24 24" stroke="#ffffff" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
  </a>
  <a href="{% url 'mapping' %}" class="qa-row">
- <div style="width:26px;height:26px;border-radius:7px;background:#002583;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+ <div class="icon-box">
  <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0z"/></svg>
  </div>
  <div style="flex:1;min-width:0;">
- <p style="font-size:12px;font-weight:600;color:#002583;margin:0;line-height:1.3;">Run policy mapping</p>
- <p style="font-size:10px;color:#002583;margin:0;">Map policy to regulations</p>
+ <p class="text-title">Run policy mapping</p>
+ <p class="text-xs-primary">Map policy to regulations</p>
  </div>
  <svg width="8" height="8" fill="none" viewBox="0 0 24 24" stroke="#ffffff" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
  </a>
@@ -203,12 +203,12 @@
  {% if is_reviewer or is_admin %}
  {# Reviewer + admin: approving/rejecting AI output #}
  <a href="{% url 'review' %}" class="qa-row">
- <div style="width:26px;height:26px;border-radius:7px;background:#002583;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+ <div class="icon-box">
  <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
  </div>
  <div style="flex:1;min-width:0;">
- <p style="font-size:12px;font-weight:600;color:#002583;margin:0;line-height:1.3;">Review findings</p>
- <p style="font-size:10px;color:#002583;margin:0;">Approve or reject AI results</p>
+ <p class="text-title">Review findings</p>
+ <p class="text-xs-primary">Approve or reject AI results</p>
  </div>
  {% if pending_review_count %}<span style="font-size:9px;font-weight:700;background:#ffffff;color:#002583;padding:2px 7px;border-radius:20px;flex-shrink:0;">{{ pending_review_count }}</span>{% endif %}
  <svg width="8" height="8" fill="none" viewBox="0 0 24 24" stroke="#ffffff" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
@@ -217,12 +217,12 @@
 
  {# All roles: read-only views #}
  <a href="{% url 'analytics' %}" class="qa-row">
- <div style="width:26px;height:26px;border-radius:7px;background:#002583;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+ <div class="icon-box">
  <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zm9.75-9.75c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v16.5c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V3.375zm-5.625 6c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v10.5c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V9.375z"/></svg>
  </div>
  <div style="flex:1;min-width:0;">
- <p style="font-size:12px;font-weight:600;color:#002583;margin:0;line-height:1.3;">View analytics</p>
- <p style="font-size:10px;color:#002583;margin:0;">Charts &amp; trends</p>
+ <p class="text-title">View analytics</p>
+ <p class="text-xs-primary">Charts &amp; trends</p>
  </div>
  <svg width="8" height="8" fill="none" viewBox="0 0 24 24" stroke="#ffffff" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
  </a>
@@ -230,22 +230,22 @@
  {% if is_admin %}
  {# Admin-only: document/library administration #}
  <a href="{% url 'library-regulations' %}" class="qa-row">
- <div style="width:26px;height:26px;border-radius:7px;background:#002583;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+ <div class="icon-box">
  <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
  </div>
  <div style="flex:1;min-width:0;">
- <p style="font-size:12px;font-weight:600;color:#002583;margin:0;line-height:1.3;">Upload document</p>
- <p style="font-size:10px;color:#002583;margin:0;">Add regulations or policies</p>
+ <p class="text-title">Upload document</p>
+ <p class="text-xs-primary">Add regulations or policies</p>
  </div>
  <svg width="8" height="8" fill="none" viewBox="0 0 24 24" stroke="#ffffff" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
  </a>
  <a href="{% url 'user-management' %}" class="qa-row">
- <div style="width:26px;height:26px;border-radius:7px;background:#002583;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+ <div class="icon-box">
  <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"/></svg>
  </div>
  <div style="flex:1;min-width:0;">
- <p style="font-size:12px;font-weight:600;color:#002583;margin:0;line-height:1.3;">Manage users</p>
- <p style="font-size:10px;color:#002583;margin:0;">Invite, reset, disable accounts</p>
+ <p class="text-title">Manage users</p>
+ <p class="text-xs-primary">Invite, reset, disable accounts</p>
  </div>
  <svg width="8" height="8" fill="none" viewBox="0 0 24 24" stroke="#ffffff" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
  </a>
@@ -285,8 +285,8 @@
  <div style="padding:10px 14px 8px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #E5E8EF;flex-shrink:0;">
  <span class="an-label">Recent Analyses</span>
  <div style="display:flex;gap:10px;">
- <a href="{% url 'comparison' %}" style="font-size:10px;color:#002583;text-decoration:none;font-weight:700;">+ Comparison</a>
- <a href="{% url 'mapping' %}" style="font-size:10px;color:#002583;text-decoration:none;font-weight:700;">+ Mapping</a>
+ <a href="{% url 'comparison' %}" class="text-link-bold">+ Comparison</a>
+ <a href="{% url 'mapping' %}" class="text-link-bold">+ Mapping</a>
  </div>
  </div>
  {% if recent_analyses %}
@@ -314,7 +314,7 @@
  </div>
  {% else %}
  <div style="flex:1;display:flex;align-items:center;justify-content:center;">
- <p style="font-size:11px;color:#002583;">No analyses yet.</p>
+ <p class="text-sm-primary">No analyses yet.</p>
  </div>
  {% endif %}
  </div>
